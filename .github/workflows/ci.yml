@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install WebUI dependencies
+        run: cd web && npm ci
+
+      - name: Build SDK workspace
+        run: npm run build -w packages/sdk
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Dead code check
+        run: npm run knip
+
+      - name: Circular dependency check
+        run: npm run circular
+
+      - name: Duplicate code check
+        run: npm run dupcheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test with coverage
+        run: npm run test:coverage
+
+      - name: Security audit
+        run: npm run audit:ci
+
+      - name: CLI smoke test
+        run: node dist/cli/index.js --help

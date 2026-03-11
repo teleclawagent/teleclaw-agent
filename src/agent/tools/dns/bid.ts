@@ -1,0 +1,155 @@
+import { Type } from "@sinclair/typebox";
+import type { Tool, ToolExecutor, ToolResult } from "../types.js";
+import { loadWallet, getKeyPair, getCachedTonClient } from "../../../ton/wallet-service.js";
+import { WalletContractV5R1, toNano, fromNano, internal } from "@ton/ton";
+import { Address, SendMode } from "@ton/core";
+import { tonapiFetch } from "../../../constants/api-endpoints.js";
+import { getErrorMessage } from "../../../utils/errors.js";
+import { createLogger } from "../../../utils/logger.js";
+import { withTxLock } from "../../../ton/tx-lock.js";
+
+const log = createLogger("Tools");
+interface DnsBidParams {
+  domain: string;
+  amount: number;
+}
+export const dnsBidTool: Tool = {
+  name: "dns_bid",
+  description:
+    "Place a bid on a .ton domain auction. Bid must be >= 105% of current bid. Use dns_check first.",
+  parameters: Type.Object({
+    domain: Type.String({
+      description: "Domain name (with or without .ton extension)",
+    }),
+    amount: Type.Number({
+      description: "Bid amount in TON (must be >= 105% of current bid)",
+      minimum: 1,
+    }),
+  }),
+};
+export const dnsBidExecutor: ToolExecutor<DnsBidParams> = async (
+  params,
+  _context
+): Promise<ToolResult> => {
+  try {
+    let { domain } = params;
+    const { amount } = params;
+
+    // Normalize domain
+    domain = domain.toLowerCase().replace(/\.ton$/, "");
+    const fullDomain = `${domain}.ton`;
+
+    // Get domain info to find NFT address
+    const dnsResponse = await tonapiFetch(`/dns/${fullDomain}`);
+
+    if (dnsResponse.status === 404) {
+      return {
+        success: false,
+        error: `Domain ${fullDomain} is not minted yet. Use dns_start_auction to start an auction.`,
+      };
+    }
+
+    if (!dnsResponse.ok) {
+      return {
+        success: false,
+        error: `TonAPI error: ${dnsResponse.status}`,
+      };
+    }
+
+    const dnsInfo = await dnsResponse.json();
+
+    // Check if domain is in auction (no owner yet)
+    if (dnsInfo.item?.owner?.address) {
+      return {
+        success: false,
+        error: `Domain ${fullDomain} is already owned. Cannot bid on owned domains.`,
+      };
+    }
+
+    const nftAddress = dnsInfo.item?.address;
+    if (!nftAddress) {
+      return {
+        success: false,
+        error: `Could not determine NFT address for ${fullDomain}`,
+      };
+    }
+
+    // Get auction details to validate bid amount
+    const auctionsResponse = await tonapiFetch(`/dns/auctions?tld=ton`);
+
+    if (auctionsResponse.ok) {
+      const auctions = await auctionsResponse.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TON DNS API response is untyped
+      const auction = auctions.data?.find((a: any) => a.domain === fullDomain);
+
+      if (auction) {
+        const currentBid = parseFloat(fromNano(auction.price));
+        const minBid = currentBid * 1.05;
+
+        if (amount < minBid) {
+          return {
+            success: false,
+            error: `Bid too low. Current bid: ${currentBid} TON. Minimum required: ${minBid.toFixed(2)} TON (+5%)`,
+          };
+        }
+      }
+    }
+
+    const walletData = loadWallet();
+    if (!walletData) {
+      return {
+        success: false,
+        error: "Wallet not initialized. Contact admin to generate wallet.",
+      };
+    }
+
+    const keyPair = await getKeyPair();
+    if (!keyPair) {
+      return { success: false, error: "Wallet key derivation failed." };
+    }
+
+    const wallet = WalletContractV5R1.create({
+      workchain: 0,
+      publicKey: keyPair.publicKey,
+    });
+
+    const client = await getCachedTonClient();
+    const contract = client.open(wallet);
+
+    await withTxLock(async () => {
+      const seqno = await contract.getSeqno();
+
+      // Send bid (just TON, no body needed for bids - op=0 is implicit)
+      await contract.sendTransfer({
+        seqno,
+        secretKey: keyPair.secretKey,
+        sendMode: SendMode.PAY_GAS_SEPARATELY,
+        messages: [
+          internal({
+            to: Address.parse(nftAddress),
+            value: toNano(amount),
+            body: "", // Empty body for bid
+            bounce: true,
+          }),
+        ],
+      });
+    });
+
+    return {
+      success: true,
+      data: {
+        domain: fullDomain,
+        amount: `${amount} TON`,
+        nftAddress,
+        from: walletData.address,
+        message: `Bid placed on ${fullDomain}: ${amount} TON\n  From: ${walletData.address}\n  NFT: ${nftAddress}\n  Transaction sent (check status in a few seconds)`,
+      },
+    };
+  } catch (error) {
+    log.error({ err: error }, "Error in dns_bid");
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
+};

@@ -1,0 +1,256 @@
+import { randomLong } from "../../../utils/gramjs-bigint.js";
+import { Type } from "@sinclair/typebox";
+import type { Tool, ToolExecutor, ToolResult } from "../types.js";
+import { generateDealId, calculateExpiry, formatDealProposal } from "../../../deals/utils.js";
+import {
+  checkStrategyCompliance,
+  formatStrategyCheckJSON,
+  type AssetValue,
+} from "../../../deals/strategy-checker.js";
+import { getErrorMessage } from "../../../utils/errors.js";
+import { createLogger } from "../../../utils/logger.js";
+
+const log = createLogger("Tools");
+
+interface DealProposeParams {
+  chatId: string;
+  userId: number;
+  userGivesType: "ton" | "gift";
+  userGivesTonAmount?: number;
+  userGivesGiftId?: string;
+  userGivesGiftSlug?: string;
+  userGivesValueTon: number;
+  agentGivesType: "ton" | "gift";
+  agentGivesTonAmount?: number;
+  agentGivesGiftId?: string;
+  agentGivesGiftSlug?: string;
+  agentGivesValueTon: number;
+  userUsername?: string;
+}
+
+export const dealProposeTool: Tool = {
+  name: "deal_propose",
+  description:
+    "Create a trade deal with Accept/Decline buttons. Sends an inline bot message — do NOT send another message after. Strategy compliance is enforced automatically (will reject bad deals). User always sends first. Expires in 2 minutes.",
+  parameters: Type.Object({
+    chatId: Type.String({ description: "Chat ID where to send proposal" }),
+    userId: Type.Number({ description: "Telegram user ID" }),
+    userGivesType: Type.Union([Type.Literal("ton"), Type.Literal("gift")]),
+    userGivesTonAmount: Type.Optional(
+      Type.Number({ description: "TON amount user gives (if type=ton)" })
+    ),
+    userGivesGiftId: Type.Optional(
+      Type.String({ description: "Gift msgId user gives (if type=gift)" })
+    ),
+    userGivesGiftSlug: Type.Optional(
+      Type.String({
+        description:
+          "Gift's slug field from telegram_get_my_gifts (e.g. 'LolPop-425402'), NOT the title",
+      })
+    ),
+    userGivesValueTon: Type.Number({ description: "Estimated TON value of what user gives" }),
+    agentGivesType: Type.Union([Type.Literal("ton"), Type.Literal("gift")]),
+    agentGivesTonAmount: Type.Optional(
+      Type.Number({ description: "TON amount you give (if type=ton)" })
+    ),
+    agentGivesGiftId: Type.Optional(
+      Type.String({ description: "Gift msgId you give (if type=gift)" })
+    ),
+    agentGivesGiftSlug: Type.Optional(
+      Type.String({
+        description:
+          "Gift's slug field from telegram_get_my_gifts (e.g. 'LolPop-425402'), NOT the title",
+      })
+    ),
+    agentGivesValueTon: Type.Number({ description: "Estimated TON value of what you give" }),
+    userUsername: Type.Optional(Type.String({ description: "User's @username for display" })),
+  }),
+};
+
+export const dealProposeExecutor: ToolExecutor<DealProposeParams> = async (
+  params,
+  context
+): Promise<ToolResult> => {
+  try {
+    const userGives: AssetValue = {
+      type: params.userGivesType,
+      tonAmount: params.userGivesTonAmount,
+      giftSlug: params.userGivesGiftSlug,
+      valueTon: params.userGivesValueTon,
+    };
+
+    const agentGives: AssetValue = {
+      type: params.agentGivesType,
+      tonAmount: params.agentGivesTonAmount,
+      giftSlug: params.agentGivesGiftSlug,
+      valueTon: params.agentGivesValueTon,
+    };
+
+    // CRITICAL: Check strategy compliance
+    const strategyCheck = checkStrategyCompliance(userGives, agentGives);
+
+    if (!strategyCheck.acceptable) {
+      return {
+        success: false,
+        error: `Deal rejected by strategy rules:\n${strategyCheck.reason}`,
+      };
+    }
+
+    // Generate deal ID and expiry
+    const dealId = generateDealId();
+    const expiresAt = calculateExpiry();
+    const createdAt = Math.floor(Date.now() / 1000);
+
+    // Create deal in database
+    context.db
+      .prepare(
+        `
+      INSERT INTO deals (
+        id, status, user_telegram_id, user_username, chat_id,
+        user_gives_type, user_gives_ton_amount, user_gives_gift_id, user_gives_gift_slug, user_gives_value_ton,
+        agent_gives_type, agent_gives_ton_amount, agent_gives_gift_id, agent_gives_gift_slug, agent_gives_value_ton,
+        strategy_check, profit_ton, created_at, expires_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `
+      )
+      .run(
+        dealId,
+        "proposed",
+        params.userId,
+        params.userUsername || null,
+        params.chatId,
+        params.userGivesType,
+        params.userGivesTonAmount || null,
+        params.userGivesGiftId || null,
+        params.userGivesGiftSlug || null,
+        params.userGivesValueTon,
+        params.agentGivesType,
+        params.agentGivesTonAmount || null,
+        params.agentGivesGiftId || null,
+        params.agentGivesGiftSlug || null,
+        params.agentGivesValueTon,
+        formatStrategyCheckJSON(strategyCheck),
+        strategyCheck.profit,
+        createdAt,
+        expiresAt
+      );
+
+    log.info(`[Deal] Created deal #${dealId} - profit: ${strategyCheck.profit.toFixed(2)} TON`);
+
+    // Send inline bot message with Accept/Decline buttons
+    const botUsername = context.config?.telegram?.bot_username;
+    let inlineSent = false;
+
+    if (botUsername) {
+      try {
+        inlineSent = await sendInlineBotResult(context.bridge, params.chatId, botUsername, dealId);
+      } catch (inlineError) {
+        log.warn({ err: inlineError }, "[Deal] Failed to send inline bot result");
+      }
+    }
+
+    // Fallback: send plain text if inline bot failed
+    if (!inlineSent) {
+      const proposalText = formatDealProposal(
+        dealId,
+        {
+          type: params.userGivesType,
+          tonAmount: params.userGivesTonAmount,
+          giftSlug: params.userGivesGiftSlug,
+          valueTon: params.userGivesValueTon,
+        },
+        {
+          type: params.agentGivesType,
+          tonAmount: params.agentGivesTonAmount,
+          giftSlug: params.agentGivesGiftSlug,
+          valueTon: params.agentGivesValueTon,
+        },
+        strategyCheck.profit,
+        true
+      );
+
+      const fallbackText = botUsername
+        ? `${proposalText}\n\nTo confirm, type: @${botUsername} ${dealId}`
+        : proposalText;
+
+      const sentMessage = await context.bridge.sendMessage({
+        chatId: params.chatId,
+        text: fallbackText,
+      });
+
+      context.db
+        .prepare(`UPDATE deals SET proposal_message_id = ? WHERE id = ?`)
+        .run(sentMessage.id, dealId);
+    }
+
+    return {
+      success: true,
+      data: {
+        dealId,
+        profit: strategyCheck.profit,
+        expiresAt: new Date(expiresAt * 1000).toISOString(),
+        strategyRule: strategyCheck.rule,
+        inlineSent,
+        note: "Deal card sent with buttons. STOP HERE — do NOT send any follow-up message. The user will click Accept/Decline on the card.",
+      },
+    };
+  } catch (error) {
+    log.error({ err: error }, "Error creating deal proposal");
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
+};
+
+/**
+ * Send inline bot result via GramJS (userbot queries the bot, then sends the result)
+ * This makes the deal card with buttons appear directly in the chat.
+ */
+async function sendInlineBotResult(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deal data is dynamically structured
+  bridge: any,
+  chatId: string,
+  botUsername: string,
+  dealId: string
+): Promise<boolean> {
+  const gramJsClient = bridge.getClient().getClient();
+  const Api = (await import("telegram")).Api;
+
+  // Resolve bot and chat entities
+  const bot = await gramJsClient.getInputEntity(botUsername);
+  const peer = await gramJsClient.getInputEntity(chatId.startsWith("-") ? Number(chatId) : chatId);
+
+  // Query the inline bot with the deal ID
+  const results = await gramJsClient.invoke(
+    new Api.messages.GetInlineBotResults({
+      bot: bot,
+      peer: peer,
+      query: dealId,
+      offset: "",
+    })
+  );
+
+  if (!results.results || results.results.length === 0) {
+    log.warn(`[Deal] No inline results returned for deal ${dealId}`);
+    return false;
+  }
+
+  // Find the deal result (skip help/not_found/wrong_user results)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deal data is dynamically structured
+  const dealResult = results.results.find((r: any) => r.id === dealId);
+  const resultToSend = dealResult || results.results[0];
+
+  // Send the inline result as a message in the chat
+  await gramJsClient.invoke(
+    new Api.messages.SendInlineBotResult({
+      peer: peer,
+      queryId: results.queryId,
+      id: resultToSend.id,
+      randomId: randomLong(),
+    })
+  );
+
+  log.info(`[Deal] Inline bot message sent for deal #${dealId}`);
+  return true;
+}

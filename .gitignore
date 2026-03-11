@@ -1,0 +1,38 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+.env
+.vscode/
+.idea/
+.obsidian/
+
+# Build outputs
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# Runtime
+*.session
+*.session-journal
+
+# Config (keep template)
+config.yaml
+!config.example.yaml
+
+# Sensitive data
+wallet.json
+*.db
+telegram_session.txt
+telegram-offset.json
+.reference/
+
+# Specs & working docs (local only)
+specs/
+docs/plans/
+TODOS/
+
+# TTS voice models (large binaries)
+piper-voices/
+

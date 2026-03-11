@@ -1,0 +1,8 @@
+node_modules
+dist
+.reference
+docker
+*.log
+*.db
+*.session
+package-lock.json
