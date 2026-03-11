@@ -42,14 +42,9 @@ Setup wizard handles:
 
 Config stored in `~/.teleclaw/`
 
-## $TELECLAW Token
+## 100% Free & Open Source
 
-Hold $TELECLAW to unlock premium features:
-- **Free:** Basic chat, limited messages
-- **Holder (100K+):** Unlimited chat, DEX tools, portfolio tracker
-- **Whale (1M+):** All features + priority access
-
-Token: `EQBrW_hvPWp3YEiKErhVawC9O-4HdA_q5gB9x1qSLHlkT5G_`
+All features are available to everyone — no paywalls, no token gates, no limits. Fork it, run it, make it yours.
 
 ## Community
 
