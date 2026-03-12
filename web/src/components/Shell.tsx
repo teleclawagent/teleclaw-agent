@@ -11,7 +11,7 @@ export function Shell({ sidebar, children }: ShellProps) {
     <div className="container">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <img src="/logo_dark.png" alt="Teleton" style={{ height: '64px' }} />
+          <img src="/logo_dark.png" alt="Teleclaw" style={{ height: '64px' }} />
         </div>
         {sidebar}
       </aside>

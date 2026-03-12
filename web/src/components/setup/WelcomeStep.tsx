@@ -29,7 +29,7 @@ export function WelcomeStep({ data, onChange }: StepProps) {
 
   return (
     <div className="step-content">
-      <h2 className="step-title">Welcome to Teleton Setup</h2>
+      <h2 className="step-title">Welcome to Teleclaw Setup</h2>
       <p className="step-description">
         Configure your autonomous Telegram agent in a few steps.
       </p>

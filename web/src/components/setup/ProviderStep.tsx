@@ -127,7 +127,7 @@ export function ProviderStep({ data, onChange }: StepProps) {
 
       {selected && selected.toolLimit !== null && (
         <div className="info-box" style={{ marginTop: '16px' }}>
-          Teleton has ~116 tools. With a {selected.toolLimit}-tool limit, some tools may be truncated or unavailable.
+          Teleclaw has ~116 tools. With a {selected.toolLimit}-tool limit, some tools may be truncated or unavailable.
         </div>
       )}
 

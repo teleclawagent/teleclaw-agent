@@ -222,7 +222,7 @@ export function Mcp() {
             </div>
           </div>
           <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '8px 0 0' }}>
-            Changes are saved to config.yaml. Restart teleton to connect.
+            Changes are saved to config.yaml. Restart teleclaw to connect.
           </p>
         </div>
       )}
@@ -231,7 +231,7 @@ export function Mcp() {
         <div className="empty">
           <p>No MCP servers configured</p>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-            Click "+ Add Server" above or use CLI: <code>teleton mcp add @modelcontextprotocol/server-filesystem /tmp</code>
+            Click "+ Add Server" above or use CLI: <code>teleclaw mcp add @modelcontextprotocol/server-filesystem /tmp</code>
           </p>
         </div>
       )}

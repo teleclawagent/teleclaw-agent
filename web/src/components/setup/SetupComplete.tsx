@@ -52,7 +52,7 @@ export function SetupComplete() {
             Start manually:
           </p>
           <code className="code-block" style={{ marginTop: '8px' }}>
-            teleton start
+            teleclaw start
           </code>
         </div>
       )}

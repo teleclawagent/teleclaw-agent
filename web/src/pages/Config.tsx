@@ -333,7 +333,7 @@ export function Config() {
                 onChange={(v) => config.setLocal('ton_proxy.binary_path', v)}
                 onSave={(v) => config.saveConfig('ton_proxy.binary_path', v)}
                 onCancel={() => config.cancelLocal('ton_proxy.binary_path')}
-                placeholder="~/.teleton/bin/tonutils-proxy-cli (auto-download)"
+                placeholder="~/.teleclaw/bin/tonutils-proxy-cli (auto-download)"
                 hotReload="restart"
               />
 

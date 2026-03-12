@@ -98,7 +98,7 @@ function AuthenticatedApp() {
     return (
       <div className="login-container">
         <div className="login-card">
-          <h1>Teleton</h1>
+          <h1>Teleclaw</h1>
           <p>Enter your authentication token to access the dashboard.</p>
           <div className="form-group">
             <label>Token</label>
