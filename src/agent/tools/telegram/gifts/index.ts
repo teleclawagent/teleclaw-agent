@@ -52,29 +52,29 @@ export { myCollectionValueTool, myCollectionValueExecutor };
 
 export const tools: ToolEntry[] = [
   { tool: telegramGetAvailableGiftsTool, executor: telegramGetAvailableGiftsExecutor },
-  { tool: telegramSendGiftTool, executor: telegramSendGiftExecutor, scope: "dm-only" },
+  { tool: telegramSendGiftTool, executor: telegramSendGiftExecutor, scope: "userbot-only" },
   { tool: telegramGetMyGiftsTool, executor: telegramGetMyGiftsExecutor },
   {
     tool: telegramTransferCollectibleTool,
     executor: telegramTransferCollectibleExecutor,
-    scope: "dm-only",
+    scope: "userbot-only",
   },
   {
     tool: telegramSetCollectiblePriceTool,
     executor: telegramSetCollectiblePriceExecutor,
-    scope: "dm-only",
+    scope: "userbot-only",
   },
   { tool: telegramGetResaleGiftsTool, executor: telegramGetResaleGiftsExecutor },
-  { tool: telegramBuyResaleGiftTool, executor: telegramBuyResaleGiftExecutor, scope: "dm-only" },
-  { tool: telegramSetGiftStatusTool, executor: telegramSetGiftStatusExecutor, scope: "dm-only" },
+  { tool: telegramBuyResaleGiftTool, executor: telegramBuyResaleGiftExecutor, scope: "userbot-only" },
+  { tool: telegramSetGiftStatusTool, executor: telegramSetGiftStatusExecutor, scope: "userbot-only" },
   { tool: telegramGetCollectibleInfoTool, executor: telegramGetCollectibleInfoExecutor },
   { tool: telegramGetUniqueGiftTool, executor: telegramGetUniqueGiftExecutor },
   { tool: telegramGetUniqueGiftValueTool, executor: telegramGetUniqueGiftValueExecutor },
-  { tool: telegramSendGiftOfferTool, executor: telegramSendGiftOfferExecutor, scope: "dm-only" },
+  { tool: telegramSendGiftOfferTool, executor: telegramSendGiftOfferExecutor, scope: "userbot-only" },
   {
     tool: telegramResolveGiftOfferTool,
     executor: telegramResolveGiftOfferExecutor,
-    scope: "dm-only",
+    scope: "userbot-only",
   },
-  { tool: myCollectionValueTool, executor: myCollectionValueExecutor, scope: "dm-only" },
+  { tool: myCollectionValueTool, executor: myCollectionValueExecutor, scope: "userbot-only" },
 ];

@@ -9,6 +9,6 @@ export const tools: ToolEntry[] = [
   {
     tool: botInlineSendTool,
     executor: botInlineSendExecutor,
-    scope: "always",
+    scope: "userbot-only",
   },
 ];
