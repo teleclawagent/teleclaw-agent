@@ -1,6 +1,6 @@
 {
-  "name": "teleclaw",
-  "version": "0.8.1",
+  "name": "teleclaw-agent",
+  "version": "1.0.0-beta.1",
   "workspaces": [
     "packages/*"
   ],
@@ -13,8 +13,14 @@
     "agent",
     "ton",
     "blockchain",
-    "userbot",
-    "llm"
+    "bot",
+    "llm",
+    "telegram-bot",
+    "defi",
+    "fragment",
+    "gifts",
+    "otc",
+    "self-hosted"
   ],
   "repository": {
     "type": "git",
