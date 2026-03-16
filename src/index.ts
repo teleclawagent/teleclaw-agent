@@ -96,6 +96,11 @@ export class TeleclawApp {
 
     // Create transport based on mode: 'bot' (Bot API) or 'userbot' (GramJS MTProto)
     const telegramMode = (this.config.telegram as Record<string, unknown>).mode as string || "bot";
+
+    // Filter out userbot-only tools when in bot mode
+    if (telegramMode === "bot") {
+      this.toolRegistry.setBotMode(true);
+    }
     const botToken = (this.config.telegram as Record<string, unknown>).bot_token as string | undefined;
 
     if (telegramMode === "bot") {
