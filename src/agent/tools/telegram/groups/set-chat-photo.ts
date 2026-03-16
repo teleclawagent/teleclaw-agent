@@ -46,7 +46,7 @@ export const telegramSetChatPhotoExecutor: ToolExecutor<SetChatPhotoParams> = as
   try {
     const { chat_id, photo_path, delete_photo = false } = params;
 
-    const client = context.bridge.getClient().getClient();
+    const client = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Get entity to determine if it's a channel or regular chat
     const entity = await client.getEntity(chat_id);

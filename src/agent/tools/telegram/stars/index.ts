@@ -16,11 +16,11 @@ export const tools: ToolEntry[] = [
   {
     tool: telegramGetStarsBalanceTool,
     executor: telegramGetStarsBalanceExecutor,
-    scope: "dm-only",
+    scope: "userbot-only",
   },
   {
     tool: telegramGetStarsTransactionsTool,
     executor: telegramGetStarsTransactionsExecutor,
-    scope: "dm-only",
+    scope: "userbot-only",
   },
 ];

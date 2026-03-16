@@ -17,6 +17,10 @@ import { tools as journalTools } from "./journal/index.js";
 import { tools as workspaceTools } from "./workspace/index.js";
 import { tools as webTools } from "./web/index.js";
 import { tools as botTools } from "./bot/index.js";
+import { tools as fragmentTools } from "./fragment/index.js";
+import { tools as marketplaceTools } from "./marketplace/index.js";
+import { tools as agenticWalletTools } from "./agentic-wallet/index.js";
+import { tools as giftMarketTools } from "./gift-market/index.js";
 
 const ALL_CATEGORIES: ToolEntry[][] = [
   telegramTools,
@@ -28,6 +32,10 @@ const ALL_CATEGORIES: ToolEntry[][] = [
   workspaceTools,
   webTools,
   botTools,
+  fragmentTools,
+  marketplaceTools,
+  agenticWalletTools,
+  giftMarketTools,
 ];
 
 export function registerAllTools(registry: ToolRegistry): void {

@@ -4,7 +4,9 @@ export type SDKErrorCode =
   | "WALLET_NOT_INITIALIZED"
   | "INVALID_ADDRESS"
   | "OPERATION_FAILED"
-  | "SECRET_NOT_FOUND";
+  | "SECRET_NOT_FOUND"
+  | "NO_RAW_CLIENT"
+  | "NOT_SUPPORTED";
 
 /**
  * Error thrown by Plugin SDK operations.

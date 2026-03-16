@@ -1,5 +1,5 @@
 import type { TaskStore } from "../memory/agent/tasks.js";
-import type { TelegramBridge } from "./bridge.js";
+import type { TelegramTransport } from "./transport.js";
 import { BATCH_TRIGGER_DELAY_MS } from "../constants/timeouts.js";
 import { MAX_DEPENDENTS_PER_TASK } from "../constants/limits.js";
 import { createLogger } from "../utils/logger.js";
@@ -19,7 +19,7 @@ const log = createLogger("Telegram");
 export class TaskDependencyResolver {
   constructor(
     private taskStore: TaskStore,
-    private bridge: TelegramBridge
+    private bridge: TelegramTransport
   ) {}
 
   /**
@@ -173,7 +173,7 @@ export class TaskDependencyResolver {
       log.info(`🚀 Triggering dependent task: ${task.description}`);
 
       // Get "me" entity for Saved Messages
-      const gramJsClient = this.bridge.getClient().getClient();
+      const gramJsClient = this.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
       const me = await gramJsClient.getMe();
 
       // Send task message immediately (no scheduling)

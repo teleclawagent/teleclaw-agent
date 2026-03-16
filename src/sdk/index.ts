@@ -1,4 +1,4 @@
-import type { TelegramBridge } from "../telegram/bridge.js";
+import type { TelegramTransport } from "../telegram/transport.js";
 import type Database from "better-sqlite3";
 import type {
   PluginSDK,
@@ -113,7 +113,7 @@ export type {
 export { PluginSDKError, type SDKErrorCode, SDK_VERSION } from "@teleclaw-agent/sdk";
 
 export interface SDKDependencies {
-  bridge: TelegramBridge;
+  bridge: TelegramTransport;
   /** Inline router for bot SDK (null if bot not configured) */
   inlineRouter?: InlineRouter | null;
   /** GramJS bot client for MTProto operations */

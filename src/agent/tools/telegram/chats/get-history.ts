@@ -64,7 +64,7 @@ export const telegramGetHistoryExecutor: ToolExecutor<GetHistoryParams> = async 
     }
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Use cached peer if available, fall back to raw chatId string
     const entity = context.bridge.getPeer(chatId) || chatId;
@@ -76,7 +76,7 @@ export const telegramGetHistoryExecutor: ToolExecutor<GetHistoryParams> = async 
     });
 
     // Parse and format messages
-    const formattedMessages = messages.map((msg) => ({
+    const formattedMessages = messages.map((msg: any) => ({
       id: msg.id,
       text: msg.message || "",
       senderId: msg.senderId?.toString() || null,

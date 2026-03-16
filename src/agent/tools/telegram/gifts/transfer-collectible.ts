@@ -52,7 +52,7 @@ export const telegramTransferCollectibleExecutor: ToolExecutor<TransferCollectib
       };
     }
 
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Validate msgId
     if (!msgId || typeof msgId !== "number") {

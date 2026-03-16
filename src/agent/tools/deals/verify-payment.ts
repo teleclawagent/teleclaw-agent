@@ -166,16 +166,16 @@ export const dealVerifyPaymentExecutor: ToolExecutor<DealVerifyPaymentParams> = 
 
       // Use GiftDetector to poll for new gifts
       // Note: We need to pass the agent's own user ID (bot's Telegram ID)
-      const me = context.bridge.getClient().getMe();
+      const meResult = context.bridge.getClient()?.getMe?.() as { id: bigint | number } | undefined;
 
-      if (!me) {
+      if (!meResult) {
         return {
           success: false,
           error: "Failed to get bot user info. Bot may not be authenticated.",
         };
       }
 
-      const botUserId = Number(me.id);
+      const botUserId = Number(meResult.id);
 
       const giftDetector = new GiftDetector();
       const newGifts = await giftDetector.detectNewGifts(botUserId, context);

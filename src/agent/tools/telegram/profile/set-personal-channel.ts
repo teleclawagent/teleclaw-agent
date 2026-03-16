@@ -28,7 +28,7 @@ export const telegramSetPersonalChannelExecutor: ToolExecutor<SetPersonalChannel
   context
 ): Promise<ToolResult> => {
   try {
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     let channel: Api.TypeEntityLike;
     let action: "set" | "removed";

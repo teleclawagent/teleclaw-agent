@@ -45,7 +45,7 @@ export const telegramSendGiftOfferExecutor: ToolExecutor<SendGiftOfferParams> = 
   try {
     const { userId, slug, price, duration = 86400 } = params;
 
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
     const peer = await gramJsClient.getInputEntity(userId);
 
     await gramJsClient.invoke(

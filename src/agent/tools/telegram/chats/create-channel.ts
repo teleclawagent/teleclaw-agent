@@ -63,7 +63,7 @@ export const telegramCreateChannelExecutor: ToolExecutor<CreateChannelParams> = 
     const { title, about = "", megagroup = false, username } = params;
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Create channel
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GramJS API response is untyped

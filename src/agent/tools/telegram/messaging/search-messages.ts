@@ -60,7 +60,7 @@ export const telegramSearchMessagesExecutor: ToolExecutor<SearchMessagesParams> 
     }
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Get chat entity
     const entity = await gramJsClient.getEntity(chatId);

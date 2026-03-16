@@ -12,9 +12,9 @@ export { telegramGetUserInfoTool, telegramGetUserInfoExecutor };
 export { telegramCheckUsernameTool, telegramCheckUsernameExecutor };
 
 export const tools: ToolEntry[] = [
-  { tool: telegramBlockUserTool, executor: telegramBlockUserExecutor, scope: "dm-only" },
-  { tool: telegramGetBlockedTool, executor: telegramGetBlockedExecutor, scope: "dm-only" },
-  { tool: telegramGetCommonChatsTool, executor: telegramGetCommonChatsExecutor },
-  { tool: telegramGetUserInfoTool, executor: telegramGetUserInfoExecutor },
-  { tool: telegramCheckUsernameTool, executor: telegramCheckUsernameExecutor },
+  { tool: telegramBlockUserTool, executor: telegramBlockUserExecutor, scope: "userbot-only" },
+  { tool: telegramGetBlockedTool, executor: telegramGetBlockedExecutor, scope: "userbot-only" },
+  { tool: telegramGetCommonChatsTool, executor: telegramGetCommonChatsExecutor , scope: "userbot-only" },
+  { tool: telegramGetUserInfoTool, executor: telegramGetUserInfoExecutor , scope: "userbot-only" },
+  { tool: telegramCheckUsernameTool, executor: telegramCheckUsernameExecutor , scope: "userbot-only" },
 ];

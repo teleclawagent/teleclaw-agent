@@ -25,7 +25,7 @@ export const telegramGetMeExecutor: ToolExecutor<{}> = async (
 ): Promise<ToolResult> => {
   try {
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Get own user info using getMe()
     const me = (await gramJsClient.getMe()) as Api.User;

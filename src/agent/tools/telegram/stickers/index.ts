@@ -10,8 +10,8 @@ export { telegramGetMyStickersTool, telegramGetMyStickersExecutor };
 export { telegramAddStickerSetTool, telegramAddStickerSetExecutor };
 
 export const tools: ToolEntry[] = [
-  { tool: telegramSearchStickersTool, executor: telegramSearchStickersExecutor },
-  { tool: telegramSearchGifsTool, executor: telegramSearchGifsExecutor },
-  { tool: telegramGetMyStickersTool, executor: telegramGetMyStickersExecutor },
-  { tool: telegramAddStickerSetTool, executor: telegramAddStickerSetExecutor },
+  { tool: telegramSearchStickersTool, executor: telegramSearchStickersExecutor , scope: "userbot-only" },
+  { tool: telegramSearchGifsTool, executor: telegramSearchGifsExecutor , scope: "userbot-only" },
+  { tool: telegramGetMyStickersTool, executor: telegramGetMyStickersExecutor , scope: "userbot-only" },
+  { tool: telegramAddStickerSetTool, executor: telegramAddStickerSetExecutor , scope: "userbot-only" },
 ];

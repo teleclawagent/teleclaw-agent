@@ -50,7 +50,7 @@ export const telegramMarkAsReadExecutor: ToolExecutor<MarkAsReadParams> = async 
     const { chatId, messageId, clearMentions = true } = params;
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Resolve entity
     let entity;

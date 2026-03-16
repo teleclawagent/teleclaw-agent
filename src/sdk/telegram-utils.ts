@@ -1,9 +1,9 @@
-import type { TelegramBridge } from "../telegram/bridge.js";
+import type { TelegramTransport } from "../telegram/transport.js";
 import type { Api } from "telegram";
 import type { SimpleMessage } from "@teleclaw-agent/sdk";
 import { PluginSDKError } from "@teleclaw-agent/sdk";
 
-export function requireBridge(bridge: TelegramBridge): void {
+export function requireBridge(bridge: TelegramTransport): void {
   if (!bridge.isAvailable()) {
     throw new PluginSDKError(
       "Telegram bridge not connected. SDK telegram methods can only be called at runtime (inside tool executors or start()), not during plugin loading.",
@@ -12,8 +12,19 @@ export function requireBridge(bridge: TelegramBridge): void {
   }
 }
 
-export function getClient(bridge: TelegramBridge) {
-  return bridge.getClient().getClient();
+/**
+ * Get the raw underlying client. In userbot mode returns GramJS TelegramClient,
+ * in bot mode returns grammY Bot instance.
+ * Prefer using TelegramTransport methods directly when possible.
+ */
+export function getRawClient(bridge: TelegramTransport): unknown {
+  if (bridge.getRawClient) {
+    return bridge.getRawClient();
+  }
+  throw new PluginSDKError(
+    "Raw client not available on this transport",
+    "NO_RAW_CLIENT"
+  );
 }
 
 /** Convert a GramJS message to a SimpleMessage */

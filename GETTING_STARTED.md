@@ -10,10 +10,7 @@ Complete guide to installing, configuring, and running your Teleclaw AI agent.
 |-------------|---------|
 | **Node.js 20+** | [Download](https://nodejs.org/) - check with `node --version` |
 | **LLM API Key** | [Anthropic](https://console.anthropic.com/) (recommended), [OpenAI](https://platform.openai.com/), [Google](https://aistudio.google.com/), [xAI](https://console.x.ai/), [Groq](https://console.groq.com/), [OpenRouter](https://openrouter.ai/), or any of 15 supported providers |
-| **Telegram Account** | Dedicated account recommended (agent has full control) |
-| **Telegram API Credentials** | `api_id` + `api_hash` from [my.telegram.org/apps](https://my.telegram.org/apps) |
-| **Telegram User ID** | Message [@userinfobot](https://t.me/userinfobot) to get yours |
-| **Bot Token** *(optional)* | From [@BotFather](https://t.me/BotFather) - required for the deals system |
+| **Bot Token** | From [@BotFather](https://t.me/BotFather) — create a bot and copy the token |
 | **TonAPI Key** *(optional)* | From [@AntTonTechBot](https://t.me/AntTonTechBot) mini app - higher rate limits |
 
 ---
@@ -53,7 +50,7 @@ teleclaw setup
 The interactive wizard configures everything:
 
 1. **LLM Provider** - Choose between 15 providers (Anthropic, OpenAI, Google, xAI, Groq, OpenRouter, Moonshot, Mistral, Cerebras, ZAI, MiniMax, Hugging Face, and more)
-2. **Telegram Auth** - API credentials, phone number, login code, 2FA password
+2. **Bot Token** - Paste your BotFather token, auto-validated
 3. **Access Policies** - DM policy (open/allowlist/pairing/disabled), group policy, mention rules
 4. **Admin** - Your Telegram User ID, owner name/username
 5. **TON Wallet** - Generates a W5R1 wallet with 24-word mnemonic
@@ -66,7 +63,7 @@ The interactive wizard configures everything:
 ├── config.yaml            # Main configuration
 ├── wallet.json            # TON wallet (chmod 600 - backup mnemonic!)
 ├── memory.db              # SQLite database
-├── telegram_session.txt   # Telegram session
+├── claim_used             # Admin claim tracking
 ├── plugins/               # Custom plugins (auto-loaded at startup)
 └── workspace/             # Sandboxed agent workspace
     ├── SOUL.md            # Personality and behavior
@@ -122,7 +119,7 @@ telegram:
   dm_policy: "open"        # open | allowlist | pairing | disabled
   group_policy: "open"     # open | allowlist | disabled
   require_mention: true    # Require @mention in groups
-  admin_ids: [123456789]   # Your Telegram User ID
+  # admin_ids: set automatically via /start <claim-code>
   debounce_ms: 1500        # Group message batching delay
 
 deals:
@@ -257,8 +254,6 @@ The agent uses a hybrid search system for context-aware responses:
 - Non-admins cannot clear history, view status, or execute tasks
 
 ### Best Practices
-- Use a dedicated Telegram account (not your main)
-- Enable 2FA on the Telegram account
 - Start with restrictive policies, open gradually
 - Monitor the journal and daily logs
 
@@ -266,11 +261,10 @@ The agent uses a hybrid search system for context-aware responses:
 
 ## Troubleshooting
 
-### Telegram Login Fails
-- Use international phone format: `+1234567890`
-- If 2FA is enabled, enter the password when prompted
-- Session expired: `rm ~/.teleclaw/telegram_session.txt` then `teleclaw setup`
-- API credentials: `api_id` is a number, `api_hash` is a string
+### Bot Token Issues
+- Make sure the token format is correct: `123456:ABC-DEF...`
+- If token is invalid, create a new bot with @BotFather
+- Revoke old tokens via @BotFather → /revoke
 
 ### Agent Not Responding
 - Check `dm_policy` / `group_policy` in config

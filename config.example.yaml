@@ -18,30 +18,20 @@ agent:
     idle_expiry_minutes: 1440        # 24 hours
 
 telegram:
-  api_id: 0                          # From https://my.telegram.org/apps
-  api_hash: "YOUR_API_HASH"
-  phone: "+1234567890"               # Phone number linked to Telegram account
-  session_name: "teleclaw_session"    # GramJS session file name
-  session_path: "~/.teleclaw"         # Directory for session files
-  dm_policy: "pairing"               # pairing | allowlist | open | disabled
+  mode: "bot"                        # Bot API mode
+  bot_token: "YOUR_BOT_TOKEN"        # From @BotFather (required)
+  # bot_username: "your_bot"         # Auto-detected from token
+  dm_policy: "open"                  # open | allowlist | admin-only | disabled
   allow_from: []                     # Telegram user IDs (for allowlist policy)
   group_policy: "open"               # open | allowlist | disabled
   group_allow_from: []               # Group chat IDs (for allowlist group policy)
   require_mention: true              # In groups, only respond when mentioned
-  # max_message_length: 4096         # MTProto limit, rarely needs changing
   typing_simulation: true            # Show "typing..." while processing
   rate_limit_messages_per_second: 1.0
   rate_limit_groups_per_minute: 20
-  admin_ids: [123456789]             # Your Telegram user ID (from @userinfobot)
-  # agent_channel: null              # Channel username or ID for announcements
-  owner_name: "Your Name"
-  owner_username: "your_username"
-  # owner_id: 123456789              # Owner's Telegram user ID
+  admin_ids: []                      # Set automatically via /start <claim-code>
+  # admin_claim_code: "TC-XXXXXX"    # Generated during setup, one-time use
   debounce_ms: 1500                  # Group message batching delay (0 = disabled)
-
-  # Optional: inline bot for deals system
-  # bot_token: "123456:ABC-DEF..."   # From @BotFather
-  # bot_username: "your_deals_bot"
 
 # Optional: TonAPI key for higher rate limits
 # tonapi_key: "YOUR_TONAPI_KEY"      # From @tonapi_bot

@@ -44,7 +44,7 @@ export const telegramSetCollectiblePriceExecutor: ToolExecutor<SetCollectiblePri
 ): Promise<ToolResult> => {
   try {
     const { msgId, price } = params;
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     const isListing = price !== undefined && price > 0;
 

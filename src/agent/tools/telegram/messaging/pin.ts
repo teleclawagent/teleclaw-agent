@@ -1,42 +1,26 @@
-/**
- * telegram_pin_message / telegram_unpin_message
- * Pin or unpin messages in chats
- */
-
 import { Type } from "@sinclair/typebox";
-import { Api } from "telegram";
 import type { Tool, ToolExecutor, ToolResult } from "../../types.js";
 import { getErrorMessage } from "../../../../utils/errors.js";
 import { createLogger } from "../../../../utils/logger.js";
 
 const log = createLogger("Tools");
 
+// ── Pin ──
+
 interface PinMessageParams {
-  chat_id: string;
-  message_id: number;
+  chatId: string;
+  messageId: number;
   silent?: boolean;
-  both_sides?: boolean;
 }
 
 export const telegramPinMessageTool: Tool = {
   name: "telegram_pin_message",
-  description: `Pin a message in a chat. In groups/channels, pinned messages appear at the top. You need admin rights to pin in groups/channels.`,
+  description: "Pin a message in a chat. Requires admin privileges in groups.",
   parameters: Type.Object({
-    chat_id: Type.String({
-      description: "Chat ID or username",
-    }),
-    message_id: Type.Number({
-      description: "ID of the message to pin",
-    }),
+    chatId: Type.String({ description: "The chat ID" }),
+    messageId: Type.Number({ description: "Message ID to pin" }),
     silent: Type.Optional(
-      Type.Boolean({
-        description: "Pin silently without notification (default: false)",
-      })
-    ),
-    both_sides: Type.Optional(
-      Type.Boolean({
-        description: "Pin for both sides in private chats (default: true)",
-      })
+      Type.Boolean({ description: "Pin without notification (default: false)" })
     ),
   }),
 };
@@ -46,61 +30,27 @@ export const telegramPinMessageExecutor: ToolExecutor<PinMessageParams> = async 
   context
 ): Promise<ToolResult> => {
   try {
-    const { chat_id, message_id, silent = false, both_sides = true } = params;
-
-    const client = context.bridge.getClient().getClient();
-
-    await client.invoke(
-      new Api.messages.UpdatePinnedMessage({
-        peer: chat_id,
-        id: message_id,
-        silent,
-        pmOneside: !both_sides,
-      })
-    );
-
-    return {
-      success: true,
-      data: {
-        chat_id,
-        message_id,
-        pinned: true,
-        message: `📌 Message #${message_id} pinned`,
-      },
-    };
+    await context.bridge.pinMessage(params.chatId, params.messageId, params.silent);
+    return { success: true, data: { pinned: true, messageId: params.messageId } };
   } catch (error) {
-    log.error({ err: error }, "Error in telegram_pin_message");
-    return {
-      success: false,
-      error: getErrorMessage(error),
-    };
+    log.error({ err: error }, "Error pinning message");
+    return { success: false, error: getErrorMessage(error) };
   }
 };
 
+// ── Unpin ──
+
 interface UnpinMessageParams {
-  chat_id: string;
-  message_id?: number;
-  unpin_all?: boolean;
+  chatId: string;
+  messageId: number;
 }
 
 export const telegramUnpinMessageTool: Tool = {
   name: "telegram_unpin_message",
-  description: `Unpin a message or all messages in a chat. You need admin rights in groups/channels.`,
+  description: "Unpin a message in a chat. Requires admin privileges in groups.",
   parameters: Type.Object({
-    chat_id: Type.String({
-      description: "Chat ID or username",
-    }),
-    message_id: Type.Optional(
-      Type.Number({
-        description:
-          "ID of the message to unpin. If not provided and unpin_all is false, unpins the most recent pinned message.",
-      })
-    ),
-    unpin_all: Type.Optional(
-      Type.Boolean({
-        description: "Unpin ALL pinned messages in the chat (default: false)",
-      })
-    ),
+    chatId: Type.String({ description: "The chat ID" }),
+    messageId: Type.Number({ description: "Message ID to unpin" }),
   }),
 };
 
@@ -109,51 +59,10 @@ export const telegramUnpinMessageExecutor: ToolExecutor<UnpinMessageParams> = as
   context
 ): Promise<ToolResult> => {
   try {
-    const { chat_id, message_id, unpin_all = false } = params;
-
-    const client = context.bridge.getClient().getClient();
-
-    if (unpin_all) {
-      await client.invoke(
-        new Api.messages.UnpinAllMessages({
-          peer: chat_id,
-        })
-      );
-
-      return {
-        success: true,
-        data: {
-          chat_id,
-          unpinned_all: true,
-          message: `📌 All messages unpinned`,
-        },
-      };
-    } else {
-      await client.invoke(
-        new Api.messages.UpdatePinnedMessage({
-          peer: chat_id,
-          id: message_id ?? 0,
-          unpin: true,
-        })
-      );
-
-      return {
-        success: true,
-        data: {
-          chat_id,
-          message_id,
-          unpinned: true,
-          message: message_id
-            ? `📌 Message #${message_id} unpinned`
-            : `📌 Latest pinned message unpinned`,
-        },
-      };
-    }
+    await context.bridge.unpinMessage(params.chatId, params.messageId);
+    return { success: true, data: { unpinned: true, messageId: params.messageId } };
   } catch (error) {
-    log.error({ err: error }, "Error in telegram_unpin_message");
-    return {
-      success: false,
-      error: getErrorMessage(error),
-    };
+    log.error({ err: error }, "Error unpinning message");
+    return { success: false, error: getErrorMessage(error) };
   }
 };

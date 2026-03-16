@@ -1,11 +1,11 @@
 import { randomLong, toLong } from "../utils/gramjs-bigint.js";
-import type { TelegramBridge } from "../telegram/bridge.js";
+import type { TelegramTransport } from "../telegram/transport.js";
 import type { Api } from "telegram";
 import type { PluginLogger, SimpleMessage, MediaSendOptions } from "@teleclaw-agent/sdk";
 import { PluginSDKError } from "@teleclaw-agent/sdk";
 import {
   requireBridge as requireBridgeUtil,
-  getClient as getClientUtil,
+  getRawClient as getClientUtil,
   getApi,
   toSimpleMessage,
 } from "./telegram-utils.js";
@@ -14,12 +14,13 @@ import {
  * Creates the Telegram messages, media, and advanced SDK methods.
  * These extend the core TelegramSDK with additional capabilities.
  */
-export function createTelegramMessagesSDK(bridge: TelegramBridge, log: PluginLogger) {
+export function createTelegramMessagesSDK(bridge: TelegramTransport, log: PluginLogger) {
   function requireBridge(): void {
     requireBridgeUtil(bridge);
   }
 
-  function getClient() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GramJS client is untyped in SDK context
+  function getClient(): any {
     return getClientUtil(bridge);
   }
 

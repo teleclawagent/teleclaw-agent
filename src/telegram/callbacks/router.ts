@@ -1,9 +1,9 @@
 import { CallbackQueryHandler } from "./handler.js";
-import type { TelegramBridge } from "../bridge.js";
+import type { TelegramTransport } from "../transport.js";
 import type Database from "better-sqlite3";
 
 export function initializeCallbackRouter(
-  bridge: TelegramBridge,
+  bridge: TelegramTransport,
   db: Database.Database
 ): CallbackQueryHandler {
   const handler = new CallbackQueryHandler(bridge, db);

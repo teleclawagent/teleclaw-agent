@@ -59,7 +59,7 @@ export const telegramSendMessageExecutor: ToolExecutor<SendMessageParams> = asyn
       success: true,
       data: {
         messageId: sentMessage?.id ?? null,
-        date: sentMessage?.date ?? null,
+        date: (sentMessage as Record<string, unknown>)?.date ?? null,
       },
     };
   } catch (error) {

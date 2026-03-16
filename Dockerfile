@@ -56,7 +56,7 @@ COPY bin/ bin/
 COPY src/templates/ src/templates/
 
 # Data directory for persistence
-ENV TELETON_HOME=/data
+ENV TELECLAW_HOME=/data
 VOLUME /data
 
 # Run as non-root

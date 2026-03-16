@@ -51,7 +51,7 @@ export const botInlineSendExecutor: ToolExecutor<BotInlineSendParams> = async (p
   }
 
   try {
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Resolve bot and chat entities
     const bot = await gramJsClient.getInputEntity(botUsername);

@@ -36,3 +36,4 @@ TODOS/
 # TTS voice models (large binaries)
 piper-voices/
 
+.secrets

@@ -11,7 +11,7 @@ export { telegramCreateFolderTool, telegramCreateFolderExecutor };
 export { telegramAddChatToFolderTool, telegramAddChatToFolderExecutor };
 
 export const tools: ToolEntry[] = [
-  { tool: telegramGetFoldersTool, executor: telegramGetFoldersExecutor },
-  { tool: telegramCreateFolderTool, executor: telegramCreateFolderExecutor },
-  { tool: telegramAddChatToFolderTool, executor: telegramAddChatToFolderExecutor },
+  { tool: telegramGetFoldersTool, executor: telegramGetFoldersExecutor , scope: "userbot-only" },
+  { tool: telegramCreateFolderTool, executor: telegramCreateFolderExecutor , scope: "userbot-only" },
+  { tool: telegramAddChatToFolderTool, executor: telegramAddChatToFolderExecutor , scope: "userbot-only" },
 ];

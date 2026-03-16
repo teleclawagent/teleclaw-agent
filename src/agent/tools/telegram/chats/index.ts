@@ -41,36 +41,36 @@ export { telegramCheckChannelUsernameTool, telegramCheckChannelUsernameExecutor 
 export { telegramSetChannelUsernameTool, telegramSetChannelUsernameExecutor };
 
 export const tools: ToolEntry[] = [
-  { tool: telegramGetDialogsTool, executor: telegramGetDialogsExecutor },
-  { tool: telegramGetHistoryTool, executor: telegramGetHistoryExecutor },
-  { tool: telegramGetChatInfoTool, executor: telegramGetChatInfoExecutor },
-  { tool: telegramMarkAsReadTool, executor: telegramMarkAsReadExecutor },
-  { tool: telegramJoinChannelTool, executor: telegramJoinChannelExecutor, scope: "dm-only" },
-  { tool: telegramLeaveChannelTool, executor: telegramLeaveChannelExecutor, scope: "dm-only" },
-  { tool: telegramCreateChannelTool, executor: telegramCreateChannelExecutor, scope: "dm-only" },
+  { tool: telegramGetDialogsTool, executor: telegramGetDialogsExecutor , scope: "userbot-only" },
+  { tool: telegramGetHistoryTool, executor: telegramGetHistoryExecutor , scope: "userbot-only" },
+  { tool: telegramGetChatInfoTool, executor: telegramGetChatInfoExecutor , scope: "userbot-only" },
+  { tool: telegramMarkAsReadTool, executor: telegramMarkAsReadExecutor , scope: "userbot-only" },
+  { tool: telegramJoinChannelTool, executor: telegramJoinChannelExecutor, scope: "userbot-only" },
+  { tool: telegramLeaveChannelTool, executor: telegramLeaveChannelExecutor, scope: "userbot-only" },
+  { tool: telegramCreateChannelTool, executor: telegramCreateChannelExecutor, scope: "userbot-only" },
   {
     tool: telegramEditChannelInfoTool,
     executor: telegramEditChannelInfoExecutor,
-    scope: "dm-only",
+    scope: "userbot-only",
   },
   {
     tool: telegramInviteToChannelTool,
     executor: telegramInviteToChannelExecutor,
-    scope: "dm-only",
+    scope: "userbot-only",
   },
   {
     tool: telegramGetAdminedChannelsTool,
     executor: telegramGetAdminedChannelsExecutor,
-    scope: "dm-only",
+    scope: "userbot-only",
   },
   {
     tool: telegramCheckChannelUsernameTool,
     executor: telegramCheckChannelUsernameExecutor,
-    scope: "dm-only",
+    scope: "userbot-only",
   },
   {
     tool: telegramSetChannelUsernameTool,
     executor: telegramSetChannelUsernameExecutor,
-    scope: "dm-only",
+    scope: "userbot-only",
   },
 ];

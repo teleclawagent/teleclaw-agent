@@ -63,7 +63,7 @@ export const telegramSendGiftExecutor: ToolExecutor<SendGiftParams> = async (
       };
     }
 
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     const user = await gramJsClient.getInputEntity(userId);
 

@@ -40,7 +40,7 @@ export const telegramTranscribeAudioExecutor: ToolExecutor<TranscribeAudioParams
   try {
     const { chatId, messageId } = params;
 
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
     const entity = await gramJsClient.getEntity(chatId);
 
     let result = await gramJsClient.invoke(

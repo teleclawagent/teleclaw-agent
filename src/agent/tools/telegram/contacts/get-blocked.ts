@@ -43,7 +43,7 @@ export const telegramGetBlockedExecutor: ToolExecutor<GetBlockedParams> = async 
     const { limit = 50 } = params;
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Get blocked users using GramJS
     const result = await gramJsClient.invoke(

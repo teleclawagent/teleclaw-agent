@@ -28,7 +28,7 @@ export const telegramGetUniqueGiftExecutor: ToolExecutor<GetUniqueGiftParams> = 
 ): Promise<ToolResult> => {
   try {
     const { slug } = params;
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GramJS API response is untyped
     const result: any = await gramJsClient.invoke(new Api.payments.GetUniqueStarGift({ slug }));

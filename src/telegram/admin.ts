@@ -1,16 +1,22 @@
-import type { TelegramConfig } from "../config/schema.js";
+import type { TelegramConfig, Config } from "../config/schema.js";
 import type { AgentRuntime } from "../agent/runtime.js";
-import type { TelegramBridge } from "./bridge.js";
+import type { TelegramTransport } from "./transport.js";
 import { getWalletAddress, getWalletBalance } from "../ton/wallet-service.js";
 import { Address } from "@ton/core";
 import { DEALS_CONFIG } from "../deals/config.js";
 import { loadTemplate } from "../workspace/manager.js";
 import { isVerbose, setVerbose, createLogger } from "../utils/logger.js";
+import { resetSession } from "../session/store.js";
+import { getDatabase } from "../memory/database.js";
+import { saveConfig } from "../config/loader.js";
+import { fetchWithTimeout } from "../utils/fetch.js";
+import { execSync } from "child_process";
 
 const log = createLogger("Telegram");
 import type { ModulePermissions, ModuleLevel } from "../agent/tools/module-permissions.js";
 import type { ToolRegistry } from "../agent/tools/registry.js";
 import { writePluginSecret, deletePluginSecret, listPluginSecretKeys } from "../sdk/secrets.js";
+// User settings imported dynamically in index.ts handleUserSettingsCommand
 
 export interface AdminCommand {
   command: string;
@@ -24,25 +30,31 @@ const VALID_GROUP_POLICIES = ["open", "allowlist", "admin-only", "disabled"] as 
 const VALID_MODULE_LEVELS = ["open", "admin", "disabled"] as const;
 
 export class AdminHandler {
-  private bridge: TelegramBridge;
+  private bridge: TelegramTransport;
   private config: TelegramConfig;
+  private fullConfig: Config | null;
+  private configPath: string | null;
   private agent: AgentRuntime;
   private paused = false;
   private permissions: ModulePermissions | null;
   private registry: ToolRegistry | null;
 
   constructor(
-    bridge: TelegramBridge,
+    bridge: TelegramTransport,
     config: TelegramConfig,
     agent: AgentRuntime,
     permissions?: ModulePermissions,
-    registry?: ToolRegistry
+    registry?: ToolRegistry,
+    fullConfig?: Config,
+    configPath?: string
   ) {
     this.bridge = bridge;
     this.config = config;
     this.agent = agent;
     this.permissions = permissions ?? null;
     this.registry = registry ?? null;
+    this.fullConfig = fullConfig ?? null;
+    this.configPath = configPath ?? null;
   }
 
   isAdmin(userId: number): boolean {
@@ -71,6 +83,45 @@ export class AdminHandler {
     };
   }
 
+  /**
+   * Handle /start <claim_code> — allows first user to become admin.
+   * Returns response string if handled, null if not a claim attempt.
+   */
+  async handleClaimAttempt(command: AdminCommand, senderId: number): Promise<string | null> {
+    if (command.command !== "start" || command.args.length === 0) return null;
+
+    const code = command.args[0].toUpperCase();
+    const expectedCode = this.config.admin_claim_code;
+
+    if (!expectedCode) return null; // No claim code configured
+    if (this.config.admin_ids.length > 0) {
+      // Admin already claimed — clear the code for safety
+      return null;
+    }
+
+    if (code !== expectedCode.toUpperCase()) {
+      return "❌ Invalid claim code.";
+    }
+
+    // Claim successful — add as admin and persist
+    this.config.admin_ids.push(senderId);
+    (this.config as Record<string, unknown>).admin_claim_code = undefined;
+
+    if (this.fullConfig && this.configPath) {
+      this.fullConfig.telegram.admin_ids = [senderId];
+      this.fullConfig.telegram.owner_id = senderId;
+      delete (this.fullConfig.telegram as Record<string, unknown>).admin_claim_code;
+      try {
+        saveConfig(this.fullConfig, this.configPath);
+        log.info({ senderId }, "Admin claimed and persisted to config");
+      } catch (err) {
+        log.error({ err }, "Failed to persist admin claim");
+      }
+    }
+
+    return `✅ You are now the admin!\n\nWelcome to Teleclaw. Use /help to see available commands.`;
+  }
+
   async handleCommand(
     command: AdminCommand,
     chatId: string,
@@ -78,6 +129,10 @@ export class AdminHandler {
     isGroup?: boolean
   ): Promise<string> {
     if (!this.isAdmin(senderId)) {
+      // Check if this is a claim attempt
+      const claimResult = await this.handleClaimAttempt({ ...command, chatId, senderId }, senderId);
+      if (claimResult) return claimResult;
+
       return "⛔ Admin access required";
     }
 
@@ -113,6 +168,22 @@ export class AdminHandler {
         return this.handleModulesCommand(command, isGroup ?? false);
       case "plugin":
         return this.handlePluginCommand(command);
+      case "reset":
+        return this.handleResetCommand(command);
+      case "history":
+        return await this.handleHistoryCommand(command);
+      case "settings":
+        return this.handleSettingsCommand(command);
+      case "portfolio":
+        return await this.handlePortfolioCommand();
+      case "sniper":
+        return this.handleSniperCommand();
+      case "alerts":
+        return this.handleAlertsCommand();
+      case "update":
+        return await this.handleUpdateCommand(command);
+      case "version":
+        return await this.handleVersionCommand();
       case "help":
         return this.handleHelpCommand();
       case "ping":
@@ -525,58 +596,255 @@ export class AdminHandler {
     }
   }
 
+  private handleResetCommand(command: AdminCommand): string {
+    try {
+      resetSession(command.chatId);
+      return "🔄 Session reset. Context cleared, memory preserved.";
+    } catch (error) {
+      return `❌ Error resetting session: ${error}`;
+    }
+  }
+
+  private async handleHistoryCommand(command: AdminCommand): Promise<string> {
+    try {
+      const db = getDatabase().getDb();
+      const rows = db
+        .prepare(
+          "SELECT sender_name, text, timestamp FROM tg_messages WHERE chat_id = ? ORDER BY timestamp DESC LIMIT 10"
+        )
+        .all(command.chatId) as Array<{
+        sender_name: string;
+        text: string;
+        timestamp: number;
+      }>;
+
+      if (rows.length === 0) return "📭 No messages found for this chat.";
+
+      const lines = rows.reverse().map((r) => {
+        const date = new Date(r.timestamp);
+        const time = date.toLocaleTimeString("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Europe/Istanbul",
+        });
+        const name = r.sender_name || "Unknown";
+        const text =
+          r.text && r.text.length > 80 ? r.text.slice(0, 80) + "…" : r.text || "(no text)";
+        return `[${time}] **${name}**: ${text}`;
+      });
+
+      return `📜 **Last ${rows.length} messages**\n\n${lines.join("\n")}`;
+    } catch (error) {
+      return `❌ Error fetching history: ${error}`;
+    }
+  }
+
+  private handleSettingsCommand(_command: AdminCommand): string {
+    const cfg = this.agent.getConfig();
+    const address = getWalletAddress();
+    const truncatedAddr = address
+      ? `${address.slice(0, 6)}…${address.slice(-4)}`
+      : "Not configured";
+
+    const buy = Math.round(DEALS_CONFIG.strategy.buyMaxMultiplier * 100);
+    const sell = Math.round(DEALS_CONFIG.strategy.sellMinMultiplier * 100);
+
+    const ragEnabled = cfg.tool_rag.enabled;
+    const ragTopK = cfg.tool_rag.top_k;
+
+    return (
+      `⚙️ **Current Settings**\n\n` +
+      `🧠 **Model:** ${cfg.agent.model}\n` +
+      `🏢 **Provider:** ${cfg.agent.provider}\n` +
+      `🔄 **Max iterations:** ${cfg.agent.max_agentic_iterations}\n\n` +
+      `📬 **DM policy:** ${this.config.dm_policy}\n` +
+      `👥 **Group policy:** ${this.config.group_policy}\n` +
+      `🔔 **Require mention:** ${this.config.require_mention ? "Yes" : "No"}\n\n` +
+      `📊 **Strategy:** Buy ≤${buy}% / Sell ≥${sell}% of floor\n\n` +
+      `🔍 **Tool RAG:** ${ragEnabled ? "ON" : "OFF"} (top_k: ${ragTopK})\n\n` +
+      `💎 **Wallet:** \`${truncatedAddr}\``
+    );
+  }
+
+  private async handlePortfolioCommand(): Promise<string> {
+    const address = getWalletAddress();
+    if (!address) return "❌ No wallet configured.";
+
+    const result = await getWalletBalance(address);
+    if (!result) return "❌ Failed to fetch balance.";
+
+    const friendly = Address.parse(address).toString({ bounceable: false });
+    return (
+      `📊 **Portfolio**\n\n` +
+      `💎 **${result.balance} TON**\n` +
+      `📍 \`${friendly}\`\n\n` +
+      `💡 Ask naturally for full portfolio: _"Show my gift portfolio"_`
+    );
+  }
+
+  private handleSniperCommand(): string {
+    return (
+      `🎯 **Sniper Commands**\n\n` +
+      `Use natural language:\n` +
+      `• _"Show my active snipers"_\n` +
+      `• _"Snipe [gift] under [price] TON"_\n` +
+      `• _"Cancel all snipers"_`
+    );
+  }
+
+  private handleAlertsCommand(): string {
+    return (
+      `🔔 **Alert Commands**\n\n` +
+      `Use natural language:\n` +
+      `• _"Show my alerts"_\n` +
+      `• _"Alert me when [gift] drops below [price] TON"_\n` +
+      `• _"Cancel all alerts"_`
+    );
+  }
+
+  private async handleVersionCommand(): Promise<string> {
+    let currentVersion = "unknown";
+    try {
+      const { createRequire } = await import("module");
+      const req = createRequire(import.meta.url);
+      currentVersion = (req("../../package.json") as { version: string }).version;
+    } catch {
+      /* ignore */
+    }
+
+    let latestVersion = "unknown";
+    try {
+      const res = await fetchWithTimeout("https://registry.npmjs.org/teleclaw/latest", {
+        headers: { Accept: "application/json" },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { version: string };
+        latestVersion = data.version;
+      }
+    } catch {
+      /* ignore */
+    }
+
+    const upToDate = currentVersion === latestVersion;
+    return (
+      `📦 **Teleclaw Version**\n\n` +
+      `Current: **${currentVersion}**\n` +
+      `Latest: **${latestVersion}**\n\n` +
+      (upToDate ? "✅ You're up to date!" : "⬆️ Update available! Use /update to upgrade.")
+    );
+  }
+
+  private async handleUpdateCommand(command: AdminCommand): Promise<string> {
+    const force = command.args[0] === "force" || command.args[0] === "yes";
+
+    // Check current vs latest
+    let currentVersion = "unknown";
+    try {
+      const { createRequire } = await import("module");
+      const req = createRequire(import.meta.url);
+      currentVersion = (req("../../package.json") as { version: string }).version;
+    } catch {
+      /* ignore */
+    }
+
+    let latestVersion = "unknown";
+    let changelog = "";
+    try {
+      const res = await fetchWithTimeout("https://registry.npmjs.org/teleclaw/latest", {
+        headers: { Accept: "application/json" },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { version: string; description?: string };
+        latestVersion = data.version;
+        changelog = data.description || "";
+      }
+    } catch {
+      /* ignore */
+    }
+
+    if (currentVersion === latestVersion && !force) {
+      return `✅ Already on latest version (**${currentVersion}**). Use /update force to reinstall.`;
+    }
+
+    if (!force) {
+      return (
+        `⬆️ **Update Available**\n\n` +
+        `Current: **${currentVersion}**\n` +
+        `Latest: **${latestVersion}**\n` +
+        (changelog ? `\n${changelog}\n` : "") +
+        `\nSend **/update yes** to install and restart.`
+      );
+    }
+
+    // Execute update
+    try {
+      await this.bridge.sendMessage({
+        chatId: command.chatId,
+        text: `⏳ Updating to **${latestVersion}**...`,
+      });
+
+      execSync("npm install -g teleclaw@latest", {
+        timeout: 120_000,
+        stdio: "pipe",
+      });
+
+      await this.bridge.sendMessage({
+        chatId: command.chatId,
+        text: `✅ Updated to **${latestVersion}**! Restarting...`,
+      });
+
+      // Restart after short delay
+      setTimeout(() => {
+        log.info("🔄 Restarting after update...");
+        process.kill(process.pid, "SIGUSR2");
+      }, 1000);
+
+      return "";
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error({ err }, "Update failed");
+      return `❌ Update failed: ${msg}\n\nTry manually: \`npm install -g teleclaw@latest\``;
+    }
+  }
+
   private handleHelpCommand(): string {
     return `🤖 **Teleclaw Admin Commands**
 
-**/status**
-View agent status
+📋 **Info**
+/ping — Check if agent is alive
+/status — Agent status & info
+/help — Show this help message
+/settings — View all current settings
+/history — Last 10 messages in chat
 
-**/model** <name>
-Switch LLM model
+🧠 **Agent**
+/model <name> — Switch LLM model
+/loop <1-50> — Set max agentic iterations
+/reset — Reset session context
+/clear [chat_id] — Clear conversation history
 
-**/loop** <1-50>
-Set max agentic iterations
+📬 **Access**
+/policy <dm|group> <value> — Change access policy
+/modules [set|info|reset] — Per-group module permissions
 
-**/policy** <dm|group> <value>
-Change access policy
+💎 **Wallet & Trading**
+/wallet — TON wallet balance
+/portfolio — Portfolio summary
+/strategy [buy|sell <percent>] — Trading thresholds
+/sniper — Sniper commands
+/alerts — Alert management
 
-**/strategy** [buy|sell <percent>]
-View or change trading thresholds
+⬆️ **Updates**
+/version — Check current & latest version
+/update — Update to latest version
 
-**/modules** [set|info|reset]
-Manage per-group module permissions
-
-**/plugin** set|unset|keys <name> ...
-Manage plugin secrets (API keys, tokens)
-
-**/wallet**
-Check TON wallet balance
-
-**/verbose**
-Toggle verbose debug logging
-
-**/rag** [status|topk <n>]
-Toggle Tool RAG or view status
-
-**/pause** / **/resume**
-Pause or resume the agent
-
-**/stop**
-Emergency shutdown
-
-**/task** <description>
-Give a task to the agent
-
-**/clear** [chat_id]
-Clear conversation history
-
-**/boot**
-Run agent bootstrap (first-time setup conversation)
-
-**/ping**
-Check if agent is responsive
-
-**/help**
-Show this help message`;
+🔧 **System**
+/rag [status|topk <n>] — Toggle Tool RAG
+/verbose — Toggle debug logging
+/plugin set|unset|keys <name> ... — Plugin secrets
+/pause / /resume — Pause or resume agent
+/stop — Emergency shutdown
+/task <description> — Give agent a task
+/boot — Run bootstrap setup`;
   }
 }

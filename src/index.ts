@@ -4,6 +4,8 @@ import { loadConfig, getDefaultConfigPath } from "./config/index.js";
 import { loadSoul } from "./soul/index.js";
 import { AgentRuntime } from "./agent/runtime.js";
 import { TelegramBridge, type TelegramMessage } from "./telegram/bridge.js";
+import { BotBridge } from "./telegram/bot-bridge.js";
+import type { TelegramTransport, CallbackQueryEvent } from "./telegram/transport.js";
 import { MessageHandler } from "./telegram/handlers.js";
 import { AdminHandler } from "./telegram/admin.js";
 import { MessageDebouncer } from "./telegram/debounce.js";
@@ -42,13 +44,14 @@ import { PluginRateLimiter } from "./bot/rate-limiter.js";
 import { setBotPreMiddleware, getDealBot } from "./deals/module.js";
 import type { TaskDependencyResolver } from "./telegram/task-dependency-resolver.js";
 import type { WebUIServer } from "./webui/server.js";
+import { checkStaleListings, expireOldListings } from "./agent/tools/fragment/stale-checker.js";
 
 const log = createLogger("App");
 
 export class TeleclawApp {
   private config;
   private agent: AgentRuntime;
-  private bridge: TelegramBridge;
+  private bridge: TelegramTransport;
   private messageHandler: MessageHandler;
   private adminHandler: AdminHandler;
   private debouncer: MessageDebouncer | null = null;
@@ -68,6 +71,7 @@ export class TeleclawApp {
   private userHookEvaluator: UserHookEvaluator | null = null;
   private startTime: number = 0;
   private messagesProcessed: number = 0;
+  private staleCheckerInterval: ReturnType<typeof setInterval> | null = null;
 
   private configPath: string;
 
@@ -92,15 +96,33 @@ export class TeleclawApp {
 
     this.agent = new AgentRuntime(this.config, soul, this.toolRegistry);
 
-    this.bridge = new TelegramBridge({
-      apiId: this.config.telegram.api_id,
-      apiHash: this.config.telegram.api_hash,
-      phone: this.config.telegram.phone,
-      sessionPath: join(TELECLAW_ROOT, "telegram_session.txt"),
-      connectionRetries: TELEGRAM_CONNECTION_RETRIES,
-      autoReconnect: true,
-      floodSleepThreshold: TELEGRAM_FLOOD_SLEEP_THRESHOLD,
-    });
+    // Create transport based on mode: 'bot' (Bot API) or 'userbot' (GramJS MTProto)
+    const telegramMode = this.config.telegram.mode || "bot";
+
+    // Filter out userbot-only tools when in bot mode
+    if (telegramMode === "bot") {
+      this.toolRegistry.setBotMode(true);
+    }
+    const botToken = this.config.telegram.bot_token;
+
+    if (telegramMode === "bot") {
+      if (!botToken) {
+        throw new Error("telegram.bot_token is required when telegram.mode = 'bot'");
+      }
+      this.bridge = new BotBridge({ token: botToken });
+      log.info("🤖 Mode: Bot API (grammY)");
+    } else {
+      this.bridge = new TelegramBridge({
+        apiId: this.config.telegram.api_id,
+        apiHash: this.config.telegram.api_hash,
+        phone: this.config.telegram.phone,
+        sessionPath: join(TELECLAW_ROOT, "telegram_session.txt"),
+        connectionRetries: TELEGRAM_CONNECTION_RETRIES,
+        autoReconnect: true,
+        floodSleepThreshold: TELEGRAM_FLOOD_SLEEP_THRESHOLD,
+      });
+      log.info("👤 Mode: Userbot (GramJS MTProto)");
+    }
 
     const embeddingProvider = this.config.embedding.provider;
     this.memory = initializeMemory({
@@ -145,7 +167,9 @@ export class TeleclawApp {
       this.config.telegram,
       this.agent,
       modulePermissions,
-      this.toolRegistry
+      this.toolRegistry,
+      this.config,
+      this.configPath
     );
   }
 
@@ -645,6 +669,33 @@ ${blue}  ┌──────────────────────�
 
       this.messageHandlersRegistered = true;
     }
+
+    // In bot mode, start polling AFTER all handlers are registered
+    if ("startPolling" in this.bridge && typeof this.bridge.startPolling === "function") {
+      (this.bridge as { startPolling(): void }).startPolling();
+    }
+
+    // Periodic OTC matchmaker maintenance (every 6 hours)
+    // - Remind sellers about stale listings (active 48h+ with matches)
+    // - Expire listings past their expiration date
+    this.staleCheckerInterval = setInterval(
+      () => {
+        const mainDb = getDatabase().getDb();
+        const ctx = {
+          bridge: this.bridge,
+          db: mainDb,
+          chatId: "",
+          isGroup: false,
+          senderId: 0,
+          config: this.config,
+        };
+        checkStaleListings(ctx, this.bridge).catch((err) =>
+          log.warn({ err }, "Stale listing check failed")
+        );
+        expireOldListings(ctx);
+      },
+      6 * 60 * 60 * 1000
+    );
   }
 
   /**
@@ -663,10 +714,18 @@ ${blue}  ┌──────────────────────�
         return;
       }
 
-      const entity = await this.bridge.getClient().getEntity(String(this.config.telegram.owner_id));
+      // getEntity is optional (only userbot mode)
+      if (!this.bridge.getEntity) {
+        log.info(
+          "Skipping owner resolution (Bot API mode — set owner_name/owner_username in config)"
+        );
+        return;
+      }
+
+      const entity = await this.bridge.getEntity(String(this.config.telegram.owner_id));
 
       // Check that the entity is a User (has firstName)
-      if (!entity || !("firstName" in entity)) {
+      if (!entity || typeof entity !== "object" || !("firstName" in entity)) {
         return;
       }
 
@@ -726,6 +785,67 @@ ${blue}  ┌──────────────────────�
         message.text.startsWith("[TASK:")
       ) {
         await this.handleScheduledTask(message);
+        return;
+      }
+
+      // Handle /start — claim code or onboarding (before admin check)
+      const startCmd = this.adminHandler.parseCommand(message.text);
+      if (startCmd && startCmd.command === "start") {
+        // Try claim first
+        const claimResult = await this.adminHandler.handleClaimAttempt(
+          { ...startCmd, chatId: message.chatId, senderId: message.senderId },
+          message.senderId
+        );
+        if (claimResult) {
+          await this.bridge.sendMessage({
+            chatId: message.chatId,
+            text: claimResult,
+            replyToId: message.id,
+          });
+          return;
+        }
+
+        // Not a claim — show welcome message (pass to agent with bootstrap)
+        if (!message.isGroup) {
+          const bootstrapContent = this.adminHandler.getBootstrapContent();
+          if (bootstrapContent) {
+            message.text = bootstrapContent;
+            // Fall through to handleMessage below
+          } else {
+            await this.bridge.sendMessage({
+              chatId: message.chatId,
+              text:
+                "👋 Welcome to Teleclaw!\n\n" +
+                "I'm your AI agent for Telegram & TON blockchain.\n\n" +
+                "Just ask me anything — trade tokens, check prices, manage gifts, flip usernames, and more.\n\n" +
+                "Type /help to see admin commands.",
+            });
+            return;
+          }
+        }
+      }
+
+      // Handle /apikey and /mymodel — available to ALL users (not admin-gated)
+      const userCmd = this.adminHandler.parseCommand(message.text);
+      if (
+        userCmd &&
+        (userCmd.command === "apikey" ||
+          userCmd.command === "mymodel" ||
+          userCmd.command === "mysettings")
+      ) {
+        const response = await this.handleUserSettingsCommand(
+          userCmd.command,
+          userCmd.args,
+          message.chatId,
+          message.senderId
+        );
+        if (response) {
+          await this.bridge.sendMessage({
+            chatId: message.chatId,
+            text: response,
+            replyToId: message.id,
+          });
+        }
         return;
       }
 
@@ -794,6 +914,106 @@ ${blue}  ┌──────────────────────�
     } catch (error) {
       log.error({ err: error }, "Error handling message");
     }
+  }
+
+  /**
+   * Handle user settings commands (/apikey, /mymodel, /mysettings)
+   */
+  private async handleUserSettingsCommand(
+    command: string,
+    args: string[],
+    chatId: string,
+    senderId: number
+  ): Promise<string> {
+    const {
+      getUserSettings: getSettings,
+      setUserProvider: setProvider,
+      setUserModel: setModel,
+      clearUserSettings: clearSettings,
+    } = await import("./session/user-settings.js");
+    const db = getDatabase().getDb();
+
+    if (command === "mysettings") {
+      const settings = getSettings(db, senderId);
+      if (!settings) {
+        return (
+          "⚙️ **Your Settings**\n\n" +
+          "No custom settings — using bot defaults.\n\n" +
+          "Commands:\n" +
+          "/apikey <provider> <key> — Set your LLM API key\n" +
+          "/mymodel <model> — Set preferred model\n" +
+          "/apikey clear — Remove custom settings"
+        );
+      }
+      return (
+        "⚙️ **Your Settings**\n\n" +
+        `Provider: **${settings.provider || "default"}**\n` +
+        `Model: **${settings.model || "default"}**\n` +
+        `API Key: **${"•".repeat(8)}${settings.apiKey?.slice(-4) || "none"}**\n\n` +
+        "Commands:\n" +
+        "/apikey <provider> <key> — Change provider\n" +
+        "/mymodel <model> — Change model\n" +
+        "/apikey clear — Remove custom settings"
+      );
+    }
+
+    if (command === "apikey") {
+      if (args[0] === "clear") {
+        clearSettings(db, senderId);
+        return "✅ Custom settings cleared. Using bot defaults now.";
+      }
+
+      if (args.length < 2) {
+        return (
+          "Usage: `/apikey <provider> <key>`\n\n" +
+          "Providers: anthropic, openai, google, xai, groq, openrouter, mistral\n\n" +
+          "Example: `/apikey anthropic sk-ant-...`\n" +
+          "Clear: `/apikey clear`"
+        );
+      }
+
+      const provider = args[0].toLowerCase();
+      const apiKey = args[1];
+      const validProviders = [
+        "anthropic",
+        "openai",
+        "google",
+        "xai",
+        "groq",
+        "openrouter",
+        "mistral",
+        "cerebras",
+        "minimax",
+        "moonshot",
+      ];
+      if (!validProviders.includes(provider)) {
+        return `❌ Unknown provider "${provider}". Valid: ${validProviders.join(", ")}`;
+      }
+
+      setProvider(db, senderId, provider, apiKey);
+
+      // Delete the message containing the API key for security
+      try {
+        await this.bridge.sendMessage({
+          chatId,
+          text: `✅ API key set for **${provider}**!\n\n⚠️ Delete your message containing the key for security.`,
+        });
+      } catch {
+        /* ignore */
+      }
+
+      return "";
+    }
+
+    if (command === "mymodel") {
+      if (args.length === 0) {
+        return "Usage: `/mymodel <model-name>`\n\nExample: `/mymodel claude-sonnet-4-20250514`";
+      }
+      setModel(db, senderId, args[0]);
+      return `✅ Model set to **${args[0]}**`;
+    }
+
+    return "❓ Unknown command.";
   }
 
   /**
@@ -959,44 +1179,15 @@ ${blue}  ┌──────────────────────�
 
     // Callback query handler: register ONCE, dispatch dynamically
     if (!this.callbackHandlerRegistered) {
-      this.bridge.getClient().addCallbackQueryHandler(async (update: unknown) => {
-        if (!update || typeof update !== "object") {
-          return;
-        }
-        const callbackUpdate = update as {
-          queryId?: unknown;
-          data?: { toString(): string } | string;
-          peer?: {
-            channelId?: { toString(): string };
-            chatId?: { toString(): string };
-            userId?: { toString(): string };
-          };
-          msgId?: unknown;
-          userId?: unknown;
-        };
-        const queryId = callbackUpdate.queryId;
-        const data =
-          typeof callbackUpdate.data === "string"
-            ? callbackUpdate.data
-            : callbackUpdate.data?.toString() || "";
+      this.bridge.addCallbackQueryHandler(async (cbEvent: CallbackQueryEvent) => {
+        const { queryId, data, chatId, messageId, userId } = cbEvent;
         const parts = data.split(":");
         const action = parts[0];
         const params = parts.slice(1);
 
-        const chatId =
-          callbackUpdate.peer?.channelId?.toString() ??
-          callbackUpdate.peer?.chatId?.toString() ??
-          callbackUpdate.peer?.userId?.toString() ??
-          "";
-        const messageId =
-          typeof callbackUpdate.msgId === "number"
-            ? callbackUpdate.msgId
-            : Number(callbackUpdate.msgId || 0);
-        const userId = Number(callbackUpdate.userId);
-
         const answer = async (text?: string, alert = false): Promise<void> => {
           try {
-            await this.bridge.getClient().answerCallbackQuery(queryId, { message: text, alert });
+            await this.bridge.answerCallbackQuery(queryId, { message: text, alert });
           } catch (err) {
             log.error(
               `❌ Failed to answer callback query: ${err instanceof Error ? err.message : err}`
@@ -1082,6 +1273,12 @@ ${blue}  ┌──────────────────────�
       } catch (e) {
         log.error({ err: e }, "⚠️ agent:stop hook failed");
       }
+    }
+
+    // Stop stale listing checker
+    if (this.staleCheckerInterval) {
+      clearInterval(this.staleCheckerInterval);
+      this.staleCheckerInterval = null;
     }
 
     // Stop plugin watcher first

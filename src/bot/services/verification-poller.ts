@@ -4,7 +4,7 @@
  */
 
 import type Database from "better-sqlite3";
-import type { TelegramBridge } from "../../telegram/bridge.js";
+import type { TelegramTransport } from "../../telegram/transport.js";
 import type { DealBot } from "../index.js";
 import type { DealContext } from "../types.js";
 import type { ToolContext } from "../../agent/tools/types.js";
@@ -37,7 +37,7 @@ interface PollerConfig {
 
 export class VerificationPoller {
   private db: Database.Database;
-  private bridge: TelegramBridge;
+  private bridge: TelegramTransport;
   private bot: DealBot;
   private config: PollerConfig;
   private intervalId: NodeJS.Timeout | null = null;
@@ -45,7 +45,7 @@ export class VerificationPoller {
 
   constructor(
     db: Database.Database,
-    bridge: TelegramBridge,
+    bridge: TelegramTransport,
     bot: DealBot,
     config: Partial<PollerConfig> = {}
   ) {
@@ -187,7 +187,7 @@ export class VerificationPoller {
   ): Promise<{ verified: boolean; giftMsgId?: string }> {
     try {
       // Get agent's own user ID
-      const me = this.bridge.getClient().getMe();
+      const me = this.bridge.getClient()?.getMe?.() as { id: bigint | number } | undefined;
       if (!me) return { verified: false };
 
       const botUserId = Number(me.id);
