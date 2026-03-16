@@ -61,9 +61,10 @@ export const AgentConfigSchema = z.object({
 });
 
 export const TelegramConfigSchema = z.object({
-  api_id: z.number(),
-  api_hash: z.string(),
-  phone: z.string(),
+  mode: z.enum(["bot", "userbot"]).default("bot").describe("Telegram connection mode: 'bot' (Bot API) or 'userbot' (GramJS MTProto)"),
+  api_id: z.number().default(0),
+  api_hash: z.string().default(""),
+  phone: z.string().default(""),
   session_name: z.string().default("teleclaw_session"),
   session_path: z.string().default("~/.teleclaw"),
   dm_policy: DMPolicy.default("allowlist"),

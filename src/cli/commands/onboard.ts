@@ -75,7 +75,21 @@ export interface OnboardOptions {
 
 // ── Progress steps ────────────────────────────────────────────────────
 
-const STEPS: StepDef[] = [
+// Steps are dynamically set based on mode (bot vs userbot)
+let STEPS: StepDef[] = [];
+
+const BOT_STEPS: StepDef[] = [
+  { label: "Mode", desc: "Bot API" },
+  { label: "Agent", desc: "Name" },
+  { label: "Provider", desc: "LLM, key & model" },
+  { label: "Config", desc: "Policies" },
+  { label: "Modules", desc: "Optional API keys" },
+  { label: "Wallet", desc: "TON blockchain" },
+  { label: "Bot Token", desc: "BotFather token" },
+];
+
+const USERBOT_STEPS: StepDef[] = [
+  { label: "Mode", desc: "Userbot (MTProto)" },
   { label: "Agent", desc: "Name" },
   { label: "Provider", desc: "LLM, key & model" },
   { label: "Config", desc: "Policies" },
@@ -196,6 +210,36 @@ async function runInteractiveOnboarding(
   let execMode: "off" | "yolo" = "off";
   let cocoonInstance = 10000;
 
+  // ── Mode selection ──
+  let telegramMode: "bot" | "userbot" = "bot";
+
+  console.clear();
+  console.log();
+  noteBox(
+    "Choose how you want to connect to Telegram:\n" +
+      "\n" +
+      `  ${GREEN("Bot Mode")} — Create a bot via @BotFather (recommended)\n` +
+      "    Users chat with your bot. No phone number needed.\n" +
+      "\n" +
+      `  ${DIM("Userbot Mode")} — Use your Telegram account directly\n` +
+      "    Runs as your user account. Requires API credentials.",
+    "Teleclaw Agent Setup 🦞",
+    CYAN
+  );
+  console.log();
+
+  telegramMode = (await select({
+    message: "Telegram mode",
+    choices: [
+      { name: "🤖 Bot (recommended)", value: "bot" },
+      { name: "👤 Userbot (advanced)", value: "userbot" },
+    ],
+    default: "bot",
+    theme,
+  })) as "bot" | "userbot";
+
+  STEPS = telegramMode === "bot" ? [...BOT_STEPS] : [...USERBOT_STEPS];
+
   // Intro
   console.clear();
   console.log();
@@ -204,7 +248,7 @@ async function runInteractiveOnboarding(
   await sleep(800);
 
   // ════════════════════════════════════════════════════════════════════
-  // Step 0: Agent — security warning, workspace, name, mode, modules
+  // Step 0/1: Agent — security warning, workspace, name
   // ════════════════════════════════════════════════════════════════════
   redraw(0);
 
@@ -859,8 +903,55 @@ async function runInteractiveOnboarding(
   STEPS[4].value = `${wallet.address.slice(0, 8)}...${wallet.address.slice(-4)}`;
 
   // ════════════════════════════════════════════════════════════════════
-  // Step 5: Telegram — credentials
+  // Step 5/6: Telegram — credentials (userbot) or Bot Token (bot mode)
   // ════════════════════════════════════════════════════════════════════
+
+  if (telegramMode === "bot") {
+    // ── Bot mode: require bot token ──
+    redraw(STEPS.length - 1);
+
+    noteBox(
+      "Create a bot with @BotFather on Telegram:\n" +
+        "\n" +
+        "  1. Open @BotFather in Telegram\n" +
+        "  2. Send /newbot and follow the instructions\n" +
+        "  3. Copy the bot token (format: 123456:ABC-DEF)\n" +
+        "\n" +
+        "Your bot will be your AI agent — users chat with it directly.",
+      "Bot Token",
+      TON
+    );
+
+    const tokenInput = await password({
+      message: "Bot token (from @BotFather)",
+      theme,
+      validate: (value: string) => {
+        if (!value || !value.includes(":")) return "Invalid format (expected id:hash)";
+        return true;
+      },
+    });
+
+    // Validate bot token
+    spinner.start(DIM("Validating bot token..."));
+    try {
+      const res = await fetchWithTimeout(`https://api.telegram.org/bot${tokenInput}/getMe`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Telegram API response
+      const data = (await res.json()) as any;
+      if (!data.ok) {
+        spinner.fail("Bot token is invalid. Please check and try again.");
+        process.exit(1);
+      }
+      botToken = tokenInput;
+      botUsername = data.result.username;
+      spinner.succeed(`Bot verified: @${botUsername}`);
+      STEPS[STEPS.length - 1].value = `@${botUsername}`;
+    } catch {
+      spinner.warn(DIM("Could not validate (network error) — saving anyway"));
+      botToken = tokenInput;
+      STEPS[STEPS.length - 1].value = "saved";
+    }
+  } else {
+  // ── Userbot mode: Telegram credentials ──
   redraw(5);
 
   noteBox(
@@ -921,7 +1012,9 @@ async function runInteractiveOnboarding(
   STEPS[5].value = phone;
 
   // ════════════════════════════════════════════════════════════════════
-  // Step 6: Connect — save config + Telegram auth
+  } // end of telegramMode else (userbot)
+
+  // Step: Connect — save config + Telegram auth (userbot) or just save (bot)
   // ════════════════════════════════════════════════════════════════════
   redraw(6);
 
@@ -949,9 +1042,10 @@ async function runInteractiveOnboarding(
       },
     },
     telegram: {
-      api_id: apiId,
-      api_hash: apiHash,
-      phone,
+      mode: telegramMode,
+      api_id: telegramMode === "userbot" ? apiId : 0,
+      api_hash: telegramMode === "userbot" ? apiHash : "",
+      phone: telegramMode === "userbot" ? phone : "",
       session_name: "teleclaw_session",
       session_path: workspace.sessionPath,
       dm_policy: dmPolicy,
@@ -1024,9 +1118,9 @@ async function runInteractiveOnboarding(
   writeFileSync(workspace.configPath, configYaml, { encoding: "utf-8", mode: 0o600 });
   spinner.succeed(DIM(`Configuration saved: ${workspace.configPath}`));
 
-  // Telegram authentication
-  let telegramConnected = false;
-  const connectNow = await confirm({
+  // Telegram authentication (userbot only — bot mode already validated token)
+  let telegramConnected = telegramMode === "bot"; // bot is already connected after token validation
+  const connectNow = telegramMode === "userbot" && await confirm({
     message: `Connect to Telegram now? ${DIM("(verification code will be sent to your phone)")}`,
     default: true,
     theme,
@@ -1130,6 +1224,7 @@ async function runNonInteractiveOnboarding(
       },
     },
     telegram: {
+      mode: "userbot" as const,
       api_id: options.apiId,
       api_hash: options.apiHash,
       phone: options.phone,
