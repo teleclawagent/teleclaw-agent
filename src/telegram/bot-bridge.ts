@@ -30,10 +30,19 @@ export class BotBridge implements TelegramTransport {
   // ── Lifecycle ──
 
   async connect(): Promise<void> {
-    await this.client.start();
+    // Phase 1: init only (fetch bot info). Handlers registered after this.
+    await this.client.init();
     const info = this.client.getBotInfo();
     this.ownId = BigInt(info.id);
     this.ownUsername = info.username?.toLowerCase();
+  }
+
+  /**
+   * Start polling AFTER all handlers are registered.
+   * Must be called after onNewMessage/onServiceMessage/addCallbackQueryHandler.
+   */
+  startPolling(): void {
+    this.client.startPolling();
   }
 
   async disconnect(): Promise<void> {

@@ -665,6 +665,11 @@ ${blue}  ┌──────────────────────�
 
       this.messageHandlersRegistered = true;
     }
+
+    // In bot mode, start polling AFTER all handlers are registered
+    if ("startPolling" in this.bridge && typeof this.bridge.startPolling === "function") {
+      (this.bridge as { startPolling(): void }).startPolling();
+    }
   }
 
   /**

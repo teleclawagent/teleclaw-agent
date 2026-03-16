@@ -15,64 +15,59 @@ export interface BotClientConfig {
 
 export class BotClient {
   private bot: Bot;
-  private started = false;
+  private initialized = false;
+  private polling = false;
 
   constructor(config: BotClientConfig) {
     this.bot = new Bot(config.token, config.botConfig);
   }
 
-  /**
-   * Get the underlying grammY Bot instance.
-   */
   getBot(): Bot {
     return this.bot;
   }
 
-  /**
-   * Get bot info (id, username, name, etc.).
-   * Only available after start() or init().
-   */
   getBotInfo() {
     return this.bot.botInfo;
   }
 
   /**
-   * Initialize the bot (fetches botInfo) and start polling.
+   * Phase 1: Initialize bot (fetch botInfo from Telegram).
+   * Call this BEFORE registering any handlers.
    */
-  async start(): Promise<void> {
-    if (this.started) return;
-
-    // Init fetches bot info from Telegram
+  async init(): Promise<void> {
+    if (this.initialized) return;
     await this.bot.init();
+    this.initialized = true;
     log.info(
       `Bot initialized: @${this.bot.botInfo.username} (${this.bot.botInfo.id})`
     );
+  }
 
-    // Start long polling in background (non-blocking)
+  /**
+   * Phase 2: Start long polling.
+   * Call this AFTER all handlers (onNewMessage, etc.) are registered.
+   */
+  startPolling(): void {
+    if (this.polling) return;
     void this.bot.start({
       drop_pending_updates: true,
       onStart: () => {
         log.info("Bot polling started");
       },
     });
-
-    this.started = true;
+    this.polling = true;
   }
 
-  /**
-   * Stop the bot gracefully.
-   */
   async stop(): Promise<void> {
-    if (!this.started) return;
+    if (!this.polling) return;
     await this.bot.stop();
-    this.started = false;
+    this.polling = false;
     log.info("Bot stopped");
   }
 
-  /**
-   * Whether the bot is currently connected and polling.
-   */
   isConnected(): boolean {
-    return this.started;
+    // After init, we're "connected" (can make API calls).
+    // Polling is separate — it's for receiving updates.
+    return this.initialized;
   }
 }
