@@ -15,6 +15,7 @@ import type { Tool, ToolExecutor, ToolResult, ToolContext } from "../types.js";
 import { calculateRarity, type RarityTier } from "./number-rarity.js";
 import { checkTokenGate } from "./token-gate.js";
 import { createLogger } from "../../../utils/logger.js";
+import { priceMatches } from "../../../ton/price-service.js";
 
 const log = createLogger("NumberProfile");
 
@@ -25,13 +26,13 @@ type LengthPref = "short" | "standard" | "any";
 
 interface NumberProfile {
   userId: number;
-  lengthPref: LengthPref;            // short (7-digit), standard (11-digit), any
-  patterns: PatternPref[];            // desired pattern types
-  preferredDigits: number[];          // digits they want more of (e.g. [8, 6, 9])
-  avoidDigits: number[];              // digits to avoid (e.g. [4])
-  minTier: RarityTier;               // minimum tier interest (e.g. "C" = C and above)
-  maxPrice: number | null;            // budget in TON
-  minScore: number;                   // minimum rarity score (0-100)
+  lengthPref: LengthPref; // short (7-digit), standard (11-digit), any
+  patterns: PatternPref[]; // desired pattern types
+  preferredDigits: number[]; // digits they want more of (e.g. [8, 6, 9])
+  avoidDigits: number[]; // digits to avoid (e.g. [4])
+  minTier: RarityTier; // minimum tier interest (e.g. "C" = C and above)
+  maxPrice: number | null; // budget in TON
+  minScore: number; // minimum rarity score (0-100)
   enabled: boolean;
 }
 
@@ -94,7 +95,13 @@ const ALERT_WINDOW_MS = 60 * 60 * 1000;
 function matchNumberToProfile(
   profile: NumberProfile,
   number: string,
-  rarity: { tier: RarityTier; score: number; tags: string[]; totalDigits: number; rawDigits: string }
+  rarity: {
+    tier: RarityTier;
+    score: number;
+    tags: string[];
+    totalDigits: number;
+    rawDigits: string;
+  }
 ): number {
   let score = 0;
   let maxScore = 0;
@@ -119,7 +126,15 @@ function matchNumberToProfile(
     if (pref === "any") continue;
     // Check if any rarity tag matches
     const tagMap: Record<string, string[]> = {
-      repeating: ["all-same", "all-eights", "near-perfect-repeat", "strong-repeat-6+", "repeat-5", "repeat-4", "repeat-3"],
+      repeating: [
+        "all-same",
+        "all-eights",
+        "near-perfect-repeat",
+        "strong-repeat-6+",
+        "repeat-5",
+        "repeat-4",
+        "repeat-3",
+      ],
       sequential: ["full-sequential", "sequential-6+", "sequential-4"],
       palindrome: ["palindrome"],
       round: ["round-5+", "round-3+"],
@@ -170,7 +185,9 @@ function getRecentAlertCount(ctx: ToolContext, userId: number): number {
       .prepare(`SELECT COUNT(*) as cnt FROM number_match_log WHERE buyer_id = ? AND sent_at > ?`)
       .get(userId, cutoff) as { cnt: number } | undefined;
     return row?.cnt ?? 0;
-  } catch { return 0; }
+  } catch {
+    return 0;
+  }
 }
 
 // ─── Tool: Set Number Preferences ────────────────────────────────────
@@ -196,13 +213,15 @@ export const numberProfileSetTool: Tool = {
   parameters: Type.Object({
     length: Type.Optional(
       Type.String({
-        description: 'Preferred length: "short" (7-digit, +888 8XXX), "standard" (11-digit), or "any"',
+        description:
+          'Preferred length: "short" (7-digit, +888 8XXX), "standard" (11-digit), or "any"',
         enum: ["short", "standard", "any"],
       })
     ),
     patterns: Type.Optional(
       Type.Array(Type.String(), {
-        description: 'Pattern preferences: ["repeating", "sequential", "palindrome", "round", "all-same", "any"]',
+        description:
+          'Pattern preferences: ["repeating", "sequential", "palindrome", "round", "all-same", "any"]',
       })
     ),
     preferred_digits: Type.Optional(
@@ -221,9 +240,7 @@ export const numberProfileSetTool: Tool = {
         enum: ["S", "A", "B", "C", "D"],
       })
     ),
-    max_price: Type.Optional(
-      Type.Number({ description: "Maximum budget in TON", minimum: 0 })
-    ),
+    max_price: Type.Optional(Type.Number({ description: "Maximum budget in TON", minimum: 0 })),
     min_score: Type.Optional(
       Type.Number({ description: "Minimum rarity score (0-100)", minimum: 0, maximum: 100 })
     ),
@@ -280,7 +297,12 @@ export const numberProfileSetExecutor: ToolExecutor<SetProfileParams> = async (
         minScore
       );
 
-    const lengthLabel = lengthPref === "short" ? "7-digit (+888 8XXX)" : lengthPref === "standard" ? "11-digit (+888 0XXX XXXX)" : "Any";
+    const lengthLabel =
+      lengthPref === "short"
+        ? "7-digit (+888 8XXX)"
+        : lengthPref === "standard"
+          ? "11-digit (+888 0XXX XXXX)"
+          : "Any";
     const prefDigitStr = preferredDigits.length > 0 ? preferredDigits.join(", ") : "Any";
     const avoidStr = avoidDigits.length > 0 ? avoidDigits.join(", ") : "None";
 
@@ -375,9 +397,7 @@ export const numberListForSaleTool: Tool = {
   category: "action",
   parameters: Type.Object({
     number: Type.String({ description: "The +888 number you want to sell" }),
-    price: Type.Optional(
-      Type.Number({ description: "Asking price in TON", minimum: 0 })
-    ),
+    price: Type.Optional(Type.Number({ description: "Asking price in TON", minimum: 0 })),
   }),
 };
 
@@ -448,7 +468,14 @@ export const numberListForSaleExecutor: ToolExecutor<ListNumberParams> = async (
       };
 
       // Price filter
-      if (profile.maxPrice && params.price && params.price > profile.maxPrice) continue;
+      // Cross-currency price check
+      if (profile.maxPrice && params.price) {
+        const listingCur =
+          ((params as unknown as Record<string, unknown>).currency as string) || "TON";
+        const buyerCur = "TON"; // number profiles currently TON-only budget
+        const canAfford = await priceMatches(params.price, listingCur, profile.maxPrice, buyerCur);
+        if (canAfford === false) continue;
+      }
 
       // Score filter
       if (rarity.score < profile.minScore) continue;
@@ -476,6 +503,16 @@ export const numberListForSaleExecutor: ToolExecutor<ListNumberParams> = async (
           listingId,
         },
         matches,
+        _notifyBuyers: matches.map((m) => ({
+          userId: m.userId,
+          message:
+            `🔔 New number listing matching your profile!\n\n` +
+            `${emoji} ${rarity.number}\n` +
+            `🏆 ${rarity.tier} — ${rarity.label} (${rarity.score}/100)\n` +
+            `💰 Price: ${priceStr}\n` +
+            `🏷️ ${rarity.tags.join(", ")}\n\n` +
+            `Interested? Tell me "express interest in ${rarity.number}"`,
+        })),
         message: [
           `✅ *Number Listed for Sale*`,
           ``,
@@ -513,9 +550,7 @@ export const numberBrowseListingsTool: Tool = {
     tier: Type.Optional(
       Type.String({ description: 'Filter by minimum tier: "S", "A", "B", "C", "D"' })
     ),
-    max_price: Type.Optional(
-      Type.Number({ description: "Maximum price in TON" })
-    ),
+    max_price: Type.Optional(Type.Number({ description: "Maximum price in TON" })),
     pattern: Type.Optional(
       Type.String({ description: "Filter by pattern tag (e.g. repeating, sequential, palindrome)" })
     ),
@@ -567,18 +602,16 @@ export const numberBrowseListingsExecutor: ToolExecutor<BrowseParams> = async (
 
     const lines = listings.map((l, i) => {
       const emoji = tierEmojis[l.tier as string] || "⚪";
-      const tags = JSON.parse(l.tags as string).slice(0, 2).join(", ");
+      const tags = JSON.parse(l.tags as string)
+        .slice(0, 2)
+        .join(", ");
       const price = l.price ? `${(l.price as number).toLocaleString()} TON` : "Offer";
       return `${i + 1}. ${emoji} ${l.number} — ${l.tier} (${l.score})\n   💰 ${price} | 🏷️ ${tags}`;
     });
 
     return {
       success: true,
-      data: [
-        `🔢 *Numbers for Sale* (${listings.length})`,
-        ``,
-        ...lines,
-      ].join("\n"),
+      data: [`🔢 *Numbers for Sale* (${listings.length})`, ``, ...lines].join("\n"),
     };
   } catch (error) {
     log.error({ err: error }, "Number browse error");
@@ -621,12 +654,216 @@ export const numberSoldExecutor: ToolExecutor<NumberSoldParams> = async (
       return { success: false, error: "No active listing found for this number, or not yours." };
     }
 
+    // Get interested buyers from match log
+    const interestedBuyers = ctx.db
+      .prepare(
+        `SELECT DISTINCT buyer_id FROM number_match_log
+         WHERE listing_id IN (SELECT id FROM number_listings WHERE number = ?)`
+      )
+      .all(params.number.replace(/\s/g, "")) as Array<{ buyer_id: number }>;
+
     return {
       success: true,
-      data: { number: params.number, status: "sold", message: `✅ ${params.number} marked as sold.` },
+      data: {
+        number: params.number,
+        status: "sold",
+        _notifyBuyers: interestedBuyers
+          .filter((b) => b.buyer_id !== ctx.senderId)
+          .map((b) => ({
+            userId: b.buyer_id,
+            message:
+              `ℹ️ A number you were interested in has been sold.\n\n` +
+              `📞 ${params.number}\n\n` +
+              `Keep browsing — new numbers are listed regularly!`,
+          })),
+        message: `✅ ${params.number} marked as sold.${interestedBuyers.length > 0 ? ` ${interestedBuyers.length} interested buyer(s) notified.` : ""}`,
+      },
     };
   } catch (error) {
     log.error({ err: error }, "Number sold error");
+    return { success: false, error: String(error) };
+  }
+};
+
+// ─── Tool: Express Interest in Number ────────────────────────────────
+
+interface NumberExpressParams {
+  number: string;
+  offer_price?: number;
+  message?: string;
+}
+
+export const numberExpressInterestTool: Tool = {
+  name: "number_express_interest",
+  description:
+    "Express interest in a listed anonymous number. The seller will be notified with your offer.\n" +
+    "After this, the seller can reach out to you directly to arrange the trade.",
+  category: "action",
+  parameters: Type.Object({
+    number: Type.String({ description: "The +888 number you're interested in" }),
+    offer_price: Type.Optional(Type.Number({ description: "Your offer price in TON" })),
+    message: Type.Optional(Type.String({ description: "Message to the seller" })),
+  }),
+};
+
+export const numberExpressInterestExecutor: ToolExecutor<NumberExpressParams> = async (
+  params,
+  ctx
+): Promise<ToolResult> => {
+  try {
+    ensureNumberProfileTables(ctx);
+
+    const gateResult = await checkTokenGate(ctx.db, ctx.senderId);
+    if (!gateResult.allowed) {
+      return { success: false, error: gateResult.reason };
+    }
+
+    const cleanNumber = params.number.replace(/\s/g, "");
+    const listing = ctx.db
+      .prepare(`SELECT * FROM number_listings WHERE number = ? AND active = 1`)
+      .get(cleanNumber) as Record<string, unknown> | undefined;
+
+    if (!listing) {
+      return { success: false, error: "No active listing found for this number." };
+    }
+
+    if ((listing.seller_id as number) === ctx.senderId) {
+      return { success: false, error: "You can't express interest in your own listing." };
+    }
+
+    // Log the match
+    ctx.db
+      .prepare(
+        `INSERT OR IGNORE INTO number_match_log (buyer_id, listing_id, score)
+         VALUES (?, ?, 100)`
+      )
+      .run(ctx.senderId, listing.id);
+
+    const buyerLabel = ctx.senderUsername ? `@${ctx.senderUsername}` : `User #${ctx.senderId}`;
+
+    return {
+      success: true,
+      data: {
+        number: params.number,
+        sellerId: listing.seller_id,
+        _notifySeller: {
+          userId: listing.seller_id as number,
+          message:
+            `🔔 Someone is interested in your number!\n\n` +
+            `📞 ${params.number}\n` +
+            `🏆 ${listing.tier} (${listing.score}/100)\n` +
+            `${params.offer_price ? `💰 Their offer: ${params.offer_price} TON\n` : ""}` +
+            `${params.message ? `💬 Message: ${params.message}\n` : ""}` +
+            `👤 Buyer: ${buyerLabel}\n\n` +
+            `Reach out to them directly if you'd like to proceed.`,
+        },
+        message:
+          `✅ Interest expressed!\n\n` +
+          `📞 ${params.number} — ${listing.price ? listing.price + " TON" : "Price TBD"}\n\n` +
+          `The seller has been notified. If they're interested, they'll reach out to you directly.`,
+      },
+    };
+  } catch (error) {
+    log.error({ err: error }, "Number express interest error");
+    return { success: false, error: String(error) };
+  }
+};
+
+// ─── Tool: Cancel Number Listing ─────────────────────────────────────
+
+interface NumberCancelParams {
+  number: string;
+}
+
+export const numberCancelTool: Tool = {
+  name: "number_cancel",
+  description: "Cancel your active number listing.",
+  category: "action",
+  parameters: Type.Object({
+    number: Type.String({ description: "The +888 number listing to cancel" }),
+  }),
+};
+
+export const numberCancelExecutor: ToolExecutor<NumberCancelParams> = async (
+  params,
+  ctx
+): Promise<ToolResult> => {
+  try {
+    ensureNumberProfileTables(ctx);
+
+    const cleanNumber = params.number.replace(/\s/g, "");
+    const result = ctx.db
+      .prepare(
+        `UPDATE number_listings SET active = 0, status = 'cancelled'
+         WHERE number = ? AND seller_id = ? AND active = 1`
+      )
+      .run(cleanNumber, ctx.senderId);
+
+    if (result.changes === 0) {
+      return { success: false, error: "No active listing found for this number, or not yours." };
+    }
+
+    return {
+      success: true,
+      data: {
+        number: params.number,
+        status: "cancelled",
+        message: `✅ Listing for ${params.number} cancelled.`,
+      },
+    };
+  } catch (error) {
+    log.error({ err: error }, "Number cancel error");
+    return { success: false, error: String(error) };
+  }
+};
+
+// ─── Tool: My Number Listings ────────────────────────────────────────
+
+export const numberMyListingsTool: Tool = {
+  name: "number_my_listings",
+  description: "View your active number listings.",
+  category: "data-bearing",
+  parameters: Type.Object({}),
+};
+
+export const numberMyListingsExecutor: ToolExecutor<Record<string, never>> = async (
+  _params,
+  ctx
+): Promise<ToolResult> => {
+  try {
+    ensureNumberProfileTables(ctx);
+
+    const listings = ctx.db
+      .prepare(
+        `SELECT * FROM number_listings WHERE seller_id = ? AND active = 1 ORDER BY listed_at DESC`
+      )
+      .all(ctx.senderId) as Array<Record<string, unknown>>;
+
+    if (listings.length === 0) {
+      return {
+        success: true,
+        data: { message: "No active listings. Use number_list_sale to list a number." },
+      };
+    }
+
+    const text = listings
+      .map((l, i) => {
+        const tierEmojis: Record<string, string> = { S: "🔴", A: "🟠", B: "🟡", C: "🟢", D: "⚪" };
+        const emoji = tierEmojis[l.tier as string] || "⚪";
+        return `${i + 1}. ${emoji} ${l.number} — ${l.price ? l.price + " TON" : "Price TBD"} | ${l.tier} (${l.score}/100)`;
+      })
+      .join("\n");
+
+    return {
+      success: true,
+      data: {
+        count: listings.length,
+        listings,
+        message: `📋 Your Listings (${listings.length}):\n\n${text}`,
+      },
+    };
+  } catch (error) {
+    log.error({ err: error }, "Number my listings error");
     return { success: false, error: String(error) };
   }
 };
@@ -653,8 +890,4 @@ export function markNumberListingReminded(ctx: ToolContext, number: string): voi
 
 // ─── Exports ─────────────────────────────────────────────────────────
 
-export {
-  ensureNumberProfileTables,
-  matchNumberToProfile,
-  type NumberProfile,
-};
+export { ensureNumberProfileTables, matchNumberToProfile, type NumberProfile };

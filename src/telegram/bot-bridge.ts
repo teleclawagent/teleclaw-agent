@@ -4,7 +4,7 @@
  */
 
 import { InlineKeyboard, InputFile } from "grammy";
-import type { Message, Update } from "grammy/types";
+import type { Message } from "grammy/types";
 import { BotClient, type BotClientConfig } from "./bot-client.js";
 import type {
   TelegramTransport,
@@ -35,6 +35,32 @@ export class BotBridge implements TelegramTransport {
     const info = this.client.getBotInfo();
     this.ownId = BigInt(info.id);
     this.ownUsername = info.username?.toLowerCase();
+
+    // Register commands with BotFather
+    try {
+      await this.client.getBot().api.setMyCommands([
+        { command: "ping", description: "Check if agent is alive" },
+        { command: "status", description: "Agent status & info" },
+        { command: "help", description: "List all commands" },
+        { command: "reset", description: "Reset session context" },
+        { command: "history", description: "Recent messages" },
+        { command: "settings", description: "View all settings" },
+        { command: "wallet", description: "TON wallet balance" },
+        { command: "portfolio", description: "Portfolio summary" },
+        { command: "model", description: "Switch LLM model" },
+        { command: "strategy", description: "Trading thresholds" },
+        { command: "sniper", description: "Sniper commands" },
+        { command: "alerts", description: "Alert management" },
+        { command: "version", description: "Check for updates" },
+        { command: "update", description: "Update to latest version" },
+        { command: "clear", description: "Clear chat history" },
+        { command: "pause", description: "Pause agent" },
+        { command: "resume", description: "Resume agent" },
+      ]);
+      log.info("Registered bot commands with BotFather");
+    } catch (error) {
+      log.warn({ err: error }, "Failed to register bot commands");
+    }
   }
 
   /**
@@ -65,9 +91,7 @@ export class BotBridge implements TelegramTransport {
 
   // ── Messaging ──
 
-  async sendMessage(
-    options: SendMessageOptions & { _rawPeer?: unknown }
-  ): Promise<{ id: number }> {
+  async sendMessage(options: SendMessageOptions & { _rawPeer?: unknown }): Promise<{ id: number }> {
     const bot = this.client.getBot();
     const chatId = options.chatId;
 
@@ -85,9 +109,7 @@ export class BotBridge implements TelegramTransport {
 
     const sent = await bot.api.sendMessage(chatId, options.text, {
       parse_mode: "HTML",
-      reply_parameters: options.replyToId
-        ? { message_id: options.replyToId }
-        : undefined,
+      reply_parameters: options.replyToId ? { message_id: options.replyToId } : undefined,
       reply_markup: replyMarkup,
     });
 
@@ -114,15 +136,10 @@ export class BotBridge implements TelegramTransport {
       replyMarkup = kb;
     }
 
-    const result = await bot.api.editMessageText(
-      options.chatId,
-      options.messageId,
-      options.text,
-      {
-        parse_mode: "HTML",
-        reply_markup: replyMarkup,
-      }
-    );
+    const result = await bot.api.editMessageText(options.chatId, options.messageId, options.text, {
+      parse_mode: "HTML",
+      reply_markup: replyMarkup,
+    });
 
     const msgId =
       typeof result === "object" && result !== null && "message_id" in result
@@ -140,13 +157,8 @@ export class BotBridge implements TelegramTransport {
     }
   }
 
-  async sendReaction(
-    chatId: string,
-    messageId: number,
-    emoji: string
-  ): Promise<void> {
+  async sendReaction(chatId: string, messageId: number, emoji: string): Promise<void> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- emoji type is a union of all TG emojis
       await this.client.getBot().api.setMessageReaction(chatId, messageId, [
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TG emoji union type
         { type: "emoji", emoji: emoji as any },
@@ -179,22 +191,14 @@ export class BotBridge implements TelegramTransport {
     return { id: sent.message_id };
   }
 
-  async pinMessage(
-    chatId: string,
-    messageId: number,
-    silent = false
-  ): Promise<void> {
-    await this.client
-      .getBot()
-      .api.pinChatMessage(chatId, messageId, {
-        disable_notification: silent,
-      });
+  async pinMessage(chatId: string, messageId: number, silent = false): Promise<void> {
+    await this.client.getBot().api.pinChatMessage(chatId, messageId, {
+      disable_notification: silent,
+    });
   }
 
   async unpinMessage(chatId: string, messageId: number): Promise<void> {
-    await this.client
-      .getBot()
-      .api.unpinChatMessage(chatId, messageId);
+    await this.client.getBot().api.unpinChatMessage(chatId, messageId);
   }
 
   // ── Media ──
@@ -205,13 +209,15 @@ export class BotBridge implements TelegramTransport {
     options?: { caption?: string; replyToId?: number }
   ): Promise<{ id: number }> {
     const bot = this.client.getBot();
-    const sent = await bot.api.sendPhoto(chatId, typeof photo === "string" ? photo : new InputFile(photo, "photo.jpg"), {
-      caption: options?.caption,
-      parse_mode: "HTML",
-      reply_parameters: options?.replyToId
-        ? { message_id: options.replyToId }
-        : undefined,
-    });
+    const sent = await bot.api.sendPhoto(
+      chatId,
+      typeof photo === "string" ? photo : new InputFile(photo, "photo.jpg"),
+      {
+        caption: options?.caption,
+        parse_mode: "HTML",
+        reply_parameters: options?.replyToId ? { message_id: options.replyToId } : undefined,
+      }
+    );
     return { id: sent.message_id };
   }
 
@@ -221,13 +227,15 @@ export class BotBridge implements TelegramTransport {
     options?: { caption?: string; replyToId?: number }
   ): Promise<{ id: number }> {
     const bot = this.client.getBot();
-    const sent = await bot.api.sendAnimation(chatId, typeof animation === "string" ? animation : new InputFile(animation, "animation.gif"), {
-      caption: options?.caption,
-      parse_mode: "HTML",
-      reply_parameters: options?.replyToId
-        ? { message_id: options.replyToId }
-        : undefined,
-    });
+    const sent = await bot.api.sendAnimation(
+      chatId,
+      typeof animation === "string" ? animation : new InputFile(animation, "animation.gif"),
+      {
+        caption: options?.caption,
+        parse_mode: "HTML",
+        reply_parameters: options?.replyToId ? { message_id: options.replyToId } : undefined,
+      }
+    );
     return { id: sent.message_id };
   }
 
@@ -237,11 +245,13 @@ export class BotBridge implements TelegramTransport {
     options?: { replyToId?: number }
   ): Promise<{ id: number }> {
     const bot = this.client.getBot();
-    const sent = await bot.api.sendSticker(chatId, typeof sticker === "string" ? sticker : new InputFile(sticker, "sticker.webp"), {
-      reply_parameters: options?.replyToId
-        ? { message_id: options.replyToId }
-        : undefined,
-    });
+    const sent = await bot.api.sendSticker(
+      chatId,
+      typeof sticker === "string" ? sticker : new InputFile(sticker, "sticker.webp"),
+      {
+        reply_parameters: options?.replyToId ? { message_id: options.replyToId } : undefined,
+      }
+    );
     return { id: sent.message_id };
   }
 
@@ -251,14 +261,16 @@ export class BotBridge implements TelegramTransport {
     options?: { caption?: string; replyToId?: number; duration?: number }
   ): Promise<{ id: number }> {
     const bot = this.client.getBot();
-    const sent = await bot.api.sendVoice(chatId, typeof voice === "string" ? voice : new InputFile(voice, "voice.ogg"), {
-      caption: options?.caption,
-      parse_mode: "HTML",
-      duration: options?.duration,
-      reply_parameters: options?.replyToId
-        ? { message_id: options.replyToId }
-        : undefined,
-    });
+    const sent = await bot.api.sendVoice(
+      chatId,
+      typeof voice === "string" ? voice : new InputFile(voice, "voice.ogg"),
+      {
+        caption: options?.caption,
+        parse_mode: "HTML",
+        duration: options?.duration,
+        reply_parameters: options?.replyToId ? { message_id: options.replyToId } : undefined,
+      }
+    );
     return { id: sent.message_id };
   }
 
@@ -268,13 +280,17 @@ export class BotBridge implements TelegramTransport {
     options?: { caption?: string; replyToId?: number; filename?: string }
   ): Promise<{ id: number }> {
     const bot = this.client.getBot();
-    const sent = await bot.api.sendDocument(chatId, typeof document === "string" ? document : new InputFile(document, options?.filename ?? "file"), {
-      caption: options?.caption,
-      parse_mode: "HTML",
-      reply_parameters: options?.replyToId
-        ? { message_id: options.replyToId }
-        : undefined,
-    });
+    const sent = await bot.api.sendDocument(
+      chatId,
+      typeof document === "string"
+        ? document
+        : new InputFile(document, options?.filename ?? "file"),
+      {
+        caption: options?.caption,
+        parse_mode: "HTML",
+        reply_parameters: options?.replyToId ? { message_id: options.replyToId } : undefined,
+      }
+    );
     return { id: sent.message_id };
   }
 
@@ -300,9 +316,7 @@ export class BotBridge implements TelegramTransport {
     const sent = await bot.api.sendPoll(chatId, question, options, {
       is_anonymous: opts?.isAnonymous,
       allows_multiple_answers: opts?.allowsMultiple,
-      reply_parameters: opts?.replyToId
-        ? { message_id: opts.replyToId }
-        : undefined,
+      reply_parameters: opts?.replyToId ? { message_id: opts.replyToId } : undefined,
     });
     return { id: sent.message_id };
   }
@@ -310,7 +324,7 @@ export class BotBridge implements TelegramTransport {
   async sendDice(
     chatId: string,
     emoji?: string,
-    replyToId?: number
+    _replyToId?: number
   ): Promise<{ id: number; value?: number }> {
     const bot = this.client.getBot();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- emoji is a union of dice emojis
@@ -347,9 +361,7 @@ export class BotBridge implements TelegramTransport {
     });
   }
 
-  onServiceMessage(
-    _handler: (message: TelegramMessage) => void | Promise<void>
-  ): void {
+  onServiceMessage(_handler: (message: TelegramMessage) => void | Promise<void>): void {
     // Bot API doesn't receive service messages the same way GramJS does.
     // Gift-related service messages aren't available via Bot API.
     // No-op for now.
@@ -364,28 +376,20 @@ export class BotBridge implements TelegramTransport {
     return [];
   }
 
-  async getMessages(
-    _chatId: string,
-    _limit?: number
-  ): Promise<TelegramMessage[]> {
+  async getMessages(_chatId: string, _limit?: number): Promise<TelegramMessage[]> {
     // Bot API doesn't support fetching chat history
     return [];
   }
 
   async fetchReplyContext(
     rawMsg: unknown
-  ): Promise<
-    { text?: string; senderName?: string; isAgent?: boolean } | undefined
-  > {
+  ): Promise<{ text?: string; senderName?: string; isAgent?: boolean } | undefined> {
     // In bot mode, rawMsg is a grammY Message object
     const msg = rawMsg as Message | undefined;
     if (!msg?.reply_to_message) return undefined;
 
     const reply = msg.reply_to_message;
-    const senderName =
-      reply.from?.first_name ||
-      reply.from?.username ||
-      undefined;
+    const senderName = reply.from?.first_name || reply.from?.username || undefined;
     const isAgent =
       this.ownId !== undefined &&
       reply.from?.id !== undefined &&
@@ -405,9 +409,7 @@ export class BotBridge implements TelegramTransport {
 
   // ── Callback queries ──
 
-  addCallbackQueryHandler(
-    handler: (event: CallbackQueryEvent) => Promise<void>
-  ): void {
+  addCallbackQueryHandler(handler: (event: CallbackQueryEvent) => Promise<void>): void {
     const bot = this.client.getBot();
 
     bot.on("callback_query:data", async (ctx) => {
@@ -494,24 +496,18 @@ export class BotBridge implements TelegramTransport {
     const isBot = msg.from?.is_bot ?? false;
 
     const isChannel = msg.chat.type === "channel";
-    const isGroup =
-      msg.chat.type === "group" || msg.chat.type === "supergroup";
+    const isGroup = msg.chat.type === "group" || msg.chat.type === "supergroup";
 
     // Check if bot is mentioned
     let mentionsMe = false;
     if (this.ownUsername && msg.text) {
-      mentionsMe = msg.text
-        .toLowerCase()
-        .includes(`@${this.ownUsername}`);
+      mentionsMe = msg.text.toLowerCase().includes(`@${this.ownUsername}`);
     }
     // Also check entities for bot_command or text_mention
     if (!mentionsMe && msg.entities) {
       for (const entity of msg.entities) {
         if (entity.type === "mention") {
-          const mentionText = msg.text?.substring(
-            entity.offset,
-            entity.offset + entity.length
-          );
+          const mentionText = msg.text?.substring(entity.offset, entity.offset + entity.length);
           if (
             mentionText &&
             this.ownUsername &&

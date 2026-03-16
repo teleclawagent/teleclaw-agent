@@ -61,7 +61,10 @@ export const AgentConfigSchema = z.object({
 });
 
 export const TelegramConfigSchema = z.object({
-  mode: z.enum(["bot", "userbot"]).default("bot").describe("Telegram connection mode: 'bot' (Bot API) or 'userbot' (GramJS MTProto)"),
+  mode: z
+    .enum(["bot", "userbot"])
+    .default("bot")
+    .describe("Telegram connection mode: 'bot' (Bot API) or 'userbot' (GramJS MTProto)"),
   api_id: z.number().default(0),
   api_hash: z.string().default(""),
   phone: z.string().default(""),
@@ -77,6 +80,10 @@ export const TelegramConfigSchema = z.object({
   rate_limit_messages_per_second: z.number().default(1.0),
   rate_limit_groups_per_minute: z.number().default(20),
   admin_ids: z.array(z.number()).default([]),
+  admin_claim_code: z
+    .string()
+    .optional()
+    .describe("One-time code for admin claim via /start <code>"),
   agent_channel: z.string().nullable().default(null),
   owner_name: z.string().optional().describe("Owner's first name (e.g., 'Alex')"),
   owner_username: z.string().optional().describe("Owner's Telegram username (without @)"),

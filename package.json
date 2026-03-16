@@ -1,5 +1,5 @@
 {
-  "name": "teleclaw-agent",
+  "name": "teleclaw",
   "version": "1.0.0-beta.1",
   "workspaces": [
     "packages/*"
@@ -39,7 +39,11 @@
     "dist/",
     "bin/",
     "scripts/",
-    "src/templates/"
+    "src/templates/",
+    "config.example.yaml",
+    "GETTING_STARTED.md",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "npm run build:sdk && npm run build:backend && npm run build:web",

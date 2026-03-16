@@ -133,6 +133,12 @@ import {
   numberBrowseListingsExecutor,
   numberSoldTool,
   numberSoldExecutor,
+  numberExpressInterestTool,
+  numberExpressInterestExecutor,
+  numberCancelTool,
+  numberCancelExecutor,
+  numberMyListingsTool,
+  numberMyListingsExecutor,
 } from "./number-profile.js";
 
 // Channel Scanner
@@ -240,10 +246,7 @@ import {
 } from "./gift-set-detector.js";
 
 // 💎 Gift Appraisal
-import {
-  giftAppraiseTool,
-  giftAppraiseExecutor,
-} from "./gift-appraisal.js";
+import { giftAppraiseTool, giftAppraiseExecutor } from "./gift-appraisal.js";
 
 // 🔔 Gift Alerts
 import {
@@ -316,6 +319,9 @@ export const tools: ToolEntry[] = [
   { tool: numberProfileViewTool, executor: numberProfileViewExecutor, scope: "dm-only" },
   { tool: numberListForSaleTool, executor: numberListForSaleExecutor, scope: "dm-only" },
   { tool: numberBrowseListingsTool, executor: numberBrowseListingsExecutor },
+  { tool: numberExpressInterestTool, executor: numberExpressInterestExecutor, scope: "dm-only" },
+  { tool: numberMyListingsTool, executor: numberMyListingsExecutor, scope: "dm-only" },
+  { tool: numberCancelTool, executor: numberCancelExecutor, scope: "dm-only" },
   { tool: numberSoldTool, executor: numberSoldExecutor, scope: "dm-only" },
 
   // 📡 Channel Scanner

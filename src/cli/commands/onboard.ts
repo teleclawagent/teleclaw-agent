@@ -33,7 +33,7 @@ import { ensureWorkspace, isNewWorkspace } from "../../workspace/manager.js";
 import { writeFileSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { TELECLAW_ROOT } from "../../workspace/paths.js";
-import { TelegramUserClient } from "../../telegram/client.js";
+// TelegramUserClient import removed — bot-only mode
 import YAML from "yaml";
 import { type Config, DealsConfigSchema } from "../../config/schema.js";
 import { getModelsForProvider } from "../../config/model-catalog.js";
@@ -75,11 +75,7 @@ export interface OnboardOptions {
 
 // ── Progress steps ────────────────────────────────────────────────────
 
-// Steps are dynamically set based on mode (bot vs userbot)
-let STEPS: StepDef[] = [];
-
-const BOT_STEPS: StepDef[] = [
-  { label: "Mode", desc: "Bot API" },
+const STEPS: StepDef[] = [
   { label: "Agent", desc: "Name" },
   { label: "Provider", desc: "LLM, key & model" },
   { label: "Config", desc: "Policies" },
@@ -88,18 +84,14 @@ const BOT_STEPS: StepDef[] = [
   { label: "Bot Token", desc: "BotFather token" },
 ];
 
-const USERBOT_STEPS: StepDef[] = [
-  { label: "Mode", desc: "Userbot (MTProto)" },
-  { label: "Agent", desc: "Name" },
-  { label: "Provider", desc: "LLM, key & model" },
-  { label: "Config", desc: "Policies" },
-  { label: "Modules", desc: "Optional API keys" },
-  { label: "Wallet", desc: "TON blockchain" },
-  { label: "Telegram", desc: "Credentials" },
-  { label: "Connect", desc: "Telegram auth" },
-];
-
 // ── Helpers ────────────────────────────────────────────────────────────
+
+function generateClaimCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I confusion
+  let code = "TC-";
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
 
 function redraw(currentStep: number): void {
   console.clear();
@@ -194,10 +186,7 @@ async function runInteractiveOnboarding(
   let selectedProvider: SupportedProvider = "anthropic";
   let selectedModel = "";
   let apiKey = "";
-  let apiId = 0;
-  let apiHash = "";
-  let phone = "";
-  let userId = 0;
+  let _userId = 0;
   let tonapiKey: string | undefined;
   let toncenterApiKey: string | undefined;
   let tavilyApiKey: string | undefined;
@@ -210,38 +199,15 @@ async function runInteractiveOnboarding(
   let execMode: "off" | "yolo" = "off";
   let cocoonInstance = 10000;
 
-  // ── Mode selection ──
-  let telegramMode: "bot" | "userbot" = "bot";
-
+  // Intro
   console.clear();
   console.log();
   noteBox(
-    "Choose how you want to connect to Telegram:\n" +
-      "\n" +
-      `  ${GREEN("Bot Mode")} — Create a bot via @BotFather (recommended)\n` +
-      "    Users chat with your bot. No phone number needed.\n" +
-      "\n" +
-      `  ${DIM("Userbot Mode")} — Use your Telegram account directly\n` +
-      "    Runs as your user account. Requires API credentials.",
+    "Set up your Teleclaw bot agent.\n" +
+      "You'll need a BotFather token, an LLM API key, and a few minutes.",
     "Teleclaw Agent Setup 🦞",
     CYAN
   );
-  console.log();
-
-  telegramMode = (await select({
-    message: "Telegram mode",
-    choices: [
-      { name: "🤖 Bot (recommended)", value: "bot" },
-      { name: "👤 Userbot (advanced)", value: "userbot" },
-    ],
-    default: "bot",
-    theme,
-  })) as "bot" | "userbot";
-
-  STEPS = telegramMode === "bot" ? [...BOT_STEPS] : [...USERBOT_STEPS];
-
-  // Intro
-  console.clear();
   console.log();
   console.log(wizardFrame(0, STEPS));
   console.log();
@@ -253,13 +219,12 @@ async function runInteractiveOnboarding(
   redraw(0);
 
   noteBox(
-    "Your Teleclaw agent will have FULL CONTROL over:\n" +
+    "Your Teleclaw bot will have access to:\n" +
       "\n" +
-      "  • TELEGRAM: Read, send, and delete messages on your behalf\n" +
+      "  • BOT CONVERSATIONS: Read and respond to messages\n" +
       "  • TON WALLET: A new wallet will be generated that the agent\n" +
       "    can use to send transactions autonomously\n" +
       "\n" +
-      "We strongly recommend using a dedicated Telegram account.\n" +
       "Only fund the generated wallet with amounts you're comfortable\n" +
       "letting the agent manage.",
     "Security Warning",
@@ -524,27 +489,9 @@ async function runInteractiveOnboarding(
   // ════════════════════════════════════════════════════════════════════
   redraw(2);
 
-  // Admin User ID
-  noteBox(
-    "To get your Telegram User ID:\n" +
-      "1. Open @userinfobot on Telegram\n" +
-      "2. Send /start\n" +
-      "3. Note the ID displayed",
-    "User ID",
-    TON
-  );
-
-  const userIdStr = options.userId
-    ? options.userId.toString()
-    : await input({
-        message: "Your Telegram User ID (for admin rights)",
-        theme,
-        validate: (value) => {
-          if (!value || isNaN(parseInt(value))) return "Invalid User ID";
-          return true;
-        },
-      });
-  userId = parseInt(userIdStr);
+  // Admin claim code — generated at setup, user sends /start <code> to become admin
+  const claimCode = generateClaimCode();
+  _userId = 0; // Will be set when user claims via bot
 
   dmPolicy = await select({
     message: "DM policy (private messages)",
@@ -903,11 +850,9 @@ async function runInteractiveOnboarding(
   STEPS[4].value = `${wallet.address.slice(0, 8)}...${wallet.address.slice(-4)}`;
 
   // ════════════════════════════════════════════════════════════════════
-  // Step 5/6: Telegram — credentials (userbot) or Bot Token (bot mode)
+  // Step 5: Bot Token (from @BotFather)
   // ════════════════════════════════════════════════════════════════════
-
-  if (telegramMode === "bot") {
-    // ── Bot mode: require bot token ──
+  {
     redraw(STEPS.length - 1);
 
     noteBox(
@@ -950,71 +895,9 @@ async function runInteractiveOnboarding(
       botToken = tokenInput;
       STEPS[STEPS.length - 1].value = "saved";
     }
-  } else {
-  // ── Userbot mode: Telegram credentials ──
-  redraw(5);
+  }
 
-  noteBox(
-    "To get your API credentials:\n" +
-      "\n" +
-      "  1. Go to https://my.telegram.org/apps\n" +
-      "  2. Log in with your phone number\n" +
-      '  3. Click "API development tools"\n' +
-      "  4. Create an application (any name/short name works)\n" +
-      "  5. Copy the API ID (number) and API Hash (hex string)\n" +
-      "\n" +
-      "⚠ Do NOT use a VPN — Telegram will block the login page.",
-    "Telegram",
-    TON
-  );
-
-  const envApiId = process.env.TELECLAW_TG_API_ID;
-  const envApiHash = process.env.TELECLAW_TG_API_HASH;
-  const envPhone = process.env.TELECLAW_TG_PHONE;
-
-  const apiIdStr = options.apiId
-    ? options.apiId.toString()
-    : await input({
-        message: envApiId ? "API ID (from env)" : "API ID (from my.telegram.org)",
-        default: envApiId,
-        theme,
-        validate: (value) => {
-          if (!value || isNaN(parseInt(value))) return "Invalid API ID (must be a number)";
-          return true;
-        },
-      });
-  apiId = parseInt(apiIdStr);
-
-  apiHash = options.apiHash
-    ? options.apiHash
-    : await input({
-        message: envApiHash ? "API Hash (from env)" : "API Hash (from my.telegram.org)",
-        default: envApiHash,
-        theme,
-        validate: (value) => {
-          if (!value || value.length < 10) return "Invalid API Hash";
-          return true;
-        },
-      });
-
-  phone = options.phone
-    ? options.phone
-    : await input({
-        message: envPhone ? "Phone number (from env)" : "Phone number (international format)",
-        default: envPhone,
-        theme,
-        validate: (value) => {
-          if (!value || !value.startsWith("+")) return "Must start with +";
-          return true;
-        },
-      });
-
-  STEPS[5].value = phone;
-
-  // ════════════════════════════════════════════════════════════════════
-  } // end of telegramMode else (userbot)
-
-  // Step: Connect — save config + Telegram auth (userbot) or just save (bot)
+  // Step: Save config
   // ════════════════════════════════════════════════════════════════════
   redraw(6);
 
@@ -1042,10 +925,10 @@ async function runInteractiveOnboarding(
       },
     },
     telegram: {
-      mode: telegramMode,
-      api_id: telegramMode === "userbot" ? apiId : 0,
-      api_hash: telegramMode === "userbot" ? apiHash : "",
-      phone: telegramMode === "userbot" ? phone : "",
+      mode: "bot" as const,
+      api_id: 0,
+      api_hash: "",
+      phone: "",
       session_name: "teleclaw_session",
       session_path: workspace.sessionPath,
       dm_policy: dmPolicy,
@@ -1057,8 +940,8 @@ async function runInteractiveOnboarding(
       typing_simulation: true,
       rate_limit_messages_per_second: 1.0,
       rate_limit_groups_per_minute: 20,
-      admin_ids: [userId],
-      owner_id: userId,
+      admin_ids: [],
+      admin_claim_code: claimCode,
       agent_channel: null,
       debounce_ms: 1500,
       bot_token: botToken,
@@ -1118,44 +1001,8 @@ async function runInteractiveOnboarding(
   writeFileSync(workspace.configPath, configYaml, { encoding: "utf-8", mode: 0o600 });
   spinner.succeed(DIM(`Configuration saved: ${workspace.configPath}`));
 
-  // Telegram authentication (userbot only — bot mode already validated token)
-  let telegramConnected = telegramMode === "bot"; // bot is already connected after token validation
-  const connectNow = telegramMode === "userbot" && await confirm({
-    message: `Connect to Telegram now? ${DIM("(verification code will be sent to your phone)")}`,
-    default: true,
-    theme,
-  });
-
-  if (connectNow) {
-    console.log(
-      `\n  ${DIM("Connecting to Telegram... Check your phone for the verification code.")}`
-    );
-    try {
-      const sessionPath = join(TELECLAW_ROOT, "telegram_session.txt");
-      const client = new TelegramUserClient({
-        apiId,
-        apiHash,
-        phone,
-        sessionPath,
-      });
-      await client.connect();
-      const me = client.getMe();
-      await client.disconnect();
-      telegramConnected = true;
-      const displayName = `${me?.firstName || ""}${me?.username ? ` (@${me.username})` : ""}`;
-      console.log(`  ${GREEN("✓")} ${DIM("Telegram connected as")} ${CYAN(displayName)}\n`);
-      STEPS[6].value = `Connected${me?.username ? ` (@${me.username})` : ""}`;
-    } catch (err) {
-      prompter.warn(
-        `Telegram connection failed: ${err instanceof Error ? err.message : String(err)}\n` +
-          "You can authenticate later when running: teleclaw start"
-      );
-      STEPS[6].value = "Auth on first start";
-    }
-  } else {
-    console.log(`\n  ${DIM("You can authenticate later when running: teleclaw start")}\n`);
-    STEPS[6].value = "Auth on first start";
-  }
+  // Bot mode — already validated token above, no further auth needed
+  const telegramConnected = true;
 
   // ════════════════════════════════════════════════════════════════════
   // Final summary
@@ -1165,6 +1012,17 @@ async function runInteractiveOnboarding(
   console.log(wizardFrame(STEPS.length, STEPS));
   console.log();
   console.log(finalSummaryBox(STEPS, telegramConnected));
+  console.log();
+  noteBox(
+    `Your admin claim code: ${GREEN.bold(claimCode)}\n` +
+      "\n" +
+      "To become admin, send this to your bot:\n" +
+      `  /start ${claimCode}\n` +
+      "\n" +
+      "This code can only be used once. Save it!",
+    "🔐 Admin Claim",
+    TON
+  );
   console.log();
   console.log(
     `  ${GREEN.bold("✔")} ${GREEN.bold("Setup complete!")} ${DIM(`Config saved to ${workspace.configPath}`)}`
@@ -1181,8 +1039,8 @@ async function runNonInteractiveOnboarding(
 ): Promise<void> {
   const selectedProvider = options.provider || "anthropic";
   const needsApiKey = selectedProvider !== "cocoon" && selectedProvider !== "local";
-  if (!options.apiId || !options.apiHash || !options.phone || !options.userId) {
-    prompter.error("Non-interactive mode requires: --api-id, --api-hash, --phone, --user-id");
+  if (!options.userId) {
+    prompter.error("Non-interactive mode requires: --user-id");
     process.exit(1);
   }
   if (needsApiKey && !options.apiKey) {
@@ -1224,10 +1082,10 @@ async function runNonInteractiveOnboarding(
       },
     },
     telegram: {
-      mode: "userbot" as const,
-      api_id: options.apiId,
-      api_hash: options.apiHash,
-      phone: options.phone,
+      mode: "bot" as const,
+      api_id: 0,
+      api_hash: "",
+      phone: "",
       session_name: "teleclaw_session",
       session_path: workspace.sessionPath,
       dm_policy: "admin-only",

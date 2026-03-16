@@ -12,13 +12,10 @@
 
 import { Type } from "@sinclair/typebox";
 import type { Tool, ToolExecutor, ToolResult, ToolContext } from "../types.js";
-import {
-  getCollection,
-  calculateRarityScore,
-  searchCollections,
-} from "./gifts-service.js";
+import { getCollection, calculateRarityScore, searchCollections } from "./gifts-service.js";
 import { checkTokenGate } from "./token-gate.js";
 import { createLogger } from "../../../utils/logger.js";
+import { priceMatches } from "../../../ton/price-service.js";
 
 const log = createLogger("GiftMatchmaker");
 
@@ -144,7 +141,11 @@ export const giftMmListTool: Tool = {
       Type.String({ description: "Notes (e.g. 'Quick sale, open to offers')" })
     ),
     expires_days: Type.Optional(
-      Type.Number({ description: "Days until listing expires (default: 14)", minimum: 1, maximum: 90 })
+      Type.Number({
+        description: "Days until listing expires (default: 14)",
+        minimum: 1,
+        maximum: 90,
+      })
     ),
   }),
 };
@@ -178,7 +179,14 @@ export const giftMmListExecutor: ToolExecutor<GiftListParams> = async (
       const suggestions = searchCollections(collection);
       return {
         success: false,
-        error: `Collection "${collection}" not found.${suggestions.length > 0 ? ` Did you mean: ${suggestions.slice(0, 3).map((s) => s.name).join(", ")}?` : ""}`,
+        error: `Collection "${collection}" not found.${
+          suggestions.length > 0
+            ? ` Did you mean: ${suggestions
+                .slice(0, 3)
+                .map((s) => s.name)
+                .join(", ")}?`
+            : ""
+        }`,
       };
     }
 
@@ -231,7 +239,8 @@ export const giftMmListExecutor: ToolExecutor<GiftListParams> = async (
       if (interest.buyer_id === context.senderId) continue;
 
       // Collection match
-      if (interest.collection && interest.collection.toLowerCase() !== col.name.toLowerCase()) continue;
+      if (interest.collection && interest.collection.toLowerCase() !== col.name.toLowerCase())
+        continue;
 
       // Model match
       if (interest.model && interest.model.toLowerCase() !== model.toLowerCase()) continue;
@@ -245,15 +254,21 @@ export const giftMmListExecutor: ToolExecutor<GiftListParams> = async (
       // Price + currency check
       if (interest.max_price && asking_price) {
         // Only compare prices if currencies match (or buyer didn't specify currency)
+        // Cross-currency price check (TON vs USDT normalized via live price)
         const interestCurrency = (interest.currency || "TON").toUpperCase();
         const listingCurrency = currency.toUpperCase();
-        if (interestCurrency === listingCurrency && asking_price > interest.max_price) continue;
-        // If currencies don't match and buyer has a price filter, skip (can't compare TON vs USDT)
-        if (interestCurrency !== listingCurrency && interest.max_price) continue;
+        const canAfford = await priceMatches(
+          asking_price,
+          listingCurrency,
+          interest.max_price,
+          interestCurrency
+        );
+        if (canAfford === false) continue;
       }
 
       // Rarity check
-      if (interest.max_rarity_permille && rarity.combinedPermille > interest.max_rarity_permille) continue;
+      if (interest.max_rarity_permille && rarity.combinedPermille > interest.max_rarity_permille)
+        continue;
 
       // Tier check
       if (interest.min_tier) {
@@ -316,6 +331,18 @@ export const giftMmListExecutor: ToolExecutor<GiftListParams> = async (
           buyerId: m.buyerId,
           reason: m.reason,
         })),
+        _notifyBuyers: matches.map((m) => ({
+          userId: m.buyerId,
+          message:
+            `🔔 New gift listing matching your interest!\n\n` +
+            `🎁 ${col.name}${gift_num ? ` #${gift_num}` : ""}\n` +
+            `Model: ${model} (${rarity.modelRarity / 10}%)\n` +
+            `Backdrop: ${backdrop} (${rarity.backdropRarity / 10}%)\n` +
+            `Symbol: ${symbol} (${rarity.symbolRarity / 10}%)\n` +
+            `Tier: ${rarity.rarityTier}\n` +
+            `Price: ${asking_price ? `${asking_price} ${currency}` : "Offers welcome"}\n\n` +
+            `Interested? Use the gift matchmaker to express interest.`,
+        })),
         note: "Teleclaw is a matchmaker only. Handle the trade yourself via any marketplace or direct transfer.",
       },
     };
@@ -362,8 +389,12 @@ export const giftMmInterestTool: Tool = {
     model: Type.Optional(Type.String({ description: "Specific model wanted (e.g. 'Ninja Mike')" })),
     backdrop: Type.Optional(Type.String({ description: "Specific backdrop wanted" })),
     symbol: Type.Optional(Type.String({ description: "Specific symbol wanted" })),
-    max_price: Type.Optional(Type.Number({ description: "Maximum price willing to pay", minimum: 0 })),
-    currency: Type.Optional(Type.String({ description: "Currency: TON, Stars, USDT (default: TON)" })),
+    max_price: Type.Optional(
+      Type.Number({ description: "Maximum price willing to pay", minimum: 0 })
+    ),
+    currency: Type.Optional(
+      Type.String({ description: "Currency: TON, Stars, USDT (default: TON)" })
+    ),
     min_tier: Type.Optional(
       Type.String({ description: "Minimum rarity tier: Legendary, Epic, Rare, Uncommon, Common" })
     ),
@@ -380,22 +411,21 @@ export const giftMmInterestExecutor: ToolExecutor<GiftInterestParams> = async (
     const gate = await checkTokenGate(context.db, context.senderId);
     if (!gate.allowed) return { success: false, error: gate.reason };
 
-    const {
-      collection,
-      model,
-      backdrop,
-      symbol,
-      max_price,
-      currency = "TON",
-      min_tier,
-    } = params;
+    const { collection, model, backdrop, symbol, max_price, currency = "TON", min_tier } = params;
 
     // Validate collection if specified
     if (collection && !getCollection(collection)) {
       const suggestions = searchCollections(collection);
       return {
         success: false,
-        error: `Collection "${collection}" not found.${suggestions.length > 0 ? ` Did you mean: ${suggestions.slice(0, 3).map((s) => s.name).join(", ")}?` : ""}`,
+        error: `Collection "${collection}" not found.${
+          suggestions.length > 0
+            ? ` Did you mean: ${suggestions
+                .slice(0, 3)
+                .map((s) => s.name)
+                .join(", ")}?`
+            : ""
+        }`,
       };
     }
 
@@ -433,11 +463,23 @@ export const giftMmInterestExecutor: ToolExecutor<GiftInterestParams> = async (
     let query = `SELECT * FROM gift_listings WHERE status = 'active'`;
     const conditions: string[] = [];
     const queryParams: unknown[] = [];
-    if (collection) { conditions.push(`LOWER(collection) = LOWER(?)`); queryParams.push(collection); }
-    if (model) { conditions.push(`LOWER(model) = LOWER(?)`); queryParams.push(model); }
-    if (backdrop) { conditions.push(`LOWER(backdrop) = LOWER(?)`); queryParams.push(backdrop); }
-    if (symbol) { conditions.push(`LOWER(symbol) = LOWER(?)`); queryParams.push(symbol); }
-    if (max_price) { conditions.push(`(asking_price IS NULL OR asking_price <= ?)`); queryParams.push(max_price); }
+    if (collection) {
+      conditions.push(`LOWER(collection) = LOWER(?)`);
+      queryParams.push(collection);
+    }
+    if (model) {
+      conditions.push(`LOWER(model) = LOWER(?)`);
+      queryParams.push(model);
+    }
+    if (backdrop) {
+      conditions.push(`LOWER(backdrop) = LOWER(?)`);
+      queryParams.push(backdrop);
+    }
+    if (symbol) {
+      conditions.push(`LOWER(symbol) = LOWER(?)`);
+      queryParams.push(symbol);
+    }
+    // Price filtering done post-query with cross-currency support
     if (min_tier) {
       const tierRank = TIER_RANK[min_tier];
       const validTiers = Object.entries(TIER_RANK)
@@ -449,9 +491,17 @@ export const giftMmInterestExecutor: ToolExecutor<GiftInterestParams> = async (
     if (conditions.length > 0) query += ` AND ${conditions.join(" AND ")}`;
 
     const existingListings = context.db.prepare(query).all(...queryParams) as GiftListingRow[];
-    const immediateMatches = existingListings
-      .filter((l) => l.seller_id !== context.senderId)
-      .slice(0, 10);
+    // Cross-currency price filter
+    const priceFiltered: GiftListingRow[] = [];
+    for (const l of existingListings) {
+      if (l.seller_id === context.senderId) continue;
+      if (max_price && l.asking_price) {
+        const canAfford = await priceMatches(l.asking_price, l.currency, max_price, currency);
+        if (canAfford === false) continue;
+      }
+      priceFiltered.push(l);
+    }
+    const immediateMatches = priceFiltered.slice(0, 10);
 
     return {
       success: true,
@@ -503,9 +553,13 @@ export const giftMmBrowseTool: Tool = {
   category: "data-bearing",
   parameters: Type.Object({
     collection: Type.Optional(Type.String({ description: "Filter by collection" })),
-    min_tier: Type.Optional(Type.String({ description: "Minimum tier: Legendary, Epic, Rare, Uncommon" })),
+    min_tier: Type.Optional(
+      Type.String({ description: "Minimum tier: Legendary, Epic, Rare, Uncommon" })
+    ),
     max_price: Type.Optional(Type.Number({ description: "Maximum price" })),
-    limit: Type.Optional(Type.Number({ description: "Max results (default 15)", minimum: 1, maximum: 50 })),
+    limit: Type.Optional(
+      Type.Number({ description: "Max results (default 15)", minimum: 1, maximum: 50 })
+    ),
   }),
 };
 
@@ -518,8 +572,14 @@ export const giftMmBrowseExecutor: ToolExecutor<GiftBrowseParams> = async (
 
     let query = `SELECT * FROM gift_listings WHERE status = 'active' AND expires_at > datetime('now')`;
     const browseParams: unknown[] = [];
-    if (params.collection) { query += ` AND LOWER(collection) = LOWER(?)`; browseParams.push(params.collection); }
-    if (params.max_price) { query += ` AND (asking_price IS NULL OR asking_price <= ?)`; browseParams.push(params.max_price); }
+    if (params.collection) {
+      query += ` AND LOWER(collection) = LOWER(?)`;
+      browseParams.push(params.collection);
+    }
+    if (params.max_price) {
+      query += ` AND (asking_price IS NULL OR asking_price <= ?)`;
+      browseParams.push(params.max_price);
+    }
     if (params.min_tier) {
       const tierRank = TIER_RANK[params.min_tier] ?? 5;
       const validTiers = Object.entries(TIER_RANK)
@@ -555,7 +615,10 @@ export const giftMmBrowseExecutor: ToolExecutor<GiftBrowseParams> = async (
       },
     };
   } catch (err: unknown) {
-    return { success: false, error: `Browse failed: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      success: false,
+      error: `Browse failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 };
 
@@ -653,7 +716,10 @@ export const giftMmCancelExecutor: ToolExecutor<GiftCancelParams> = async (
       },
     };
   } catch (err: unknown) {
-    return { success: false, error: `Cancel failed: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      success: false,
+      error: `Cancel failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 };
 
@@ -709,7 +775,14 @@ export const giftMmExpressExecutor: ToolExecutor<GiftExpressParams> = async (
         `INSERT INTO gift_matches (id, listing_id, buyer_id, seller_id, collection, gift_num)
          VALUES (?, ?, ?, ?, ?, ?)`
       )
-      .run(matchId, params.listing_id, context.senderId, listing.seller_id, listing.collection, listing.gift_num);
+      .run(
+        matchId,
+        params.listing_id,
+        context.senderId,
+        listing.seller_id,
+        listing.collection,
+        listing.gift_num
+      );
 
     // Update match count
     context.db
@@ -727,16 +800,33 @@ export const giftMmExpressExecutor: ToolExecutor<GiftExpressParams> = async (
           backdrop: listing.backdrop,
           symbol: listing.symbol,
           tier: listing.rarity_tier,
-          askingPrice: listing.asking_price ? `${listing.asking_price} ${listing.currency}` : "Offers welcome",
+          askingPrice: listing.asking_price
+            ? `${listing.asking_price} ${listing.currency}`
+            : "Offers welcome",
         },
         yourOffer: params.offer_price ? `${params.offer_price} TON` : undefined,
         yourMessage: params.message,
         sellerId: listing.seller_id,
+        // Notify seller via DM
+        _notifySeller: {
+          userId: listing.seller_id,
+          message:
+            `🔔 Someone is interested in your gift!\n\n` +
+            `🎁 ${listing.collection}${listing.gift_num ? ` #${listing.gift_num}` : ""}\n` +
+            `Model: ${listing.model} | Tier: ${listing.rarity_tier}\n` +
+            `${params.offer_price ? `💰 Their offer: ${params.offer_price} TON\n` : ""}` +
+            `${params.message ? `💬 Message: ${params.message}\n` : ""}` +
+            `👤 Buyer: ${context.senderUsername ? "@" + context.senderUsername : "User #" + context.senderId}\n\n` +
+            `Reach out to them directly if you'd like to proceed.`,
+        },
         note: "The seller has been notified. Handle the trade directly — Teleclaw does not process payments or transfers.",
       },
     };
   } catch (err: unknown) {
-    return { success: false, error: `Express interest failed: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      success: false,
+      error: `Express interest failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 };
 
@@ -796,11 +886,23 @@ export const giftMmSoldExecutor: ToolExecutor<GiftSoldParams> = async (
         status: "sold",
         buyersToNotify: interestedBuyers.length,
         buyerIds: interestedBuyers.map((b) => b.buyer_id),
+        _notifyBuyers: interestedBuyers
+          .filter((b) => b.buyer_id !== context.senderId)
+          .map((b) => ({
+            userId: b.buyer_id,
+            message:
+              `ℹ️ A gift you were interested in has been sold.\n\n` +
+              `🎁 ${listing.collection}${listing.gift_num ? " #" + listing.gift_num : ""} — ${listing.model}\n\n` +
+              `Keep browsing — more gifts are listed regularly!`,
+          })),
         note: "Listing closed. All interested buyers will be informed this gift is no longer available.",
       },
     };
   } catch (err: unknown) {
-    return { success: false, error: `Mark sold failed: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      success: false,
+      error: `Mark sold failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 };
 

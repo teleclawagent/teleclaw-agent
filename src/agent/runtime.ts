@@ -52,6 +52,7 @@ import type { ToolContext } from "./tools/types.js";
 import { appendToDailyLog } from "../memory/daily-logs.js";
 import { saveSessionMemory } from "../session/memory-hook.js";
 import { createLogger } from "../utils/logger.js";
+import { getUserSettings, getEffectiveAgentConfig } from "../session/user-settings.js";
 import type { createHookRunner } from "../sdk/hooks/runner.js";
 import type { UserHookEvaluator } from "./hooks/user-hook-evaluator.js";
 import type {
@@ -587,7 +588,10 @@ export class AgentRuntime {
         });
         const maskedContext: Context = { ...context, messages: maskedMessages };
 
-        const response: ChatResponse = await chatWithContext(this.config.agent, {
+        // Per-user API key override
+        const effectiveAgentConfig = this.getEffectiveAgentConfig(toolContext?.senderId);
+
+        const response: ChatResponse = await chatWithContext(effectiveAgentConfig, {
           systemPrompt,
           context: maskedContext,
           sessionId: session.sessionId,
@@ -853,9 +857,9 @@ export class AgentRuntime {
             // Notify matching buyers (from mm_list_username)
             if (Array.isArray(data._notifyBuyers)) {
               for (const n of data._notifyBuyers as Array<{ userId: number; message: string }>) {
-                bridge.sendMessage({ chatId: String(n.userId), text: n.message }).catch((err) =>
-                  log.warn({ err, userId: n.userId }, "Failed to notify buyer")
-                );
+                bridge
+                  .sendMessage({ chatId: String(n.userId), text: n.message })
+                  .catch((err) => log.warn({ err, userId: n.userId }, "Failed to notify buyer"));
               }
               delete data._notifyBuyers; // Strip from result before sending to model
             }
@@ -863,9 +867,9 @@ export class AgentRuntime {
             // Notify seller (from mm_express_interest)
             if (data._notifySeller && typeof data._notifySeller === "object") {
               const ns = data._notifySeller as { userId: number; message: string };
-              bridge.sendMessage({ chatId: String(ns.userId), text: ns.message }).catch((err) =>
-                log.warn({ err, userId: ns.userId }, "Failed to notify seller")
-              );
+              bridge
+                .sendMessage({ chatId: String(ns.userId), text: ns.message })
+                .catch((err) => log.warn({ err, userId: ns.userId }, "Failed to notify seller"));
               delete data._notifySeller; // Strip from result
             }
           }
@@ -1104,6 +1108,21 @@ export class AgentRuntime {
 
   getConfig(): Config {
     return this.config;
+  }
+
+  /**
+   * Get effective agent config for a user — overlays per-user settings on global config.
+   */
+  private getEffectiveAgentConfig(senderId?: number): Config["agent"] {
+    if (!senderId) return this.config.agent;
+    try {
+      const db = getDatabase().getDb();
+      const userSettings = getUserSettings(db, senderId);
+      if (!userSettings) return this.config.agent;
+      return getEffectiveAgentConfig(this.config.agent, userSettings) as Config["agent"];
+    } catch {
+      return this.config.agent;
+    }
   }
 
   getActiveChatIds(): string[] {

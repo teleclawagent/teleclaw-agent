@@ -7,7 +7,7 @@ Your own AI-powered Telegram bot with 150+ built-in tools for crypto trading, NF
 ## Quick Start
 
 ```bash
-npm install -g teleclaw-agent
+npm install -g teleclaw
 teleclaw setup
 teleclaw start
 ```
@@ -60,16 +60,18 @@ Config lives at `~/.teleclaw/config.yaml`. Key settings:
 
 ```yaml
 telegram:
-  mode: bot              # 'bot' (recommended) or 'userbot'
+  mode: bot              # Bot API mode
   bot_token: "..."       # from @BotFather
   dm_policy: open        # who can DM the bot
-  admin_ids: [12345]     # your Telegram user ID
+  # admin_ids set automatically via claim code
 
 agent:
   provider: anthropic    # claude, openai, google, local, etc.
   model: claude-sonnet-4-20250514
   api_key: "..."         # your provider API key
 ```
+
+After setup, send `/start <claim-code>` to your bot to become admin.
 
 ## Commands
 

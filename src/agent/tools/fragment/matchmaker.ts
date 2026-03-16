@@ -16,6 +16,7 @@ import { categorizeUsername, getChineseMeaning, type CategoryKey } from "./categ
 import { findMatchingBuyers } from "./taste-profile.js";
 import { checkTokenGate } from "./token-gate.js";
 import { createLogger } from "../../../utils/logger.js";
+import { priceMatches } from "../../../ton/price-service.js";
 
 const log = createLogger("Matchmaker");
 
@@ -107,7 +108,11 @@ export const mmListTool: Tool = {
       Type.String({ description: "Short description or notes (e.g. 'OG 4-letter, clean history')" })
     ),
     expires_days: Type.Optional(
-      Type.Number({ description: "Days until listing expires (default: 14)", minimum: 1, maximum: 90 })
+      Type.Number({
+        description: "Days until listing expires (default: 14)",
+        minimum: 1,
+        maximum: 90,
+      })
     ),
   }),
 };
@@ -160,20 +165,24 @@ export const mmListExecutor: ToolExecutor<ListForSaleParams> = async (
 
     // ── Match via Taste Profiles (AI-powered) ──
     const tasteMatches = findMatchingBuyers(
-      context, clean, categories as CategoryKey[], asking_price, 40
+      context,
+      clean,
+      categories as CategoryKey[],
+      asking_price,
+      40
     ).filter((m) => m.userId !== context.senderId);
 
     // ── Match via Category Interests (legacy/manual) ──
     const interests = context.db
       .prepare(`SELECT * FROM mm_interests WHERE active = 1`)
       .all() as Array<{
-        id: string;
-        buyer_id: number;
-        buyer_username: string | null;
-        categories: string;
-        max_price: number | null;
-        keywords: string | null;
-      }>;
+      id: string;
+      buyer_id: number;
+      buyer_username: string | null;
+      categories: string;
+      max_price: number | null;
+      keywords: string | null;
+    }>;
 
     const interestMatches: Array<{ buyerId: number; interestId: string; reason: string }> = [];
 
@@ -183,12 +192,20 @@ export const mmListExecutor: ToolExecutor<ListForSaleParams> = async (
       const buyerCats: string[] = JSON.parse(interest.categories);
       const overlap = categories.filter((c) => buyerCats.includes(c));
       if (overlap.length === 0) continue;
-      // Currency-aware price check
+      // Cross-currency price check (TON vs USDT normalized via live price)
       if (interest.max_price && asking_price) {
-        const interestCurrency = ((interest as Record<string, unknown>).currency as string || "TON").toUpperCase();
+        const interestCurrency = (
+          ((interest as Record<string, unknown>).currency as string) || "TON"
+        ).toUpperCase();
         const listingCurrency = currency.toUpperCase();
-        if (interestCurrency === listingCurrency && asking_price > interest.max_price) continue;
-        if (interestCurrency !== listingCurrency) continue; // Can't compare TON vs USDT
+        const canAfford = await priceMatches(
+          asking_price,
+          listingCurrency,
+          interest.max_price,
+          interestCurrency
+        );
+        if (canAfford === false) continue; // Too expensive
+        // canAfford === null means price fetch failed — include match to not miss opportunities
       }
 
       if (interest.keywords) {
@@ -207,7 +224,12 @@ export const mmListExecutor: ToolExecutor<ListForSaleParams> = async (
 
     // Merge both match sources, deduplicate by userId
     const allBuyerIds = new Set<number>();
-    const matchedBuyers: Array<{ buyerId: number; interestId?: string; reason: string; score?: number }> = [];
+    const matchedBuyers: Array<{
+      buyerId: number;
+      interestId?: string;
+      reason: string;
+      score?: number;
+    }> = [];
 
     // Taste profile matches first (higher quality)
     for (const tm of tasteMatches) {
@@ -252,9 +274,10 @@ export const mmListExecutor: ToolExecutor<ListForSaleParams> = async (
     }
 
     const priceText = asking_price ? `${asking_price} TON` : "Offers welcome";
-    const matchText = matchedBuyers.length > 0
-      ? `\n\n🎯 ${matchedBuyers.length} potential buyer${matchedBuyers.length !== 1 ? "s" : ""} found! They'll be notified.`
-      : "\n\nNo matching buyers yet — they'll be notified when they register interest.";
+    const matchText =
+      matchedBuyers.length > 0
+        ? `\n\n🎯 ${matchedBuyers.length} potential buyer${matchedBuyers.length !== 1 ? "s" : ""} found! They'll be notified.`
+        : "\n\nNo matching buyers yet — they'll be notified when they register interest.";
 
     return {
       success: true,
@@ -315,21 +338,44 @@ export const mmInterestTool: Tool = {
     categories: Type.Array(
       Type.String({
         enum: [
-          "ultra_short", "short", "medium", "standard",
-          "numeric", "repeating", "palindrome",
-          "crypto", "finance", "gaming", "tech", "social",
-          "business", "lifestyle", "media",
-          "premium", "brandable", "emoji_name",
-          "country", "name", "ton_related", "meme", "chinese",
+          "ultra_short",
+          "short",
+          "medium",
+          "standard",
+          "numeric",
+          "repeating",
+          "palindrome",
+          "crypto",
+          "finance",
+          "gaming",
+          "tech",
+          "social",
+          "business",
+          "lifestyle",
+          "media",
+          "premium",
+          "brandable",
+          "emoji_name",
+          "country",
+          "name",
+          "ton_related",
+          "meme",
+          "chinese",
         ],
       }),
-      { description: "Categories you're interested in (e.g. crypto, short, gaming, premium)", minItems: 1 }
+      {
+        description: "Categories you're interested in (e.g. crypto, short, gaming, premium)",
+        minItems: 1,
+      }
     ),
     max_price: Type.Optional(
       Type.Number({ description: "Maximum you're willing to pay", minimum: 0 })
     ),
     currency: Type.Optional(
-      Type.String({ description: "Price currency: TON or USDT (default: TON). Only listings in this currency will match." })
+      Type.String({
+        description:
+          "Price currency: TON or USDT (default: TON). Only listings in this currency will match.",
+      })
     ),
     keywords: Type.Optional(
       Type.String({ description: "Specific keywords (comma-separated, e.g. 'wallet,pay,bank')" })
@@ -374,17 +420,15 @@ export const mmInterestExecutor: ToolExecutor<RegisterInterestParams> = async (
 
     // Check existing active listings that match
     const listings = context.db
-      .prepare(
-        `SELECT * FROM mm_listings WHERE status = 'active' AND expires_at > datetime('now')`
-      )
+      .prepare(`SELECT * FROM mm_listings WHERE status = 'active' AND expires_at > datetime('now')`)
       .all() as Array<{
-        id: string;
-        seller_id: number;
-        username: string;
-        asking_price: number | null;
-        categories: string;
-        estimated_value: number | null;
-      }>;
+      id: string;
+      seller_id: number;
+      username: string;
+      asking_price: number | null;
+      categories: string;
+      estimated_value: number | null;
+    }>;
 
     const existingMatches: string[] = [];
     for (const listing of listings) {
@@ -393,18 +437,26 @@ export const mmInterestExecutor: ToolExecutor<RegisterInterestParams> = async (
       const listingCats: string[] = JSON.parse(listing.categories);
       const overlap = categories.filter((c) => listingCats.includes(c));
       if (overlap.length === 0) continue;
-      if (max_price && listing.asking_price && listing.asking_price > max_price) continue;
+      if (max_price && listing.asking_price) {
+        const listingCur = ((listing as Record<string, unknown>).currency as string) || "TON";
+        const canAfford = await priceMatches(listing.asking_price, listingCur, max_price, currency);
+        if (canAfford === false) continue;
+      }
 
       existingMatches.push(
         `${listing.username} — ${listing.asking_price ? listing.asking_price + " TON" : "offers welcome"}`
       );
     }
 
-    const matchText = existingMatches.length > 0
-      ? `\n\n📋 ${existingMatches.length} existing listing${existingMatches.length !== 1 ? "s" : ""} match:\n` +
-        existingMatches.slice(0, 10).map((m, i) => `  ${i + 1}. ${m}`).join("\n") +
-        "\n\nUse mm_express_interest to signal interest in any listing."
-      : "\n\nNo current listings match — you'll be notified when one appears.";
+    const matchText =
+      existingMatches.length > 0
+        ? `\n\n📋 ${existingMatches.length} existing listing${existingMatches.length !== 1 ? "s" : ""} match:\n` +
+          existingMatches
+            .slice(0, 10)
+            .map((m, i) => `  ${i + 1}. ${m}`)
+            .join("\n") +
+          "\n\nUse mm_express_interest to signal interest in any listing."
+        : "\n\nNo current listings match — you'll be notified when one appears.";
 
     return {
       success: true,
@@ -442,12 +494,8 @@ export const mmExpressInterestTool: Tool = {
     "The seller will be notified that you're interested and can DM you to arrange the trade.",
   category: "action",
   parameters: Type.Object({
-    listing_id: Type.Optional(
-      Type.String({ description: "Listing ID (full or last 8 chars)" })
-    ),
-    username: Type.Optional(
-      Type.String({ description: "Or specify the username directly" })
-    ),
+    listing_id: Type.Optional(Type.String({ description: "Listing ID (full or last 8 chars)" })),
+    username: Type.Optional(Type.String({ description: "Or specify the username directly" })),
   }),
 };
 
@@ -472,9 +520,7 @@ export const mmExpressInterestExecutor: ToolExecutor<ExpressInterestParams> = as
     let listing;
     if (listing_id) {
       listing = context.db
-        .prepare(
-          `SELECT * FROM mm_listings WHERE (id = ? OR id LIKE ?) AND status = 'active'`
-        )
+        .prepare(`SELECT * FROM mm_listings WHERE (id = ? OR id LIKE ?) AND status = 'active'`)
         .get(listing_id, `%${listing_id}`) as Record<string, unknown> | undefined;
     } else if (username) {
       const clean = `@${username.replace(/^@/, "").toLowerCase()}`;
@@ -510,9 +556,7 @@ export const mmExpressInterestExecutor: ToolExecutor<ExpressInterestParams> = as
     const priceText = listing.asking_price ? `${listing.asking_price} TON` : "offers welcome";
 
     // Get buyer's username from context for seller notification
-    const buyerUsername = context.senderUsername
-      ? `@${context.senderUsername}`
-      : null;
+    const buyerUsername = context.senderUsername ? `@${context.senderUsername}` : null;
     const buyerLabel = buyerUsername || `User #${context.senderId}`;
 
     return {
@@ -565,18 +609,33 @@ export const mmBrowseTool: Tool = {
       Type.String({
         description: "Filter by category",
         enum: [
-          "ultra_short", "short", "medium", "standard",
-          "numeric", "repeating", "palindrome",
-          "crypto", "finance", "gaming", "tech", "social",
-          "business", "lifestyle", "media",
-          "premium", "brandable", "emoji_name",
-          "country", "name", "ton_related", "meme", "chinese",
+          "ultra_short",
+          "short",
+          "medium",
+          "standard",
+          "numeric",
+          "repeating",
+          "palindrome",
+          "crypto",
+          "finance",
+          "gaming",
+          "tech",
+          "social",
+          "business",
+          "lifestyle",
+          "media",
+          "premium",
+          "brandable",
+          "emoji_name",
+          "country",
+          "name",
+          "ton_related",
+          "meme",
+          "chinese",
         ],
       })
     ),
-    max_price: Type.Optional(
-      Type.Number({ description: "Max price in TON", minimum: 0 })
-    ),
+    max_price: Type.Optional(Type.Number({ description: "Max price in TON", minimum: 0 })),
     sort: Type.Optional(
       Type.String({
         description: "Sort: newest, cheapest, popular (most interest)",
@@ -606,9 +665,11 @@ export const mmBrowseExecutor: ToolExecutor<BrowseListingsParams> = async (
     }
 
     const orderBy =
-      sort === "cheapest" ? "asking_price ASC NULLS LAST" :
-      sort === "popular" ? "match_count DESC" :
-      "created_at DESC";
+      sort === "cheapest"
+        ? "asking_price ASC NULLS LAST"
+        : sort === "popular"
+          ? "match_count DESC"
+          : "created_at DESC";
     query += ` ORDER BY ${orderBy} LIMIT ?`;
     queryParams.push(limit);
 
@@ -683,14 +744,14 @@ export const mmMyListingsExecutor: ToolExecutor<Record<string, never>> = async (
          ORDER BY created_at DESC`
       )
       .all(context.senderId) as Array<{
-        id: string;
-        username: string;
-        asking_price: number | null;
-        match_count: number;
-        created_at: string;
-        expires_at: string;
-        status: string;
-      }>;
+      id: string;
+      username: string;
+      asking_price: number | null;
+      match_count: number;
+      created_at: string;
+      expires_at: string;
+      status: string;
+    }>;
 
     if (listings.length === 0) {
       return {
@@ -759,7 +820,7 @@ export const mmCancelExecutor: ToolExecutor<CancelListingParams> = async (
         )
         .run(listing_id, `%${listing_id}`, context.senderId);
     } else {
-      const clean = `@${username!.replace(/^@/, "").toLowerCase()}`;
+      const clean = `@${(username ?? "").replace(/^@/, "").toLowerCase()}`;
       result = context.db
         .prepare(
           `UPDATE mm_listings SET status = 'cancelled'
@@ -817,12 +878,16 @@ export const mmSoldExecutor: ToolExecutor<SoldParams> = async (
     let listing;
     if (listing_id) {
       listing = context.db
-        .prepare(`SELECT * FROM mm_listings WHERE (id = ? OR id LIKE ?) AND seller_id = ? AND status = 'active'`)
+        .prepare(
+          `SELECT * FROM mm_listings WHERE (id = ? OR id LIKE ?) AND seller_id = ? AND status = 'active'`
+        )
         .get(listing_id, `%${listing_id}`, context.senderId) as Record<string, unknown> | undefined;
     } else {
-      const clean = `@${username!.replace(/^@/, "").toLowerCase()}`;
+      const clean = `@${(username ?? "").replace(/^@/, "").toLowerCase()}`;
       listing = context.db
-        .prepare(`SELECT * FROM mm_listings WHERE username = ? AND seller_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1`)
+        .prepare(
+          `SELECT * FROM mm_listings WHERE username = ? AND seller_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1`
+        )
         .get(clean, context.senderId) as Record<string, unknown> | undefined;
     }
 
@@ -847,6 +912,15 @@ export const mmSoldExecutor: ToolExecutor<SoldParams> = async (
         status: "sold",
         buyersToNotify: interestedBuyers.length,
         buyerIds: interestedBuyers.map((b) => b.buyer_id),
+        _notifyBuyers: interestedBuyers
+          .filter((b) => b.buyer_id !== context.senderId)
+          .map((b) => ({
+            userId: b.buyer_id,
+            message:
+              `ℹ️ A username you were interested in has been sold.\n\n` +
+              `🔗 ${listing.username}\n\n` +
+              `Keep browsing — new usernames are listed regularly!`,
+          })),
         message: `✅ ${listing.username} marked as sold! ${interestedBuyers.length} interested buyer(s) will be notified.`,
       },
     };

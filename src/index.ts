@@ -44,6 +44,7 @@ import { PluginRateLimiter } from "./bot/rate-limiter.js";
 import { setBotPreMiddleware, getDealBot } from "./deals/module.js";
 import type { TaskDependencyResolver } from "./telegram/task-dependency-resolver.js";
 import type { WebUIServer } from "./webui/server.js";
+import { checkStaleListings, expireOldListings } from "./agent/tools/fragment/stale-checker.js";
 
 const log = createLogger("App");
 
@@ -70,6 +71,7 @@ export class TeleclawApp {
   private userHookEvaluator: UserHookEvaluator | null = null;
   private startTime: number = 0;
   private messagesProcessed: number = 0;
+  private staleCheckerInterval: ReturnType<typeof setInterval> | null = null;
 
   private configPath: string;
 
@@ -165,7 +167,9 @@ export class TeleclawApp {
       this.config.telegram,
       this.agent,
       modulePermissions,
-      this.toolRegistry
+      this.toolRegistry,
+      this.config,
+      this.configPath
     );
   }
 
@@ -670,6 +674,28 @@ ${blue}  ┌──────────────────────�
     if ("startPolling" in this.bridge && typeof this.bridge.startPolling === "function") {
       (this.bridge as { startPolling(): void }).startPolling();
     }
+
+    // Periodic OTC matchmaker maintenance (every 6 hours)
+    // - Remind sellers about stale listings (active 48h+ with matches)
+    // - Expire listings past their expiration date
+    this.staleCheckerInterval = setInterval(
+      () => {
+        const mainDb = getDatabase().getDb();
+        const ctx = {
+          bridge: this.bridge,
+          db: mainDb,
+          chatId: "",
+          isGroup: false,
+          senderId: 0,
+          config: this.config,
+        };
+        checkStaleListings(ctx, this.bridge).catch((err) =>
+          log.warn({ err }, "Stale listing check failed")
+        );
+        expireOldListings(ctx);
+      },
+      6 * 60 * 60 * 1000
+    );
   }
 
   /**
@@ -690,7 +716,9 @@ ${blue}  ┌──────────────────────�
 
       // getEntity is optional (only userbot mode)
       if (!this.bridge.getEntity) {
-        log.info("Skipping owner resolution (Bot API mode — set owner_name/owner_username in config)");
+        log.info(
+          "Skipping owner resolution (Bot API mode — set owner_name/owner_username in config)"
+        );
         return;
       }
 
@@ -760,6 +788,67 @@ ${blue}  ┌──────────────────────�
         return;
       }
 
+      // Handle /start — claim code or onboarding (before admin check)
+      const startCmd = this.adminHandler.parseCommand(message.text);
+      if (startCmd && startCmd.command === "start") {
+        // Try claim first
+        const claimResult = await this.adminHandler.handleClaimAttempt(
+          { ...startCmd, chatId: message.chatId, senderId: message.senderId },
+          message.senderId
+        );
+        if (claimResult) {
+          await this.bridge.sendMessage({
+            chatId: message.chatId,
+            text: claimResult,
+            replyToId: message.id,
+          });
+          return;
+        }
+
+        // Not a claim — show welcome message (pass to agent with bootstrap)
+        if (!message.isGroup) {
+          const bootstrapContent = this.adminHandler.getBootstrapContent();
+          if (bootstrapContent) {
+            message.text = bootstrapContent;
+            // Fall through to handleMessage below
+          } else {
+            await this.bridge.sendMessage({
+              chatId: message.chatId,
+              text:
+                "👋 Welcome to Teleclaw!\n\n" +
+                "I'm your AI agent for Telegram & TON blockchain.\n\n" +
+                "Just ask me anything — trade tokens, check prices, manage gifts, flip usernames, and more.\n\n" +
+                "Type /help to see admin commands.",
+            });
+            return;
+          }
+        }
+      }
+
+      // Handle /apikey and /mymodel — available to ALL users (not admin-gated)
+      const userCmd = this.adminHandler.parseCommand(message.text);
+      if (
+        userCmd &&
+        (userCmd.command === "apikey" ||
+          userCmd.command === "mymodel" ||
+          userCmd.command === "mysettings")
+      ) {
+        const response = await this.handleUserSettingsCommand(
+          userCmd.command,
+          userCmd.args,
+          message.chatId,
+          message.senderId
+        );
+        if (response) {
+          await this.bridge.sendMessage({
+            chatId: message.chatId,
+            text: response,
+            replyToId: message.id,
+          });
+        }
+        return;
+      }
+
       // Check if this is an admin command
       const adminCmd = this.adminHandler.parseCommand(message.text);
       if (adminCmd && this.adminHandler.isAdmin(message.senderId)) {
@@ -825,6 +914,106 @@ ${blue}  ┌──────────────────────�
     } catch (error) {
       log.error({ err: error }, "Error handling message");
     }
+  }
+
+  /**
+   * Handle user settings commands (/apikey, /mymodel, /mysettings)
+   */
+  private async handleUserSettingsCommand(
+    command: string,
+    args: string[],
+    chatId: string,
+    senderId: number
+  ): Promise<string> {
+    const {
+      getUserSettings: getSettings,
+      setUserProvider: setProvider,
+      setUserModel: setModel,
+      clearUserSettings: clearSettings,
+    } = await import("./session/user-settings.js");
+    const db = getDatabase().getDb();
+
+    if (command === "mysettings") {
+      const settings = getSettings(db, senderId);
+      if (!settings) {
+        return (
+          "⚙️ **Your Settings**\n\n" +
+          "No custom settings — using bot defaults.\n\n" +
+          "Commands:\n" +
+          "/apikey <provider> <key> — Set your LLM API key\n" +
+          "/mymodel <model> — Set preferred model\n" +
+          "/apikey clear — Remove custom settings"
+        );
+      }
+      return (
+        "⚙️ **Your Settings**\n\n" +
+        `Provider: **${settings.provider || "default"}**\n` +
+        `Model: **${settings.model || "default"}**\n` +
+        `API Key: **${"•".repeat(8)}${settings.apiKey?.slice(-4) || "none"}**\n\n` +
+        "Commands:\n" +
+        "/apikey <provider> <key> — Change provider\n" +
+        "/mymodel <model> — Change model\n" +
+        "/apikey clear — Remove custom settings"
+      );
+    }
+
+    if (command === "apikey") {
+      if (args[0] === "clear") {
+        clearSettings(db, senderId);
+        return "✅ Custom settings cleared. Using bot defaults now.";
+      }
+
+      if (args.length < 2) {
+        return (
+          "Usage: `/apikey <provider> <key>`\n\n" +
+          "Providers: anthropic, openai, google, xai, groq, openrouter, mistral\n\n" +
+          "Example: `/apikey anthropic sk-ant-...`\n" +
+          "Clear: `/apikey clear`"
+        );
+      }
+
+      const provider = args[0].toLowerCase();
+      const apiKey = args[1];
+      const validProviders = [
+        "anthropic",
+        "openai",
+        "google",
+        "xai",
+        "groq",
+        "openrouter",
+        "mistral",
+        "cerebras",
+        "minimax",
+        "moonshot",
+      ];
+      if (!validProviders.includes(provider)) {
+        return `❌ Unknown provider "${provider}". Valid: ${validProviders.join(", ")}`;
+      }
+
+      setProvider(db, senderId, provider, apiKey);
+
+      // Delete the message containing the API key for security
+      try {
+        await this.bridge.sendMessage({
+          chatId,
+          text: `✅ API key set for **${provider}**!\n\n⚠️ Delete your message containing the key for security.`,
+        });
+      } catch {
+        /* ignore */
+      }
+
+      return "";
+    }
+
+    if (command === "mymodel") {
+      if (args.length === 0) {
+        return "Usage: `/mymodel <model-name>`\n\nExample: `/mymodel claude-sonnet-4-20250514`";
+      }
+      setModel(db, senderId, args[0]);
+      return `✅ Model set to **${args[0]}**`;
+    }
+
+    return "❓ Unknown command.";
   }
 
   /**
@@ -1084,6 +1273,12 @@ ${blue}  ┌──────────────────────�
       } catch (e) {
         log.error({ err: e }, "⚠️ agent:stop hook failed");
       }
+    }
+
+    // Stop stale listing checker
+    if (this.staleCheckerInterval) {
+      clearInterval(this.staleCheckerInterval);
+      this.staleCheckerInterval = null;
     }
 
     // Stop plugin watcher first
