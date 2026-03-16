@@ -1,5 +1,5 @@
 import type { TSchema } from "@sinclair/typebox";
-import type { TelegramBridge } from "../../telegram/bridge.js";
+import type { TelegramTransport } from "../../telegram/transport.js";
 import type Database from "better-sqlite3";
 import type { Config } from "../../config/schema.js";
 
@@ -7,14 +7,16 @@ import type { Config } from "../../config/schema.js";
  * Context provided to tool executors
  */
 export interface ToolContext {
-  /** Telegram bridge for sending messages, reactions, etc. */
-  bridge: TelegramBridge;
+  /** Telegram transport for sending messages, reactions, etc. */
+  bridge: TelegramTransport;
   /** Database instance for storage */
   db: Database.Database;
   /** Current chat ID where the tool is being executed */
   chatId: string;
   /** Current user/sender ID */
   senderId: number;
+  /** Current user's Telegram username (without @, if available) */
+  senderUsername?: string;
   /** Whether this is a group chat */
   isGroup: boolean;
   /** Full config for accessing API key, model, etc. (optional) */
@@ -117,7 +119,7 @@ export interface PluginModule {
  * Context provided to plugin modules during start()
  */
 export interface PluginContext {
-  bridge: TelegramBridge;
+  bridge: TelegramTransport;
   db: Database.Database;
   config: Config;
   /** Plugin-specific config from config.yaml plugins section (external plugins only) */

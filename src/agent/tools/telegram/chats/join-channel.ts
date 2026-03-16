@@ -48,7 +48,7 @@ export const telegramJoinChannelExecutor: ToolExecutor<JoinChannelParams> = asyn
     const { channel } = params;
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Try invite link first if the input looks like one
     const inviteHash = extractInviteHash(channel);

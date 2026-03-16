@@ -1,0 +1,189 @@
+/**
+ * 🏪 Marketplace Aggregator Service
+ *
+ * Queries all available marketplaces in parallel for a given asset,
+ * normalizes results, and returns sorted by price.
+ *
+ * Gracefully handles unavailable marketplaces — if Fragment is down,
+ * we still return Getgems + Market.app results.
+ */
+
+import type {
+  MarketplaceAdapter,
+  MarketplaceListing,
+  SearchParams,
+  AggregatedResult,
+  AssetKind,
+  MarketplaceId,
+} from "./types.js";
+import { getMarketplacesForAsset } from "./types.js";
+import { fragmentAdapter } from "./adapters/fragment-adapter.js";
+import { getgemsAdapter } from "./adapters/getgems-adapter.js";
+import { marketAppAdapter } from "./adapters/marketapp-adapter.js";
+import { tonnelAdapter } from "./adapters/tonnel-adapter.js";
+import { portalsAdapter } from "./adapters/portals-adapter.js";
+import { mrktAdapter } from "./adapters/mrkt-adapter.js";
+import { createLogger } from "../../../utils/logger.js";
+
+const log = createLogger("Aggregator");
+
+// ─── Adapter Registry ────────────────────────────────────────────────
+
+const ALL_ADAPTERS: MarketplaceAdapter[] = [
+  fragmentAdapter,
+  getgemsAdapter,
+  marketAppAdapter,
+  tonnelAdapter,
+  portalsAdapter,
+  mrktAdapter,
+];
+
+const adapterMap = new Map<MarketplaceId, MarketplaceAdapter>();
+for (const adapter of ALL_ADAPTERS) {
+  adapterMap.set(adapter.id, adapter);
+}
+
+/** Get adapters that support a given asset type */
+function getAdaptersForAsset(assetKind: AssetKind): MarketplaceAdapter[] {
+  const ids = getMarketplacesForAsset(assetKind);
+  return ids.map((id) => adapterMap.get(id)!).filter(Boolean);
+}
+
+// ─── Aggregated Search ───────────────────────────────────────────────
+
+const SEARCH_TIMEOUT_MS = 8000; // 8s per marketplace max
+
+/**
+ * Search across all marketplaces for a given asset type.
+ * Runs queries in parallel with individual timeouts.
+ */
+export async function aggregatedSearch(params: SearchParams): Promise<AggregatedResult> {
+  const adapters = getAdaptersForAsset(params.assetKind);
+  const checked: MarketplaceId[] = [];
+  const failed: MarketplaceId[] = [];
+  const allListings: MarketplaceListing[] = [];
+
+  // Query all adapters in parallel
+  const results = await Promise.allSettled(
+    adapters.map(async (adapter) => {
+      checked.push(adapter.id);
+
+      // Wrap each adapter call with a timeout
+      const timeoutPromise = new Promise<MarketplaceListing[]>((_, reject) => {
+        setTimeout(() => reject(new Error("Timeout")), SEARCH_TIMEOUT_MS);
+      });
+
+      try {
+        const listings = await Promise.race([
+          adapter.search(params),
+          timeoutPromise,
+        ]);
+        return { id: adapter.id, listings };
+      } catch (err) {
+        log.warn({ marketplace: adapter.id, err }, "Adapter search failed");
+        failed.push(adapter.id);
+        return { id: adapter.id, listings: [] as MarketplaceListing[] };
+      }
+    })
+  );
+
+  // Collect results
+  for (const result of results) {
+    if (result.status === "fulfilled" && result.value.listings.length > 0) {
+      allListings.push(...result.value.listings);
+    }
+  }
+
+  // Sort by price (lowest first, null prices at end)
+  allListings.sort((a, b) => {
+    if (a.priceTon === null && b.priceTon === null) return 0;
+    if (a.priceTon === null) return 1;
+    if (b.priceTon === null) return -1;
+    return a.priceTon - b.priceTon;
+  });
+
+  // Apply overall limit
+  const limited = allListings.slice(0, params.limit ?? 30);
+
+  // Find best deal
+  const bestDeal = limited.find((l) => l.priceTon !== null) ?? null;
+
+  // Price range
+  const priced = limited.filter((l) => l.priceTon !== null);
+  const lowest = priced.length > 0 ? priced[0].priceTon : null;
+  const highest = priced.length > 0 ? priced[priced.length - 1].priceTon : null;
+
+  return {
+    listings: limited,
+    marketplacesChecked: checked,
+    marketplacesFailed: failed,
+    bestDeal,
+    totalFound: allListings.length,
+    priceRange: {
+      lowest,
+      highest,
+      marketplace_lowest: bestDeal?.marketplace ?? null,
+    },
+  };
+}
+
+/**
+ * Get a specific listing from all marketplaces.
+ * Returns the first match found (useful for cross-marketplace price comparison).
+ */
+export async function aggregatedGetListing(
+  assetKind: AssetKind,
+  identifier: string
+): Promise<{
+  listings: MarketplaceListing[];
+  cheapest: MarketplaceListing | null;
+}> {
+  const adapters = getAdaptersForAsset(assetKind);
+
+  const results = await Promise.allSettled(
+    adapters.map(async (adapter) => {
+      try {
+        return await adapter.getListing(assetKind, identifier);
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  const listings = results
+    .filter((r) => r.status === "fulfilled" && r.value !== null)
+    .map((r) => (r as PromiseFulfilledResult<MarketplaceListing>).value);
+
+  listings.sort((a, b) => {
+    if (a.priceTon === null) return 1;
+    if (b.priceTon === null) return -1;
+    return a.priceTon - b.priceTon;
+  });
+
+  return {
+    listings,
+    cheapest: listings[0] ?? null,
+  };
+}
+
+/**
+ * Check which marketplaces are currently available.
+ */
+export async function checkMarketplaceHealth(): Promise<
+  Array<{ id: MarketplaceId; name: string; available: boolean; supports: AssetKind[] }>
+> {
+  const results = await Promise.allSettled(
+    ALL_ADAPTERS.map(async (adapter) => ({
+      id: adapter.id,
+      name: adapter.name,
+      available: await adapter.isAvailable(),
+      supports: adapter.supports,
+    }))
+  );
+
+  return results.map((r) =>
+    r.status === "fulfilled"
+      ? r.value
+      : { id: "unknown" as MarketplaceId, name: "Unknown", available: false, supports: [] as AssetKind[] }
+  );
+}

@@ -29,7 +29,7 @@ export const telegramGetAdminedChannelsExecutor: ToolExecutor<GetAdminedChannels
   context
 ): Promise<ToolResult> => {
   try {
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     const result = await gramJsClient.invoke(
       new Api.channels.GetAdminedPublicChannels({

@@ -48,7 +48,7 @@ export const telegramGetCommonChatsExecutor: ToolExecutor<GetCommonChatsParams> 
     const { userId, limit = 50 } = params;
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Get user entity
     const userEntity = await gramJsClient.getInputEntity(userId);

@@ -29,6 +29,10 @@ import {
   telegramResolveGiftOfferTool,
   telegramResolveGiftOfferExecutor,
 } from "./resolve-gift-offer.js";
+import {
+  myCollectionValueTool,
+  myCollectionValueExecutor,
+} from "./my-collection-value.js";
 import type { ToolEntry } from "../../types.js";
 
 export { telegramGetAvailableGiftsTool, telegramGetAvailableGiftsExecutor };
@@ -44,6 +48,7 @@ export { telegramGetUniqueGiftTool, telegramGetUniqueGiftExecutor };
 export { telegramGetUniqueGiftValueTool, telegramGetUniqueGiftValueExecutor };
 export { telegramSendGiftOfferTool, telegramSendGiftOfferExecutor };
 export { telegramResolveGiftOfferTool, telegramResolveGiftOfferExecutor };
+export { myCollectionValueTool, myCollectionValueExecutor };
 
 export const tools: ToolEntry[] = [
   { tool: telegramGetAvailableGiftsTool, executor: telegramGetAvailableGiftsExecutor },
@@ -71,4 +76,5 @@ export const tools: ToolEntry[] = [
     executor: telegramResolveGiftOfferExecutor,
     scope: "dm-only",
   },
+  { tool: myCollectionValueTool, executor: myCollectionValueExecutor, scope: "dm-only" },
 ];

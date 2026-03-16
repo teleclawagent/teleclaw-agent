@@ -38,7 +38,7 @@ export const telegramAddStickerSetExecutor: ToolExecutor<AddStickerSetParams> = 
     const { shortName } = params;
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Get the sticker set info first
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GramJS API response is untyped

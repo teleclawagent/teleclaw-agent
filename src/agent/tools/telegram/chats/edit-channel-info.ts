@@ -57,7 +57,7 @@ export const telegramEditChannelInfoExecutor: ToolExecutor<EditChannelInfoParams
       };
     }
 
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Get channel entity
     const entity = await gramJsClient.getEntity(channelId);

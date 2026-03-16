@@ -92,6 +92,7 @@ function isContextOverflowError(errorMessage?: string): boolean {
 function isTrivialMessage(text: string): boolean {
   const stripped = text.trim();
   if (!stripped) return true;
+  if (stripped.length <= 1 && !/[a-zA-Z0-9а-яА-ЯёЁ]/.test(stripped)) return false; // single chars like "?" are follow-ups, not trivial
   if (!/[a-zA-Z0-9а-яА-ЯёЁ]/.test(stripped)) return true;
   const trivial =
     /^(ok|okay|k|oui|non|yes|no|yep|nope|sure|thanks|merci|thx|ty|lol|haha|cool|nice|wow|bravo|top|parfait|d'accord|alright|fine|got it|np|gg)\.?!?$/i;
@@ -844,6 +845,31 @@ export class AgentRuntime {
           log.debug(`${block.name}: ${exec.result.success ? "✓" : "✗"} ${exec.result.error || ""}`);
           iterationToolNames.push(`${block.name} ${exec.result.success ? "✓" : "✗"}`);
 
+          // ── Matchmaker DM Notifications ──
+          if (exec.result.success && exec.result.data && toolContext) {
+            const data = exec.result.data as Record<string, unknown>;
+            const bridge = toolContext.bridge;
+
+            // Notify matching buyers (from mm_list_username)
+            if (Array.isArray(data._notifyBuyers)) {
+              for (const n of data._notifyBuyers as Array<{ userId: number; message: string }>) {
+                bridge.sendMessage({ chatId: String(n.userId), text: n.message }).catch((err) =>
+                  log.warn({ err, userId: n.userId }, "Failed to notify buyer")
+                );
+              }
+              delete data._notifyBuyers; // Strip from result before sending to model
+            }
+
+            // Notify seller (from mm_express_interest)
+            if (data._notifySeller && typeof data._notifySeller === "object") {
+              const ns = data._notifySeller as { userId: number; message: string };
+              bridge.sendMessage({ chatId: String(ns.userId), text: ns.message }).catch((err) =>
+                log.warn({ err, userId: ns.userId }, "Failed to notify seller")
+              );
+              delete data._notifySeller; // Strip from result
+            }
+          }
+
           totalToolCalls.push({
             name: block.name,
             input: block.arguments,
@@ -1002,6 +1028,9 @@ export class AgentRuntime {
       } else if (!content && accumulatedUsage.input === 0 && accumulatedUsage.output === 0) {
         log.warn("⚠️ Empty response with zero tokens - possible API issue");
         content = "I couldn't process your request. Please try again.";
+      } else if (!content && totalToolCalls.length === 0) {
+        log.warn("⚠️ Empty response with no tool calls - model returned nothing");
+        content = "Hmm, I didn't catch that. Could you try rephrasing?";
       }
 
       // Hook: response:before — plugins can mutate or block the response text

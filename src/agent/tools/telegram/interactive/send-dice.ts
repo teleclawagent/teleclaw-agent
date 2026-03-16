@@ -47,7 +47,7 @@ export const telegramSendDiceExecutor: ToolExecutor<SendDiceParams> = async (
     const { chat_id, emoticon = "🎲", reply_to } = params;
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Send dice using SendMedia
     const result = await gramJsClient.invoke(

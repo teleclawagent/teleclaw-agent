@@ -1,6 +1,6 @@
 import type { TelegramConfig, Config } from "../config/schema.js";
 import type { AgentRuntime } from "../agent/runtime.js";
-import type { TelegramBridge } from "./bridge.js";
+import type { TelegramTransport } from "./transport.js";
 import { type TelegramMessage } from "./bridge.js";
 import { MessageStore, ChatStore, UserStore } from "../memory/feed/index.js";
 import type Database from "better-sqlite3";
@@ -105,7 +105,7 @@ class ChatQueue {
 }
 
 export class MessageHandler {
-  private bridge: TelegramBridge;
+  private bridge: TelegramTransport;
   private config: TelegramConfig;
   private fullConfig?: Config;
   private agent: AgentRuntime;
@@ -122,7 +122,7 @@ export class MessageHandler {
   private static readonly DEDUP_MAX_SIZE = 500;
 
   constructor(
-    bridge: TelegramBridge,
+    bridge: TelegramTransport,
     config: TelegramConfig,
     agent: AgentRuntime,
     db: Database.Database,
@@ -412,6 +412,7 @@ export class MessageHandler {
             bridge: this.bridge,
             db: this.db,
             senderId: message.senderId,
+            senderUsername: message.senderUsername ?? undefined,
             config: this.fullConfig,
           };
 
@@ -471,7 +472,7 @@ export class MessageHandler {
                 isChannel: message.isChannel,
                 isBot: false,
                 mentionsMe: false,
-                timestamp: new Date(sentMessage.date * 1000),
+                timestamp: new Date(((sentMessage as Record<string, unknown>).date as number ?? Math.floor(Date.now() / 1000)) * 1000),
                 hasMedia: false,
               },
               true
@@ -492,6 +493,21 @@ export class MessageHandler {
         log.debug(`Processed message ${message.id} in chat ${message.chatId}`);
       } catch (error) {
         log.error({ err: error }, "Error handling message");
+        // Send user-facing error message so the user isn't left hanging
+        try {
+          const errMsg = error instanceof Error ? error.message : String(error);
+          const userMessage = errMsg.includes("rate limit")
+            ? "⚠️ I hit an API rate limit. Give me a moment and try again."
+            : "⚠️ Something went wrong processing your message. Please try again.";
+          await this.bridge.sendMessage({
+            chatId: message.chatId,
+            text: userMessage,
+            replyToId: message.id,
+          });
+        } catch {
+          // If even error reply fails, just log it
+          log.error("Failed to send error message to user");
+        }
       }
     });
   }

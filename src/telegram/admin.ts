@@ -1,6 +1,6 @@
 import type { TelegramConfig } from "../config/schema.js";
 import type { AgentRuntime } from "../agent/runtime.js";
-import type { TelegramBridge } from "./bridge.js";
+import type { TelegramTransport } from "./transport.js";
 import { getWalletAddress, getWalletBalance } from "../ton/wallet-service.js";
 import { Address } from "@ton/core";
 import { DEALS_CONFIG } from "../deals/config.js";
@@ -24,7 +24,7 @@ const VALID_GROUP_POLICIES = ["open", "allowlist", "admin-only", "disabled"] as 
 const VALID_MODULE_LEVELS = ["open", "admin", "disabled"] as const;
 
 export class AdminHandler {
-  private bridge: TelegramBridge;
+  private bridge: TelegramTransport;
   private config: TelegramConfig;
   private agent: AgentRuntime;
   private paused = false;
@@ -32,7 +32,7 @@ export class AdminHandler {
   private registry: ToolRegistry | null;
 
   constructor(
-    bridge: TelegramBridge,
+    bridge: TelegramTransport,
     config: TelegramConfig,
     agent: AgentRuntime,
     permissions?: ModulePermissions,

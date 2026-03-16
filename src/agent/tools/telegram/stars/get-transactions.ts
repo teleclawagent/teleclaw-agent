@@ -52,7 +52,7 @@ export const telegramGetStarsTransactionsExecutor: ToolExecutor<GetTransactionsP
 ): Promise<ToolResult> => {
   try {
     const { limit = 20, inbound, outbound } = params;
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GramJS API response is untyped
     const result: any = await gramJsClient.invoke(

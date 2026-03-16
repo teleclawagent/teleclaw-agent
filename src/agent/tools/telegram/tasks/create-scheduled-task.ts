@@ -250,7 +250,7 @@ export const telegramCreateScheduledTaskExecutor: ToolExecutor<CreateScheduledTa
       };
     } else if (scheduleTimestamp) {
       // Task has schedule date - schedule Telegram message
-      const gramJsClient = context.bridge.getClient().getClient();
+      const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
       // Get "me" entity for Saved Messages
       const me = await gramJsClient.getMe();

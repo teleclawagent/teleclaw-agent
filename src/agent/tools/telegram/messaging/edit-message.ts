@@ -48,7 +48,7 @@ export const telegramEditMessageExecutor: ToolExecutor<EditMessageParams> = asyn
     const { chatId, messageId, text } = params;
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Convert Markdown to Telegram HTML
     const formattedText = markdownToTelegramHtml(text);

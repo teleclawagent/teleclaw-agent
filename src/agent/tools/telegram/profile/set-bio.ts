@@ -39,7 +39,7 @@ export const telegramSetBioExecutor: ToolExecutor<SetBioParams> = async (
     const { bio } = params;
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Update bio using UpdateProfile
     await gramJsClient.invoke(

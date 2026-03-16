@@ -1,6 +1,7 @@
 import { TelegramUserClient, type TelegramClientConfig } from "./client.js";
 import { Api } from "telegram";
 import type { NewMessageEvent } from "telegram/events/NewMessage.js";
+import type { TelegramTransport, CallbackQueryEvent, LegacyClientCompat } from "./transport.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("Telegram");
@@ -37,7 +38,7 @@ export interface SendMessageOptions {
   inlineKeyboard?: InlineButton[][];
 }
 
-export class TelegramBridge {
+export class TelegramBridge implements TelegramTransport {
   private client: TelegramUserClient;
   private ownUserId?: bigint;
   private ownUsername?: string;
@@ -545,7 +546,89 @@ export class TelegramBridge {
     }
   }
 
-  getClient(): TelegramUserClient {
+  getClient(): LegacyClientCompat {
+    return this.client as unknown as LegacyClientCompat;
+  }
+
+  /**
+   * Get the typed TelegramUserClient (userbot mode only).
+   */
+  getUserClient(): TelegramUserClient {
+    return this.client;
+  }
+
+  // ── TelegramTransport interface methods ──
+
+  addCallbackQueryHandler(
+    handler: (event: CallbackQueryEvent) => Promise<void>
+  ): void {
+    this.client.addCallbackQueryHandler(async (update: unknown) => {
+      if (!update || typeof update !== "object") return;
+
+      const callbackUpdate = update as {
+        queryId?: unknown;
+        data?: { toString(): string } | string;
+        peer?: {
+          channelId?: { toString(): string };
+          chatId?: { toString(): string };
+          userId?: { toString(): string };
+        };
+        msgId?: unknown;
+        userId?: unknown;
+      };
+
+      const queryId = String(callbackUpdate.queryId ?? "");
+      const data =
+        typeof callbackUpdate.data === "string"
+          ? callbackUpdate.data
+          : callbackUpdate.data?.toString() || "";
+      const chatId =
+        callbackUpdate.peer?.channelId?.toString() ??
+        callbackUpdate.peer?.chatId?.toString() ??
+        callbackUpdate.peer?.userId?.toString() ??
+        "";
+      const messageId =
+        typeof callbackUpdate.msgId === "number"
+          ? callbackUpdate.msgId
+          : Number(callbackUpdate.msgId || 0);
+      const userId = Number(callbackUpdate.userId);
+
+      const event: CallbackQueryEvent = {
+        queryId,
+        data,
+        chatId,
+        messageId,
+        userId,
+      };
+
+      await handler(event);
+    });
+  }
+
+  async answerCallbackQuery(
+    queryId: string,
+    options: { message?: string; alert?: boolean }
+  ): Promise<void> {
+    try {
+      await this.client.answerCallbackQuery(queryId, {
+        message: options.message,
+        alert: options.alert,
+      });
+    } catch (error) {
+      log.error({ err: error }, "Failed to answer callback query");
+    }
+  }
+
+  async getEntity(id: string): Promise<unknown> {
+    try {
+      return await this.client.getClient().getEntity(id);
+    } catch (error) {
+      log.warn({ err: error }, `Failed to get entity: ${id}`);
+      return undefined;
+    }
+  }
+
+  getRawClient(): unknown {
     return this.client;
   }
 }

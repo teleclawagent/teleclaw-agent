@@ -45,7 +45,7 @@ export const telegramSetGiftStatusExecutor: ToolExecutor<SetGiftStatusParams> = 
 ): Promise<ToolResult> => {
   try {
     const { collectibleId, clear = false } = params;
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     let emojiStatus: Api.TypeEmojiStatus;
 

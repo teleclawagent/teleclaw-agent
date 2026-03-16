@@ -103,7 +103,7 @@ export const telegramGetMyGiftsExecutor: ToolExecutor<GetMyGiftsParams> = async 
       excludeSaved,
       sortByValue = false,
     } = params;
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     const targetUserId = viewSender ? context.senderId.toString() : userId;
 

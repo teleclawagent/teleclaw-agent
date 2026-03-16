@@ -1,4 +1,4 @@
-import type { TelegramBridge } from "../telegram/bridge.js";
+import type { TelegramTransport } from "../telegram/transport.js";
 import { Api } from "telegram";
 import { randomLong } from "../utils/gramjs-bigint.js";
 import type { TelegramSDK, TelegramUser, SimpleMessage, PluginLogger } from "@teleclaw-agent/sdk";
@@ -7,7 +7,7 @@ import { requireBridge as requireBridgeUtil } from "./telegram-utils.js";
 import { createTelegramMessagesSDK } from "./telegram-messages.js";
 import { createTelegramSocialSDK } from "./telegram-social.js";
 
-export function createTelegramSDK(bridge: TelegramBridge, log: PluginLogger): TelegramSDK {
+export function createTelegramSDK(bridge: TelegramTransport, log: PluginLogger): TelegramSDK {
   function requireBridge(): void {
     requireBridgeUtil(bridge);
   }
@@ -54,44 +54,57 @@ export function createTelegramSDK(bridge: TelegramBridge, log: PluginLogger): Te
     async sendDice(chatId, emoticon, replyToId) {
       requireBridge();
       try {
-        const gramJsClient = bridge.getClient().getClient();
+        // Try raw client (GramJS in userbot mode) for dice
+        const rawClient = bridge.getRawClient?.();
+        if (rawClient && typeof rawClient === "object" && "getClient" in rawClient) {
+          // Userbot mode — use GramJS MTProto
+          const gramJsClient = (rawClient as { getClient(): unknown }).getClient() as {
+            invoke(request: unknown): Promise<unknown>;
+          };
 
-        const result = await gramJsClient.invoke(
-          new Api.messages.SendMedia({
-            peer: chatId,
-            media: new Api.InputMediaDice({ emoticon }),
-            message: "",
-            randomId: randomLong(),
-            replyTo: replyToId
-              ? new Api.InputReplyToMessage({ replyToMsgId: replyToId })
-              : undefined,
-          })
-        );
+          const result = await gramJsClient.invoke(
+            new Api.messages.SendMedia({
+              peer: chatId,
+              media: new Api.InputMediaDice({ emoticon }),
+              message: "",
+              randomId: randomLong(),
+              replyTo: replyToId
+                ? new Api.InputReplyToMessage({ replyToMsgId: replyToId })
+                : undefined,
+            })
+          );
 
-        let value: number | undefined;
-        let messageId: number | undefined;
+          let value: number | undefined;
+          let messageId: number | undefined;
 
-        if (result instanceof Api.Updates || result instanceof Api.UpdatesCombined) {
-          for (const update of result.updates) {
-            if (
-              update.className === "UpdateNewMessage" ||
-              update.className === "UpdateNewChannelMessage"
-            ) {
-              const msg = update.message;
-              if (msg instanceof Api.Message && msg.media?.className === "MessageMediaDice") {
-                value = (msg.media as Api.MessageMediaDice).value;
-                messageId = msg.id;
-                break;
+          if (result instanceof Api.Updates || result instanceof Api.UpdatesCombined) {
+            for (const update of result.updates) {
+              if (
+                update.className === "UpdateNewMessage" ||
+                update.className === "UpdateNewChannelMessage"
+              ) {
+                const msg = update.message;
+                if (msg instanceof Api.Message && msg.media?.className === "MessageMediaDice") {
+                  value = (msg.media as Api.MessageMediaDice).value;
+                  messageId = msg.id;
+                  break;
+                }
               }
             }
           }
+
+          if (value === undefined || messageId === undefined) {
+            throw new Error("Could not extract dice value from Telegram response");
+          }
+
+          return { value, messageId };
         }
 
-        if (value === undefined || messageId === undefined) {
-          throw new Error("Could not extract dice value from Telegram response");
-        }
-
-        return { value, messageId };
+        // Bot mode — sendDice not available via transport yet
+        throw new PluginSDKError(
+          "sendDice is not available in bot mode SDK",
+          "NOT_SUPPORTED"
+        );
       } catch (err) {
         if (err instanceof PluginSDKError) throw err;
         throw new PluginSDKError(
@@ -133,13 +146,14 @@ export function createTelegramSDK(bridge: TelegramBridge, log: PluginLogger): Te
 
     getMe(): TelegramUser | null {
       try {
-        const me = bridge.getClient()?.getMe?.();
-        if (!me) return null;
+        const ownId = bridge.getOwnUserId();
+        const username = bridge.getUsername();
+        if (!ownId) return null;
         return {
-          id: Number(me.id),
-          username: me.username,
-          firstName: me.firstName,
-          isBot: me.isBot,
+          id: Number(ownId),
+          username: username,
+          firstName: undefined,
+          isBot: true, // In bot mode always true, userbot mode doesn't use SDK getMe typically
         };
       } catch {
         return null;
@@ -154,7 +168,7 @@ export function createTelegramSDK(bridge: TelegramBridge, log: PluginLogger): Te
       log.warn("getRawClient() called — this bypasses SDK sandbox guarantees");
       if (!bridge.isAvailable()) return null;
       try {
-        return bridge.getClient().getClient();
+        return bridge.getRawClient?.() ?? null;
       } catch {
         return null;
       }

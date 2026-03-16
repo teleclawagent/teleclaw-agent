@@ -4,6 +4,8 @@ import { loadConfig, getDefaultConfigPath } from "./config/index.js";
 import { loadSoul } from "./soul/index.js";
 import { AgentRuntime } from "./agent/runtime.js";
 import { TelegramBridge, type TelegramMessage } from "./telegram/bridge.js";
+import { BotBridge } from "./telegram/bot-bridge.js";
+import type { TelegramTransport, CallbackQueryEvent } from "./telegram/transport.js";
 import { MessageHandler } from "./telegram/handlers.js";
 import { AdminHandler } from "./telegram/admin.js";
 import { MessageDebouncer } from "./telegram/debounce.js";
@@ -48,7 +50,7 @@ const log = createLogger("App");
 export class TeleclawApp {
   private config;
   private agent: AgentRuntime;
-  private bridge: TelegramBridge;
+  private bridge: TelegramTransport;
   private messageHandler: MessageHandler;
   private adminHandler: AdminHandler;
   private debouncer: MessageDebouncer | null = null;
@@ -92,15 +94,28 @@ export class TeleclawApp {
 
     this.agent = new AgentRuntime(this.config, soul, this.toolRegistry);
 
-    this.bridge = new TelegramBridge({
-      apiId: this.config.telegram.api_id,
-      apiHash: this.config.telegram.api_hash,
-      phone: this.config.telegram.phone,
-      sessionPath: join(TELECLAW_ROOT, "telegram_session.txt"),
-      connectionRetries: TELEGRAM_CONNECTION_RETRIES,
-      autoReconnect: true,
-      floodSleepThreshold: TELEGRAM_FLOOD_SLEEP_THRESHOLD,
-    });
+    // Create transport based on mode: 'bot' (Bot API) or 'userbot' (GramJS MTProto)
+    const telegramMode = (this.config.telegram as Record<string, unknown>).mode as string || "bot";
+    const botToken = (this.config.telegram as Record<string, unknown>).bot_token as string | undefined;
+
+    if (telegramMode === "bot") {
+      if (!botToken) {
+        throw new Error("telegram.bot_token is required when telegram.mode = 'bot'");
+      }
+      this.bridge = new BotBridge({ token: botToken });
+      log.info("🤖 Mode: Bot API (grammY)");
+    } else {
+      this.bridge = new TelegramBridge({
+        apiId: this.config.telegram.api_id,
+        apiHash: this.config.telegram.api_hash,
+        phone: this.config.telegram.phone,
+        sessionPath: join(TELECLAW_ROOT, "telegram_session.txt"),
+        connectionRetries: TELEGRAM_CONNECTION_RETRIES,
+        autoReconnect: true,
+        floodSleepThreshold: TELEGRAM_FLOOD_SLEEP_THRESHOLD,
+      });
+      log.info("👤 Mode: Userbot (GramJS MTProto)");
+    }
 
     const embeddingProvider = this.config.embedding.provider;
     this.memory = initializeMemory({
@@ -663,10 +678,16 @@ ${blue}  ┌──────────────────────�
         return;
       }
 
-      const entity = await this.bridge.getClient().getEntity(String(this.config.telegram.owner_id));
+      // getEntity is optional (only userbot mode)
+      if (!this.bridge.getEntity) {
+        log.info("Skipping owner resolution (Bot API mode — set owner_name/owner_username in config)");
+        return;
+      }
+
+      const entity = await this.bridge.getEntity(String(this.config.telegram.owner_id));
 
       // Check that the entity is a User (has firstName)
-      if (!entity || !("firstName" in entity)) {
+      if (!entity || typeof entity !== "object" || !("firstName" in entity)) {
         return;
       }
 
@@ -959,44 +980,15 @@ ${blue}  ┌──────────────────────�
 
     // Callback query handler: register ONCE, dispatch dynamically
     if (!this.callbackHandlerRegistered) {
-      this.bridge.getClient().addCallbackQueryHandler(async (update: unknown) => {
-        if (!update || typeof update !== "object") {
-          return;
-        }
-        const callbackUpdate = update as {
-          queryId?: unknown;
-          data?: { toString(): string } | string;
-          peer?: {
-            channelId?: { toString(): string };
-            chatId?: { toString(): string };
-            userId?: { toString(): string };
-          };
-          msgId?: unknown;
-          userId?: unknown;
-        };
-        const queryId = callbackUpdate.queryId;
-        const data =
-          typeof callbackUpdate.data === "string"
-            ? callbackUpdate.data
-            : callbackUpdate.data?.toString() || "";
+      this.bridge.addCallbackQueryHandler(async (cbEvent: CallbackQueryEvent) => {
+        const { queryId, data, chatId, messageId, userId } = cbEvent;
         const parts = data.split(":");
         const action = parts[0];
         const params = parts.slice(1);
 
-        const chatId =
-          callbackUpdate.peer?.channelId?.toString() ??
-          callbackUpdate.peer?.chatId?.toString() ??
-          callbackUpdate.peer?.userId?.toString() ??
-          "";
-        const messageId =
-          typeof callbackUpdate.msgId === "number"
-            ? callbackUpdate.msgId
-            : Number(callbackUpdate.msgId || 0);
-        const userId = Number(callbackUpdate.userId);
-
         const answer = async (text?: string, alert = false): Promise<void> => {
           try {
-            await this.bridge.getClient().answerCallbackQuery(queryId, { message: text, alert });
+            await this.bridge.answerCallbackQuery(queryId, { message: text, alert });
           } catch (err) {
             log.error(
               `❌ Failed to answer callback query: ${err instanceof Error ? err.message : err}`

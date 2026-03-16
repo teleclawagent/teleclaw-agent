@@ -33,7 +33,7 @@ export const telegramGetCollectibleInfoExecutor: ToolExecutor<GetCollectibleInfo
 ): Promise<ToolResult> => {
   try {
     const { type, value } = params;
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     const collectible =
       type === "username"

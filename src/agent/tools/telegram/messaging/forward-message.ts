@@ -59,7 +59,7 @@ export const telegramForwardMessageExecutor: ToolExecutor<ForwardMessageParams> 
     const { fromChatId, toChatId, messageIds, silent = false, background = false } = params;
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Forward messages using GramJS API
     const _result = await gramJsClient.invoke(

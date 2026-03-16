@@ -1,197 +1,122 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ──────────────────────────────────────────────
-# Teleton Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/TONresistor/teleton-agent/main/install.sh | bash
-# ──────────────────────────────────────────────
+# Teleclaw Installer
+# Usage: curl -fsSL https://raw.githubusercontent.com/gioooton/teleclaw-agent/main/install.sh | bash
 
-REPO="tonresistor/teleton-agent"
+REPO="gioooton/teleclaw-agent"
 DOCKER_IMAGE="ghcr.io/${REPO}:latest"
-NPM_PACKAGE="teleton"
-MIN_NODE_VERSION=20
+NPM_PACKAGE="teleclaw"
 
-# Colors
-RED='\033[0;31m'
+BOLD='\033[1m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-BOLD='\033[1m'
+RED='\033[0;31m'
 NC='\033[0m'
 
-info()  { echo -e "${BLUE}[INFO]${NC} $*"; }
-ok()    { echo -e "${GREEN}[OK]${NC} $*"; }
-warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
-error() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
+ok()   { echo -e "${GREEN}✓${NC} $1"; }
+warn() { echo -e "${YELLOW}!${NC} $1"; }
+err()  { echo -e "${RED}✗${NC} $1"; }
 
-# ── Detect OS ──
-detect_os() {
-  case "$(uname -s)" in
-    Linux*)  OS="linux" ;;
-    Darwin*) OS="macos" ;;
-    MINGW*|MSYS*|CYGWIN*) OS="windows" ;;
-    *) error "Unsupported OS: $(uname -s)" ;;
-  esac
-  info "Detected OS: ${OS}"
-}
-
-# ── Check if command exists ──
-has() { command -v "$1" &>/dev/null; }
-
-# ── Check Node.js version ──
-check_node() {
-  if ! has node; then
-    return 1
-  fi
-  local version
-  version=$(node -v | sed 's/v//' | cut -d. -f1)
-  if [ "$version" -ge "$MIN_NODE_VERSION" ]; then
-    ok "Node.js v$(node -v | sed 's/v//') found"
-    return 0
-  else
-    warn "Node.js v$(node -v | sed 's/v//') found (need >= ${MIN_NODE_VERSION})"
-    return 1
-  fi
-}
-
-# ── Install via npm ──
 install_npm() {
-  info "Installing via npm..."
-  if npm install -g "${NPM_PACKAGE}"; then
-    ok "Teleton installed via npm"
+  echo ""
+  echo -e "${BOLD}Installing via npm...${NC}"
+  if command -v npm &>/dev/null; then
+    npm install -g "${NPM_PACKAGE}"
+    ok "Teleclaw installed via npm"
     echo ""
-    echo -e "${BOLD}Next steps:${NC}"
-    echo "  teleton setup    # Configure your agent"
-    echo "  teleton start    # Start the agent"
-    echo "  teleton doctor   # Run health checks"
+    echo "Next steps:"
+    echo "  teleclaw setup    # Configure your agent"
+    echo "  teleclaw start    # Start the agent"
+    echo "  teleclaw doctor   # Run health checks"
   else
-    error "npm install failed. Try: sudo npm install -g ${NPM_PACKAGE}"
+    err "npm not found. Install Node.js 18+ first."
+    exit 1
   fi
 }
 
-# ── Install via Docker ──
 install_docker() {
-  info "Pulling Docker image..."
-  if docker pull "${DOCKER_IMAGE}"; then
-    ok "Teleton Docker image pulled"
+  echo ""
+  echo -e "${BOLD}Installing via Docker...${NC}"
+  if command -v docker &>/dev/null; then
+    docker pull "${DOCKER_IMAGE}"
+    ok "Teleclaw Docker image pulled"
     echo ""
-    echo -e "${BOLD}Next steps:${NC}"
-    echo "  # Setup (interactive)"
-    echo "  docker run -it -v ~/.teleton:/data ${DOCKER_IMAGE} setup"
+    echo "Setup:"
+    echo "  docker run -it -v ~/.teleclaw:/data ${DOCKER_IMAGE} setup"
     echo ""
-    echo "  # Start agent (background)"
-    echo "  docker run -d -v ~/.teleton:/data --name teleton ${DOCKER_IMAGE}"
+    echo "Start:"
+    echo "  docker run -d -v ~/.teleclaw:/data --name teleclaw ${DOCKER_IMAGE}"
     echo ""
-    echo "  # Health check"
-    echo "  docker run -it -v ~/.teleton:/data ${DOCKER_IMAGE} doctor"
+    echo "Health check:"
+    echo "  docker run -it -v ~/.teleclaw:/data ${DOCKER_IMAGE} doctor"
   else
-    error "Docker pull failed"
+    err "Docker not found."
+    exit 1
   fi
 }
 
-# ── Install via git clone ──
-install_git() {
-  local install_dir="${HOME}/.teleton-app"
-  info "Cloning repository to ${install_dir}..."
-
-  if [ -d "${install_dir}" ]; then
-    warn "Directory ${install_dir} already exists, updating..."
-    git -C "${install_dir}" pull --ff-only
-  else
-    git clone "https://github.com/${REPO}.git" "${install_dir}"
-  fi
-
-  info "Installing dependencies..."
-  (cd "${install_dir}" && npm install)
-
-  info "Building..."
-  (cd "${install_dir}" && npm run build)
-
-  # Create symlink
+install_binary() {
+  local install_dir="${HOME}/.teleclaw-app"
   local bin_dir="${HOME}/.local/bin"
-  mkdir -p "${bin_dir}"
-  ln -sf "${install_dir}/bin/teleton.js" "${bin_dir}/teleton"
+  local version="latest"
+
+  echo ""
+  echo -e "${BOLD}Installing standalone binary...${NC}"
+
+  local os=$(uname -s | tr '[:upper:]' '[:lower:]')
+  local arch=$(uname -m)
+  [[ "$arch" == "x86_64" ]] && arch="amd64"
+  [[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && arch="arm64"
+
+  local tarball="teleclaw-${os}-${arch}.tar.gz"
+  local url="https://github.com/${REPO}/releases/${version}/download/${tarball}"
+
+  mkdir -p "${install_dir}" "${bin_dir}"
+
+  echo "Downloading ${url}..."
+  curl -fsSL "${url}" | tar xz -C "${install_dir}"
+
+  ln -sf "${install_dir}/bin/teleclaw.js" "${bin_dir}/teleclaw"
 
   if echo "$PATH" | grep -q "${bin_dir}"; then
-    ok "Teleton installed to ${bin_dir}/teleton"
+    ok "Teleclaw installed to ${bin_dir}/teleclaw"
   else
-    ok "Teleton installed to ${bin_dir}/teleton"
-    warn "Add to your PATH: export PATH=\"${bin_dir}:\$PATH\""
-    echo "  Add this to your ~/.bashrc or ~/.zshrc"
+    ok "Teleclaw installed to ${bin_dir}/teleclaw"
+    warn "Add ${bin_dir} to your PATH:"
+    echo "  export PATH=\"\$PATH:${bin_dir}\""
   fi
 
   echo ""
-  echo -e "${BOLD}Next steps:${NC}"
-  echo "  teleton setup    # Configure your agent"
-  echo "  teleton start    # Start the agent"
+  echo "Next steps:"
+  echo "  teleclaw setup    # Configure your agent"
+  echo "  teleclaw start    # Start the agent"
 }
 
-# ── Main ──
-main() {
-  echo ""
-  echo -e "${BOLD}  ╔══════════════════════════════════╗${NC}"
-  echo -e "${BOLD}  ║       Teleton Installer          ║${NC}"
-  echo -e "${BOLD}  ║   Personal AI Agent for Telegram ║${NC}"
-  echo -e "${BOLD}  ╚══════════════════════════════════╝${NC}"
-  echo ""
+# ── Main ──────────────────────────────────────────────────────────────
+clear 2>/dev/null || true
+echo ""
+echo -e "${BOLD}  ╔═══════════════════════════════════╗${NC}"
+echo -e "${BOLD}  ║       Teleclaw Installer          ║${NC}"
+echo -e "${BOLD}  ║   AI Agent for Telegram & TON     ║${NC}"
+echo -e "${BOLD}  ╚═══════════════════════════════════╝${NC}"
+echo ""
 
-  detect_os
+echo "Choose installation method:"
+echo ""
+echo "  1) npm (recommended)"
+echo "  2) Docker"
+echo "  3) Standalone binary"
+echo ""
 
-  local has_docker=false
-  local has_node=false
+read -rp "Select [1-3]: " choice
 
-  has docker && has_docker=true
-  check_node && has_node=true
+case "${choice}" in
+  1) install_npm ;;
+  2) install_docker ;;
+  3) install_binary ;;
+  *) err "Invalid choice"; exit 1 ;;
+esac
 
-  echo ""
-
-  # Offer choices based on what's available
-  if $has_docker && $has_node; then
-    {
-      echo -e "${BOLD}Choose installation method:${NC}"
-      echo "  1) npm install -g (recommended)"
-      echo "  2) Docker"
-      echo "  3) Git clone (development)"
-      echo ""
-      read -rp "Choice [1]: " choice
-      choice="${choice:-1}"
-    } < /dev/tty
-    case "$choice" in
-      1) install_npm ;;
-      2) install_docker ;;
-      3) install_git ;;
-      *) error "Invalid choice" ;;
-    esac
-
-  elif $has_node; then
-    {
-      echo -e "${BOLD}Choose installation method:${NC}"
-      echo "  1) npm install -g (recommended)"
-      echo "  2) Git clone (development)"
-      echo ""
-      read -rp "Choice [1]: " choice
-      choice="${choice:-1}"
-    } < /dev/tty
-    case "$choice" in
-      1) install_npm ;;
-      2) install_git ;;
-      *) error "Invalid choice" ;;
-    esac
-
-  elif $has_docker; then
-    info "Node.js not found, using Docker"
-    install_docker
-
-  else
-    error "Neither Node.js >= ${MIN_NODE_VERSION} nor Docker found.
-
-Install one of:
-  - Node.js: https://nodejs.org (v${MIN_NODE_VERSION}+)
-  - Docker:  https://docs.docker.com/get-docker/"
-  fi
-
-  echo ""
-  ok "Done!"
-}
-
-main "$@"
+echo ""
+ok "Done! 🚀"

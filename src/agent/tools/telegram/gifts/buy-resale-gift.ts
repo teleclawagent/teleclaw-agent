@@ -36,7 +36,7 @@ export const telegramBuyResaleGiftExecutor: ToolExecutor<BuyResaleGiftParams> = 
 ): Promise<ToolResult> => {
   try {
     const { slug } = params;
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Buy for self
     const toId = new Api.InputPeerSelf();

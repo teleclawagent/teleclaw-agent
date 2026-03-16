@@ -59,7 +59,7 @@ export const telegramQuoteReplyExecutor: ToolExecutor<QuoteReplyParams> = async 
     const { chatId, messageId, quoteText, text, quoteOffset = 0 } = params;
 
     // Get the underlying GramJS client
-    const client = context.bridge.getClient().getClient();
+    const client = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Resolve the peer (chat entity)
     const peer = await client.getInputEntity(chatId);

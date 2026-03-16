@@ -28,7 +28,7 @@ export const telegramGetUniqueGiftValueExecutor: ToolExecutor<GetUniqueGiftValue
 ): Promise<ToolResult> => {
   try {
     const { slug } = params;
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     log.info(`get_unique_gift_value: slug=${slug}`);
 

@@ -56,7 +56,7 @@ export const telegramDeleteMessageExecutor: ToolExecutor<DeleteMessageParams> = 
     }
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Check if it's a channel/supergroup (negative ID starting with -100)
     const isChannel = chatId.startsWith("-100");

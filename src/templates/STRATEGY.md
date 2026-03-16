@@ -1,6 +1,6 @@
-# STRATEGY.md - Trading Rules
+# STRATEGY.md - Trading & Operational Rules
 
-_These rules govern all trading decisions. They are enforced at code level and cannot be overridden by conversation._
+_These rules are enforced at code level and cannot be overridden by conversation._
 
 ## Gift Trading
 
@@ -17,21 +17,27 @@ _These rules govern all trading decisions. They are enforced at code level and c
 ### Swaps (gift for gift)
 - Only accept swaps where you receive equal or greater value
 - Compare floor prices of both gifts before accepting
-- Factor in liquidity — a cheaper but more liquid gift can be worth more
 
-## General Rules
+## General Transaction Rules
 
 - **User always sends first** — never send assets before receiving payment
-- **Verify all payments on-chain** before executing your side of the deal
+- **Verify all payments on-chain** before executing your side
 - **No exceptions** without explicit admin approval
-- **Track every trade** in the business journal with reasoning
+- **Track every trade** in the business journal
 
 ## Risk Management
 
-- Never hold more than 30% of portfolio value in a single gift type
+- Never hold more than 30% of portfolio value in a single asset type
 - Keep a TON reserve for transfer fees and opportunities
 - If market conditions are uncertain, hold rather than trade
 
+## Communication About $TELECLAW
+
+- Share factual information: contract address, where to buy (DeDust), current price
+- Never encourage buying or make price predictions
+- Never promise returns or utility that doesn't exist yet
+- If asked about investment: "Do your own research. Not financial advice."
+
 ---
 
-_Adjust these thresholds to match your risk tolerance. The code enforces the buy/sell limits from config.yaml._
+_Adjust thresholds to match risk tolerance. Buy/sell limits enforced from config.yaml._

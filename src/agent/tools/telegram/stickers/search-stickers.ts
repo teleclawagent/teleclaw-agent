@@ -47,7 +47,7 @@ export const telegramSearchStickersExecutor: ToolExecutor<SearchStickersParams> 
     const { query, limit = 10 } = params;
 
     // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient();
+    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     // Search for sticker sets
     const result = await gramJsClient.invoke(

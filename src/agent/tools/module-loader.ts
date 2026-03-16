@@ -11,6 +11,7 @@ import type Database from "better-sqlite3";
 import dealsModule from "../../deals/module.js";
 import tonProxyModule from "../../ton-proxy/module.js";
 import { execModule } from "./exec/index.js";
+import { migrateAgenticWallet } from "./agentic-wallet/index.js";
 import { createLogger } from "../../utils/logger.js";
 
 const log = createLogger("ModuleLoader");
@@ -39,6 +40,13 @@ export function loadModules(
     } catch (error) {
       log.error({ err: error }, `Module "${mod.name}" failed to load`);
     }
+  }
+
+  // Run agentic wallet migrations (creates tables for trading tools)
+  try {
+    migrateAgenticWallet(db);
+  } catch (error) {
+    log.warn({ err: error }, "Agentic wallet migration skipped");
   }
 
   return loaded;

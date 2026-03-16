@@ -48,7 +48,7 @@ export const telegramPinMessageExecutor: ToolExecutor<PinMessageParams> = async 
   try {
     const { chat_id, message_id, silent = false, both_sides = true } = params;
 
-    const client = context.bridge.getClient().getClient();
+    const client = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     await client.invoke(
       new Api.messages.UpdatePinnedMessage({
@@ -111,7 +111,7 @@ export const telegramUnpinMessageExecutor: ToolExecutor<UnpinMessageParams> = as
   try {
     const { chat_id, message_id, unpin_all = false } = params;
 
-    const client = context.bridge.getClient().getClient();
+    const client = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
     if (unpin_all) {
       await client.invoke(

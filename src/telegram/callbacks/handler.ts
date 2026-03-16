@@ -1,4 +1,4 @@
-import type { TelegramBridge } from "../bridge.js";
+import type { TelegramTransport } from "../transport.js";
 import type Database from "better-sqlite3";
 import { createLogger } from "../../utils/logger.js";
 
@@ -17,7 +17,7 @@ export class CallbackQueryHandler {
   private handlers: Map<string, CallbackHandler> = new Map();
 
   constructor(
-    private bridge: TelegramBridge,
+    private bridge: TelegramTransport,
     private db: Database.Database
   ) {}
 
@@ -66,7 +66,7 @@ export class CallbackQueryHandler {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GramJS BigInteger queryId
   private async answerCallback(queryId: any, message?: string, alert = false): Promise<void> {
     try {
-      await this.bridge.getClient().answerCallbackQuery(queryId, { message, alert });
+      await this.bridge.answerCallbackQuery(String(queryId), { message, alert });
     } catch (error) {
       log.error({ err: error }, "Error answering callback");
     }

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- GramJS API responses/errors are untyped; every `any` in this file is for Telegram API interop */
-import type { TelegramBridge } from "../telegram/bridge.js";
+import type { TelegramTransport } from "../telegram/transport.js";
 import type { Api } from "telegram";
 import type {
   PluginLogger,
@@ -22,17 +22,18 @@ import { PluginSDKError } from "@teleclaw-agent/sdk";
 import { randomLong, toLong } from "../utils/gramjs-bigint.js";
 import {
   requireBridge as requireBridgeUtil,
-  getClient as getClientUtil,
+  getRawClient as getClientUtil,
   getApi,
   toSimpleMessage,
 } from "./telegram-utils.js";
 
-export function createTelegramSocialSDK(bridge: TelegramBridge, log: PluginLogger) {
+export function createTelegramSocialSDK(bridge: TelegramTransport, log: PluginLogger) {
   function requireBridge(): void {
     requireBridgeUtil(bridge);
   }
 
-  function getClient() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GramJS client is untyped in SDK context
+  function getClient(): any {
     return getClientUtil(bridge);
   }
 
@@ -677,7 +678,7 @@ export function createTelegramSocialSDK(bridge: TelegramBridge, log: PluginLogge
         const client = getClient();
         const dialogs = await client.getDialogs({ limit: Math.min(limit ?? 50, 100) });
 
-        return dialogs.map((dialog) => ({
+        return dialogs.map((dialog: any) => ({
           id: dialog.id?.toString() || null,
           title: dialog.title || "Unknown",
           type: (dialog.isChannel ? "channel" : dialog.isGroup ? "group" : "dm") as Dialog["type"],
