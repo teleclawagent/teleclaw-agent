@@ -17,6 +17,7 @@ import { findMatchingBuyers } from "./taste-profile.js";
 import { checkTokenGate } from "./token-gate.js";
 import { createLogger } from "../../../utils/logger.js";
 import { priceMatches } from "../../../ton/price-service.js";
+import { requireOtcConsent } from "./otc-consent.js";
 
 const log = createLogger("Matchmaker");
 
@@ -127,6 +128,9 @@ export const mmListExecutor: ToolExecutor<ListForSaleParams> = async (
     const clean = `@${username.replace(/^@/, "").toLowerCase()}`;
 
     // 🔒 Token Gate: verify $TELECLAW holdings
+    // 🤝 OTC Consent check
+    const consentError = requireOtcConsent(context);
+    if (consentError) return consentError;
     const gateResult = await checkTokenGate(context.db, context.senderId);
     if (!gateResult.allowed) {
       return { success: false, error: gateResult.reason };
@@ -392,6 +396,9 @@ export const mmInterestExecutor: ToolExecutor<RegisterInterestParams> = async (
     const { categories, max_price, currency = "TON", keywords } = params;
 
     // 🔒 Token Gate: verify $TELECLAW holdings
+    // 🤝 OTC Consent check
+    const consentError = requireOtcConsent(context);
+    if (consentError) return consentError;
     const gateResult = await checkTokenGate(context.db, context.senderId);
     if (!gateResult.allowed) {
       return { success: false, error: gateResult.reason };
@@ -508,6 +515,9 @@ export const mmExpressInterestExecutor: ToolExecutor<ExpressInterestParams> = as
     const { listing_id, username } = params;
 
     // 🔒 Token Gate: verify $TELECLAW holdings
+    // 🤝 OTC Consent check
+    const consentError = requireOtcConsent(context);
+    if (consentError) return consentError;
     const gateResult = await checkTokenGate(context.db, context.senderId);
     if (!gateResult.allowed) {
       return { success: false, error: gateResult.reason };

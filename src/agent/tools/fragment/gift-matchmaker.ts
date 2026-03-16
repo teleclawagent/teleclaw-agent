@@ -16,6 +16,7 @@ import { getCollection, calculateRarityScore, searchCollections } from "./gifts-
 import { checkTokenGate } from "./token-gate.js";
 import { createLogger } from "../../../utils/logger.js";
 import { priceMatches } from "../../../ton/price-service.js";
+import { requireOtcConsent } from "./otc-consent.js";
 
 const log = createLogger("GiftMatchmaker");
 
@@ -158,6 +159,8 @@ export const giftMmListExecutor: ToolExecutor<GiftListParams> = async (
     ensureGiftMatchmakerTables(context);
 
     // Token gate
+    const consentError = requireOtcConsent(context);
+    if (consentError) return consentError;
     const gate = await checkTokenGate(context.db, context.senderId);
     if (!gate.allowed) return { success: false, error: gate.reason };
 
@@ -408,6 +411,8 @@ export const giftMmInterestExecutor: ToolExecutor<GiftInterestParams> = async (
   try {
     ensureGiftMatchmakerTables(context);
 
+    const consentError = requireOtcConsent(context);
+    if (consentError) return consentError;
     const gate = await checkTokenGate(context.db, context.senderId);
     if (!gate.allowed) return { success: false, error: gate.reason };
 
@@ -753,6 +758,8 @@ export const giftMmExpressExecutor: ToolExecutor<GiftExpressParams> = async (
   try {
     ensureGiftMatchmakerTables(context);
 
+    const consentError = requireOtcConsent(context);
+    if (consentError) return consentError;
     const gate = await checkTokenGate(context.db, context.senderId);
     if (!gate.allowed) return { success: false, error: gate.reason };
 

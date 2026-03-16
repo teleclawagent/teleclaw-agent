@@ -16,6 +16,7 @@ import { calculateRarity, type RarityTier } from "./number-rarity.js";
 import { checkTokenGate } from "./token-gate.js";
 import { createLogger } from "../../../utils/logger.js";
 import { priceMatches } from "../../../ton/price-service.js";
+import { requireOtcConsent } from "./otc-consent.js";
 
 const log = createLogger("NumberProfile");
 
@@ -255,6 +256,8 @@ export const numberProfileSetExecutor: ToolExecutor<SetProfileParams> = async (
     ensureNumberProfileTables(ctx);
 
     // 🔒 Token Gate: verify $TELECLAW holdings for matchmaker features
+    const consentError = requireOtcConsent(ctx);
+    if (consentError) return consentError;
     const gateResult = await checkTokenGate(ctx.db, ctx.senderId);
     if (!gateResult.allowed) {
       return { success: false, error: gateResult.reason };
@@ -411,6 +414,8 @@ export const numberListForSaleExecutor: ToolExecutor<ListNumberParams> = async (
     ensureNumberProfileTables(ctx);
 
     // 🔒 Token Gate: verify $TELECLAW holdings for matchmaker features
+    const consentError = requireOtcConsent(ctx);
+    if (consentError) return consentError;
     const gateResult = await checkTokenGate(ctx.db, ctx.senderId);
     if (!gateResult.allowed) {
       return { success: false, error: gateResult.reason };
@@ -713,6 +718,8 @@ export const numberExpressInterestExecutor: ToolExecutor<NumberExpressParams> = 
   try {
     ensureNumberProfileTables(ctx);
 
+    const consentError = requireOtcConsent(ctx);
+    if (consentError) return consentError;
     const gateResult = await checkTokenGate(ctx.db, ctx.senderId);
     if (!gateResult.allowed) {
       return { success: false, error: gateResult.reason };

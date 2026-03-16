@@ -141,6 +141,16 @@ import {
   numberMyListingsExecutor,
 } from "./number-profile.js";
 
+// OTC Consent
+import {
+  otcJoinTool,
+  otcJoinExecutor,
+  otcLeaveTool,
+  otcLeaveExecutor,
+  otcStatusTool,
+  otcStatusExecutor,
+} from "./otc-consent.js";
+
 // Channel Scanner
 import {
   channelScanAddTool,
@@ -323,6 +333,11 @@ export const tools: ToolEntry[] = [
   { tool: numberMyListingsTool, executor: numberMyListingsExecutor, scope: "dm-only" },
   { tool: numberCancelTool, executor: numberCancelExecutor, scope: "dm-only" },
   { tool: numberSoldTool, executor: numberSoldExecutor, scope: "dm-only" },
+
+  // 🤝 OTC Consent
+  { tool: otcJoinTool, executor: otcJoinExecutor, scope: "dm-only" },
+  { tool: otcLeaveTool, executor: otcLeaveExecutor, scope: "dm-only" },
+  { tool: otcStatusTool, executor: otcStatusExecutor, scope: "dm-only" },
 
   // 📡 Channel Scanner
   { tool: channelScanAddTool, executor: channelScanAddExecutor, scope: "dm-only" },

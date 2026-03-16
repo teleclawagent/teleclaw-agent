@@ -1,14 +1,12 @@
 /**
  * Shared OTC Matchmaker API Client
  *
- * Connects local Teleclaw instances to a shared matchmaker pool.
+ * Connects local Teleclaw instances to a shared anonymous matchmaker pool.
  * Falls back to local-only mode if the API is unavailable.
  *
- * Architecture:
- * - Each Teleclaw instance has its own local SQLite (always works)
- * - If MATCHMAKER_API_URL is configured, listings sync to shared pool
- * - Matches from shared pool are pulled down to local
- * - API is optional — local matchmaking always works as before
+ * PRIVACY: No user data ever leaves the local bot instance.
+ * The shared API only stores: item info, price, bot_id, listing_id.
+ * User identities stay in each bot's local SQLite.
  */
 
 import { createLogger } from "../../../utils/logger.js";
@@ -16,38 +14,39 @@ import { fetchWithTimeout } from "../../../utils/fetch.js";
 
 const log = createLogger("MatchmakerAPI");
 
+// ─── Types ───────────────────────────────────────────────────────────
+
 export interface SharedListing {
   id: string;
-  type: "username" | "gift";
+  type: "username" | "gift" | "number";
   item_name: string;
   item_details: Record<string, unknown>;
-  seller_bot_id: string; // Bot's Telegram ID (for callback routing)
-  seller_chat_id: string; // Seller's chat ID on their local bot
-  price_ton: number;
-  price_stars?: number;
+  bot_id: string; // Bot's unique ID (for routing callbacks)
+  price: number | null;
+  currency: string;
+  price_usd: number | null; // Normalized for cross-currency matching
   created_at: string;
-  expires_at?: string;
+  expires_at: string;
 }
 
-export interface SharedInterest {
+export interface SharedInterestSignal {
   listing_id: string;
-  buyer_bot_id: string;
-  buyer_chat_id: string;
-  max_price_ton?: number;
-  message?: string;
-  created_at: string;
+  buyer_bot_id: string; // Which bot the buyer is on
+  offer_price?: number;
+  offer_currency?: string;
+  message?: string; // Optional message (no user identifiers)
 }
 
-export interface SharedMatch {
+export interface SharedCallback {
+  type: "interest" | "sold" | "cancelled";
   listing_id: string;
-  seller_bot_id: string;
-  seller_chat_id: string;
-  buyer_bot_id: string;
-  buyer_chat_id: string;
-  item_name: string;
-  price_ton: number;
-  matched_at: string;
+  from_bot_id: string;
+  data?: Record<string, unknown>;
 }
+
+// ─── Client ──────────────────────────────────────────────────────────
+
+const DEFAULT_API_URL = "https://otc.teleclaw.ai";
 
 export class MatchmakerAPIClient {
   private apiUrl: string | null;
@@ -75,15 +74,26 @@ export class MatchmakerAPIClient {
     return h;
   }
 
-  // ── Listings ──
+  // ── Publish Listing (anonymous) ──
 
-  async publishListing(listing: Omit<SharedListing, "id" | "created_at" | "seller_bot_id">): Promise<string | null> {
+  async publishListing(listing: {
+    type: "username" | "gift" | "number";
+    item_name: string;
+    item_details: Record<string, unknown>;
+    price: number | null;
+    currency: string;
+    price_usd: number | null;
+    expires_days?: number;
+  }): Promise<string | null> {
     if (!this.apiUrl) return null;
     try {
-      const res = await fetchWithTimeout(`${this.apiUrl}/listings`, {
+      const res = await fetchWithTimeout(`${this.apiUrl}/api/listings`, {
         method: "POST",
         headers: this.headers,
-        body: JSON.stringify({ ...listing, seller_bot_id: this.botId }),
+        body: JSON.stringify({
+          ...listing,
+          bot_id: this.botId,
+        }),
       });
       if (!res.ok) {
         log.warn(`Failed to publish listing: ${res.status}`);
@@ -92,15 +102,17 @@ export class MatchmakerAPIClient {
       const data = (await res.json()) as { id: string };
       return data.id;
     } catch (error) {
-      log.warn({ err: error }, "Matchmaker API unreachable — operating in local mode");
+      log.debug({ err: error }, "Matchmaker API unreachable — local-only mode");
       return null;
     }
   }
 
+  // ── Remove Listing ──
+
   async removeListing(listingId: string): Promise<boolean> {
     if (!this.apiUrl) return false;
     try {
-      const res = await fetchWithTimeout(`${this.apiUrl}/listings/${listingId}`, {
+      const res = await fetchWithTimeout(`${this.apiUrl}/api/listings/${listingId}`, {
         method: "DELETE",
         headers: this.headers,
       });
@@ -110,9 +122,11 @@ export class MatchmakerAPIClient {
     }
   }
 
+  // ── Browse Listings (from other bots) ──
+
   async browseListings(filters?: {
-    type?: "username" | "gift";
-    maxPrice?: number;
+    type?: "username" | "gift" | "number";
+    max_price_usd?: number;
     search?: string;
     limit?: number;
   }): Promise<SharedListing[]> {
@@ -120,11 +134,13 @@ export class MatchmakerAPIClient {
     try {
       const params = new URLSearchParams();
       if (filters?.type) params.set("type", filters.type);
-      if (filters?.maxPrice) params.set("max_price", filters.maxPrice.toString());
+      if (filters?.max_price_usd) params.set("max_price_usd", filters.max_price_usd.toString());
       if (filters?.search) params.set("q", filters.search);
       if (filters?.limit) params.set("limit", filters.limit.toString());
+      // Exclude own bot's listings
+      params.set("exclude_bot", this.botId);
 
-      const res = await fetchWithTimeout(`${this.apiUrl}/listings?${params.toString()}`, {
+      const res = await fetchWithTimeout(`${this.apiUrl}/api/listings?${params.toString()}`, {
         headers: this.headers,
       });
       if (!res.ok) return [];
@@ -134,15 +150,23 @@ export class MatchmakerAPIClient {
     }
   }
 
-  // ── Interests ──
+  // ── Signal Interest (anonymous — only bot_id, no user info) ──
 
-  async expressInterest(interest: Omit<SharedInterest, "buyer_bot_id" | "created_at">): Promise<boolean> {
+  async signalInterest(signal: {
+    listing_id: string;
+    offer_price?: number;
+    offer_currency?: string;
+    message?: string;
+  }): Promise<boolean> {
     if (!this.apiUrl) return false;
     try {
-      const res = await fetchWithTimeout(`${this.apiUrl}/interests`, {
+      const res = await fetchWithTimeout(`${this.apiUrl}/api/interests`, {
         method: "POST",
         headers: this.headers,
-        body: JSON.stringify({ ...interest, buyer_bot_id: this.botId }),
+        body: JSON.stringify({
+          ...signal,
+          buyer_bot_id: this.botId,
+        }),
       });
       return res.ok;
     } catch {
@@ -150,18 +174,33 @@ export class MatchmakerAPIClient {
     }
   }
 
-  // ── Matches ──
+  // ── Poll for callbacks (interest signals from other bots) ──
 
-  async getMatches(): Promise<SharedMatch[]> {
+  async pollCallbacks(): Promise<SharedCallback[]> {
     if (!this.apiUrl) return [];
     try {
-      const res = await fetchWithTimeout(`${this.apiUrl}/matches?bot_id=${this.botId}`, {
+      const res = await fetchWithTimeout(`${this.apiUrl}/api/callbacks?bot_id=${this.botId}`, {
         headers: this.headers,
       });
       if (!res.ok) return [];
-      return (await res.json()) as SharedMatch[];
+      return (await res.json()) as SharedCallback[];
     } catch {
       return [];
+    }
+  }
+
+  // ── Acknowledge callback (mark as processed) ──
+
+  async ackCallback(callbackId: string): Promise<boolean> {
+    if (!this.apiUrl) return false;
+    try {
+      const res = await fetchWithTimeout(`${this.apiUrl}/api/callbacks/${callbackId}/ack`, {
+        method: "POST",
+        headers: this.headers,
+      });
+      return res.ok;
+    } catch {
+      return false;
     }
   }
 
@@ -170,7 +209,7 @@ export class MatchmakerAPIClient {
   async ping(): Promise<boolean> {
     if (!this.apiUrl) return false;
     try {
-      const res = await fetchWithTimeout(`${this.apiUrl}/health`, {
+      const res = await fetchWithTimeout(`${this.apiUrl}/api/health`, {
         headers: this.headers,
       });
       return res.ok;
@@ -190,15 +229,15 @@ export function createMatchmakerClient(config: {
   apiKey?: string;
 }): MatchmakerAPIClient {
   const client = new MatchmakerAPIClient({
-    apiUrl: config.matchmakerApiUrl,
+    apiUrl: config.matchmakerApiUrl || DEFAULT_API_URL,
     botId: config.botId,
     apiKey: config.apiKey,
   });
 
   if (client.isConnected) {
-    log.info(`Matchmaker API: ${config.matchmakerApiUrl}`);
+    log.info(`Matchmaker API: ${config.matchmakerApiUrl || DEFAULT_API_URL}`);
   } else {
-    log.info("Matchmaker: local-only mode (no shared API configured)");
+    log.info("Matchmaker: local-only mode");
   }
 
   return client;
