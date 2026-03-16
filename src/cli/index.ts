@@ -3,6 +3,7 @@ import { onboardCommand } from "./commands/onboard.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { mcpAddCommand, mcpRemoveCommand, mcpListCommand } from "./commands/mcp.js";
 import { configCommand } from "./commands/config.js";
+import { skillCreate, skillList, skillRemove } from "./commands/skill.js";
 import { main as startApp } from "../index.js";
 import { configExists, getDefaultConfigPath } from "../config/loader.js";
 import { readFileSync, existsSync } from "fs";
@@ -183,5 +184,29 @@ program
 program.action(() => {
   program.help();
 });
+
+// Skill commands
+const skill = program.command("skill").description("Manage custom skills (plugins)");
+
+skill
+  .command("create <name>")
+  .description("Create a new skill from template")
+  .action((name: string) => {
+    skillCreate(name);
+  });
+
+skill
+  .command("list")
+  .description("List installed skills")
+  .action(() => {
+    skillList();
+  });
+
+skill
+  .command("remove <name>")
+  .description("Remove a skill (moves to trash)")
+  .action((name: string) => {
+    skillRemove(name);
+  });
 
 program.parse(process.argv);
