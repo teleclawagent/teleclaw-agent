@@ -57,6 +57,24 @@ export interface TelegramTransport {
     handler: (message: TelegramMessage) => void | Promise<void>
   ): void;
 
+  // ── Extended messaging ──
+  deleteMessages(chatId: string, messageIds: number[]): Promise<void>;
+  forwardMessage(fromChatId: string, toChatId: string, messageId: number): Promise<{ id: number }>;
+  pinMessage(chatId: string, messageId: number, silent?: boolean): Promise<void>;
+  unpinMessage(chatId: string, messageId: number): Promise<void>;
+
+  // ── Media ──
+  sendPhoto(chatId: string, photo: string | Buffer, options?: { caption?: string; replyToId?: number }): Promise<{ id: number }>;
+  sendAnimation(chatId: string, animation: string | Buffer, options?: { caption?: string; replyToId?: number }): Promise<{ id: number }>;
+  sendSticker(chatId: string, sticker: string | Buffer, options?: { replyToId?: number }): Promise<{ id: number }>;
+  sendVoice(chatId: string, voice: string | Buffer, options?: { caption?: string; replyToId?: number; duration?: number }): Promise<{ id: number }>;
+  sendDocument(chatId: string, document: string | Buffer, options?: { caption?: string; replyToId?: number; filename?: string }): Promise<{ id: number }>;
+  downloadFile(fileId: string): Promise<Buffer>;
+
+  // ── Interactive ──
+  sendPoll(chatId: string, question: string, options: string[], opts?: { isAnonymous?: boolean; allowsMultiple?: boolean; replyToId?: number }): Promise<{ id: number }>;
+  sendDice(chatId: string, emoji?: string, replyToId?: number): Promise<{ id: number; value?: number }>;
+
   // ── Chat data ──
   getDialogs(): Promise<
     Array<{ id: string; title: string; isGroup: boolean; isChannel: boolean }>

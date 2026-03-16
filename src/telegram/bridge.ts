@@ -546,6 +546,146 @@ export class TelegramBridge implements TelegramTransport {
     }
   }
 
+  // ── Extended messaging (TelegramTransport) ──
+
+  async deleteMessages(chatId: string, messageIds: number[]): Promise<void> {
+    const peer = this.peerCache.get(chatId) || chatId;
+    await this.client.getClient().deleteMessages(peer, messageIds, { revoke: true });
+  }
+
+  async forwardMessage(fromChatId: string, toChatId: string, messageId: number): Promise<{ id: number }> {
+    const fromPeer = this.peerCache.get(fromChatId) || fromChatId;
+    const toPeer = this.peerCache.get(toChatId) || toChatId;
+    const result = await this.client.getClient().forwardMessages(toPeer, {
+      fromPeer,
+      messages: [messageId],
+    });
+    const msgId = Array.isArray(result) && result.length > 0 ? result[0].id : messageId;
+    return { id: msgId };
+  }
+
+  async pinMessage(chatId: string, messageId: number, silent = false): Promise<void> {
+    const peer = this.peerCache.get(chatId) || chatId;
+    await this.client.getClient().pinMessage(peer, messageId, { notify: !silent });
+  }
+
+  async unpinMessage(chatId: string, messageId: number): Promise<void> {
+    const peer = this.peerCache.get(chatId) || chatId;
+    await this.client.getClient().unpinMessage(peer, messageId);
+  }
+
+  async sendPhoto(chatId: string, photo: string | Buffer, options?: { caption?: string; replyToId?: number }): Promise<{ id: number }> {
+    const peer = this.peerCache.get(chatId) || chatId;
+    const msg = await this.client.getClient().sendFile(peer, {
+      file: photo,
+      caption: options?.caption,
+      replyTo: options?.replyToId,
+    });
+    return { id: msg.id };
+  }
+
+  async sendAnimation(chatId: string, animation: string | Buffer, options?: { caption?: string; replyToId?: number }): Promise<{ id: number }> {
+    const peer = this.peerCache.get(chatId) || chatId;
+    const msg = await this.client.getClient().sendFile(peer, {
+      file: animation,
+      caption: options?.caption,
+      replyTo: options?.replyToId,
+      forceDocument: false,
+    });
+    return { id: msg.id };
+  }
+
+  async sendSticker(chatId: string, sticker: string | Buffer, options?: { replyToId?: number }): Promise<{ id: number }> {
+    const peer = this.peerCache.get(chatId) || chatId;
+    const msg = await this.client.getClient().sendFile(peer, {
+      file: sticker,
+      replyTo: options?.replyToId,
+    });
+    return { id: msg.id };
+  }
+
+  async sendVoice(chatId: string, voice: string | Buffer, options?: { caption?: string; replyToId?: number; duration?: number }): Promise<{ id: number }> {
+    const peer = this.peerCache.get(chatId) || chatId;
+    const msg = await this.client.getClient().sendFile(peer, {
+      file: voice,
+      caption: options?.caption,
+      replyTo: options?.replyToId,
+      voiceNote: true,
+    });
+    return { id: msg.id };
+  }
+
+  async sendDocument(chatId: string, document: string | Buffer, options?: { caption?: string; replyToId?: number; filename?: string }): Promise<{ id: number }> {
+    const peer = this.peerCache.get(chatId) || chatId;
+    const msg = await this.client.getClient().sendFile(peer, {
+      file: document,
+      caption: options?.caption,
+      replyTo: options?.replyToId,
+      forceDocument: true,
+    });
+    return { id: msg.id };
+  }
+
+  async downloadFile(fileId: string): Promise<Buffer> {
+    // In GramJS mode, fileId handling is complex — this is a simplified version
+    // Most tool executors use getClient() directly for media downloads
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GramJS downloadMedia accepts various types
+    const result = await this.client.getClient().downloadMedia(fileId as any);
+    if (result instanceof Buffer) return result;
+    throw new Error("Failed to download file");
+  }
+
+  async sendPoll(chatId: string, question: string, options: string[], opts?: { isAnonymous?: boolean; allowsMultiple?: boolean; replyToId?: number }): Promise<{ id: number }> {
+    const peer = this.peerCache.get(chatId) || chatId;
+    const { Api: TgApi } = await import("telegram");
+    const { randomLong } = await import("../utils/gramjs-bigint.js");
+    const result = await this.client.getClient().invoke(
+      new TgApi.messages.SendMedia({
+        peer,
+        media: new TgApi.InputMediaPoll({
+          poll: new TgApi.Poll({
+            id: randomLong(),
+            question: new TgApi.TextWithEntities({ text: question, entities: [] }),
+            answers: options.map((opt, i) =>
+              new TgApi.PollAnswer({ text: new TgApi.TextWithEntities({ text: opt, entities: [] }), option: Buffer.from([i]) })
+            ),
+            publicVoters: !(opts?.isAnonymous ?? true),
+            multipleChoice: opts?.allowsMultiple,
+          }),
+        }),
+        message: "",
+        randomId: randomLong(),
+      })
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- extracting message ID from Updates
+    const updates = result as any;
+    const msgId = updates?.updates?.find?.((u: { className: string; message?: { id: number } }) =>
+      u.className === "UpdateNewMessage" || u.className === "UpdateNewChannelMessage"
+    )?.message?.id ?? 0;
+    return { id: msgId };
+  }
+
+  async sendDice(chatId: string, emoji?: string, replyToId?: number): Promise<{ id: number; value?: number }> {
+    const peer = this.peerCache.get(chatId) || chatId;
+    const { Api: TgApi } = await import("telegram");
+    const { randomLong } = await import("../utils/gramjs-bigint.js");
+    const result = await this.client.getClient().invoke(
+      new TgApi.messages.SendMedia({
+        peer,
+        media: new TgApi.InputMediaDice({ emoticon: emoji || "🎲" }),
+        message: "",
+        randomId: randomLong(),
+        replyTo: replyToId ? new TgApi.InputReplyToMessage({ replyToMsgId: replyToId }) : undefined,
+      })
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- extracting from Updates
+    const updates = result as any;
+    const msg = updates?.updates?.find?.((u: { className: string }) =>
+      u.className === "UpdateNewMessage" || u.className === "UpdateNewChannelMessage"
+    )?.message;
+    return { id: msg?.id ?? 0, value: msg?.media?.value };
+  }
+
   getClient(): LegacyClientCompat {
     return this.client as unknown as LegacyClientCompat;
   }

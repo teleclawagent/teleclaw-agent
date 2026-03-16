@@ -1,156 +1,54 @@
-import { randomLong } from "../../../../utils/gramjs-bigint.js";
 import { Type } from "@sinclair/typebox";
-import { Api } from "telegram";
 import type { Tool, ToolExecutor, ToolResult } from "../../types.js";
-import { MAX_POLL_QUESTION_LENGTH } from "../../../../constants/limits.js";
 import { getErrorMessage } from "../../../../utils/errors.js";
 import { createLogger } from "../../../../utils/logger.js";
 
 const log = createLogger("Tools");
 
-/**
- * Parameters for telegram_create_poll tool
- */
 interface CreatePollParams {
   chatId: string;
   question: string;
   options: string[];
-  anonymous?: boolean;
-  multipleChoice?: boolean;
-  publicVoters?: boolean;
-  closePeriod?: number;
-  closeDate?: number;
+  isAnonymous?: boolean;
+  allowsMultipleAnswers?: boolean;
+  replyToId?: number;
 }
 
-/**
- * Tool definition for creating polls
- */
 export const telegramCreatePollTool: Tool = {
   name: "telegram_create_poll",
-  description:
-    "Create a poll in a chat. For quizzes with a correct answer, use telegram_create_quiz instead.",
+  description: "Create a poll in a Telegram chat.",
   parameters: Type.Object({
-    chatId: Type.String({
-      description: "The chat ID where the poll will be created",
+    chatId: Type.String({ description: "The chat ID" }),
+    question: Type.String({ description: "Poll question (max 300 characters)", maxLength: 300 }),
+    options: Type.Array(Type.String(), {
+      description: "Poll options (2-10)",
+      minItems: 2,
+      maxItems: 10,
     }),
-    question: Type.String({
-      description: `The poll question/prompt (max ${MAX_POLL_QUESTION_LENGTH} characters)`,
-      maxLength: MAX_POLL_QUESTION_LENGTH,
-    }),
-    options: Type.Array(
-      Type.String({
-        description: "Answer option (max 100 characters)",
-        maxLength: 100,
-      }),
-      {
-        description:
-          "Array of answer options (2-10 options, each max 100 characters). Example: ['Yes', 'No', 'Maybe']",
-        minItems: 2,
-        maxItems: 10,
-      }
+    isAnonymous: Type.Optional(Type.Boolean({ description: "Anonymous voting (default: true)" })),
+    allowsMultipleAnswers: Type.Optional(
+      Type.Boolean({ description: "Allow multiple answers (default: false)" })
     ),
-    anonymous: Type.Optional(
-      Type.Boolean({
-        description:
-          "Whether votes are anonymous (voters not visible). Default: true. Set to false for public polls.",
-      })
-    ),
-    multipleChoice: Type.Optional(
-      Type.Boolean({
-        description: "Allow users to select multiple answers. Default: false (single choice only).",
-      })
-    ),
-    publicVoters: Type.Optional(
-      Type.Boolean({
-        description:
-          "Show who voted for what (only for non-anonymous polls). Default: false. Requires anonymous=false.",
-      })
-    ),
-    closePeriod: Type.Optional(
-      Type.Number({
-        description:
-          "Auto-close poll after N seconds (5-600). Cannot be used with closeDate. Example: 300 for 5 minutes.",
-      })
-    ),
-    closeDate: Type.Optional(
-      Type.Number({
-        description:
-          "Unix timestamp when poll should close. Cannot be used with closePeriod. Example: 1735689600 for a specific date/time.",
-      })
-    ),
+    replyToId: Type.Optional(Type.Number({ description: "Message ID to reply to" })),
   }),
 };
 
-/**
- * Executor for telegram_create_poll tool
- */
 export const telegramCreatePollExecutor: ToolExecutor<CreatePollParams> = async (
   params,
   context
 ): Promise<ToolResult> => {
   try {
-    const {
-      chatId,
-      question,
-      options,
-      anonymous = true,
-      multipleChoice = false,
-      publicVoters = false,
-      closePeriod,
-      closeDate,
-    } = params;
-
-    if (options.length < 2 || options.length > 10) {
-      return {
-        success: false,
-        error: "Poll must have between 2 and 10 options",
-      };
-    }
-
-    // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
-
-    // Create poll using GramJS
-    const poll = new Api.Poll({
-      id: randomLong(),
-      question: new Api.TextWithEntities({ text: question, entities: [] }),
-      answers: options.map(
-        (opt, idx) =>
-          new Api.PollAnswer({
-            text: new Api.TextWithEntities({ text: opt, entities: [] }),
-            option: Buffer.from([idx]),
-          })
-      ),
-      publicVoters: !anonymous && publicVoters,
-      multipleChoice,
-      closePeriod,
-      closeDate,
+    const result = await context.bridge.sendPoll(params.chatId, params.question, params.options, {
+      isAnonymous: params.isAnonymous,
+      allowsMultiple: params.allowsMultipleAnswers,
+      replyToId: params.replyToId,
     });
-
-    const _result = await gramJsClient.invoke(
-      new Api.messages.SendMedia({
-        peer: chatId,
-        media: new Api.InputMediaPoll({
-          poll,
-        }),
-        message: "",
-        randomId: randomLong(),
-      })
-    );
-
     return {
       success: true,
-      data: {
-        pollId: poll.id.toString(),
-        question,
-        optionCount: options.length,
-      },
+      data: { messageId: result.id, question: params.question, optionCount: params.options.length },
     };
   } catch (error) {
     log.error({ err: error }, "Error creating poll");
-    return {
-      success: false,
-      error: getErrorMessage(error),
-    };
+    return { success: false, error: getErrorMessage(error) };
   }
 };

@@ -3,7 +3,7 @@
  * Used when Teleclaw runs as a Telegram bot (self-hosted by users).
  */
 
-import { InlineKeyboard } from "grammy";
+import { InlineKeyboard, InputFile } from "grammy";
 import type { Message, Update } from "grammy/types";
 import { BotClient, type BotClientConfig } from "./bot-client.js";
 import type {
@@ -139,11 +139,174 @@ export class BotBridge implements TelegramTransport {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- emoji type is a union of all TG emojis
       await this.client.getBot().api.setMessageReaction(chatId, messageId, [
-        { type: "emoji", emoji: emoji as any // eslint-disable-line @typescript-eslint/no-explicit-any -- TG emoji union },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TG emoji union type
+        { type: "emoji", emoji: emoji as any },
       ]);
     } catch (error) {
       log.warn({ err: error }, "Failed to send reaction");
     }
+  }
+
+  // ── Extended messaging ──
+
+  async deleteMessages(chatId: string, messageIds: number[]): Promise<void> {
+    const bot = this.client.getBot();
+    for (const msgId of messageIds) {
+      try {
+        await bot.api.deleteMessage(chatId, msgId);
+      } catch (error) {
+        log.warn({ err: error }, `Failed to delete message ${msgId}`);
+      }
+    }
+  }
+
+  async forwardMessage(
+    fromChatId: string,
+    toChatId: string,
+    messageId: number
+  ): Promise<{ id: number }> {
+    const bot = this.client.getBot();
+    const sent = await bot.api.forwardMessage(toChatId, fromChatId, messageId);
+    return { id: sent.message_id };
+  }
+
+  async pinMessage(
+    chatId: string,
+    messageId: number,
+    silent = false
+  ): Promise<void> {
+    await this.client
+      .getBot()
+      .api.pinChatMessage(chatId, messageId, {
+        disable_notification: silent,
+      });
+  }
+
+  async unpinMessage(chatId: string, messageId: number): Promise<void> {
+    await this.client
+      .getBot()
+      .api.unpinChatMessage(chatId, messageId);
+  }
+
+  // ── Media ──
+
+  async sendPhoto(
+    chatId: string,
+    photo: string | Buffer,
+    options?: { caption?: string; replyToId?: number }
+  ): Promise<{ id: number }> {
+    const bot = this.client.getBot();
+    const sent = await bot.api.sendPhoto(chatId, typeof photo === "string" ? photo : new InputFile(photo, "photo.jpg"), {
+      caption: options?.caption,
+      parse_mode: "HTML",
+      reply_parameters: options?.replyToId
+        ? { message_id: options.replyToId }
+        : undefined,
+    });
+    return { id: sent.message_id };
+  }
+
+  async sendAnimation(
+    chatId: string,
+    animation: string | Buffer,
+    options?: { caption?: string; replyToId?: number }
+  ): Promise<{ id: number }> {
+    const bot = this.client.getBot();
+    const sent = await bot.api.sendAnimation(chatId, typeof animation === "string" ? animation : new InputFile(animation, "animation.gif"), {
+      caption: options?.caption,
+      parse_mode: "HTML",
+      reply_parameters: options?.replyToId
+        ? { message_id: options.replyToId }
+        : undefined,
+    });
+    return { id: sent.message_id };
+  }
+
+  async sendSticker(
+    chatId: string,
+    sticker: string | Buffer,
+    options?: { replyToId?: number }
+  ): Promise<{ id: number }> {
+    const bot = this.client.getBot();
+    const sent = await bot.api.sendSticker(chatId, typeof sticker === "string" ? sticker : new InputFile(sticker, "sticker.webp"), {
+      reply_parameters: options?.replyToId
+        ? { message_id: options.replyToId }
+        : undefined,
+    });
+    return { id: sent.message_id };
+  }
+
+  async sendVoice(
+    chatId: string,
+    voice: string | Buffer,
+    options?: { caption?: string; replyToId?: number; duration?: number }
+  ): Promise<{ id: number }> {
+    const bot = this.client.getBot();
+    const sent = await bot.api.sendVoice(chatId, typeof voice === "string" ? voice : new InputFile(voice, "voice.ogg"), {
+      caption: options?.caption,
+      parse_mode: "HTML",
+      duration: options?.duration,
+      reply_parameters: options?.replyToId
+        ? { message_id: options.replyToId }
+        : undefined,
+    });
+    return { id: sent.message_id };
+  }
+
+  async sendDocument(
+    chatId: string,
+    document: string | Buffer,
+    options?: { caption?: string; replyToId?: number; filename?: string }
+  ): Promise<{ id: number }> {
+    const bot = this.client.getBot();
+    const sent = await bot.api.sendDocument(chatId, typeof document === "string" ? document : new InputFile(document, options?.filename ?? "file"), {
+      caption: options?.caption,
+      parse_mode: "HTML",
+      reply_parameters: options?.replyToId
+        ? { message_id: options.replyToId }
+        : undefined,
+    });
+    return { id: sent.message_id };
+  }
+
+  async downloadFile(fileId: string): Promise<Buffer> {
+    const bot = this.client.getBot();
+    const file = await bot.api.getFile(fileId);
+    if (!file.file_path) throw new Error("File path not available");
+    const url = `https://api.telegram.org/file/bot${this.client.getBot().token}/${file.file_path}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+    return Buffer.from(await response.arrayBuffer());
+  }
+
+  // ── Interactive ──
+
+  async sendPoll(
+    chatId: string,
+    question: string,
+    options: string[],
+    opts?: { isAnonymous?: boolean; allowsMultiple?: boolean; replyToId?: number }
+  ): Promise<{ id: number }> {
+    const bot = this.client.getBot();
+    const sent = await bot.api.sendPoll(chatId, question, options, {
+      is_anonymous: opts?.isAnonymous,
+      allows_multiple_answers: opts?.allowsMultiple,
+      reply_parameters: opts?.replyToId
+        ? { message_id: opts.replyToId }
+        : undefined,
+    });
+    return { id: sent.message_id };
+  }
+
+  async sendDice(
+    chatId: string,
+    emoji?: string,
+    replyToId?: number
+  ): Promise<{ id: number; value?: number }> {
+    const bot = this.client.getBot();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- emoji is a union of dice emojis
+    const sent = await bot.api.sendDice(chatId, emoji as any);
+    return { id: sent.message_id, value: sent.dice?.value };
   }
 
   // ── Event handlers ──

@@ -1,147 +1,40 @@
-import { randomLong, toLong } from "../../../../utils/gramjs-bigint.js";
 import { Type } from "@sinclair/typebox";
-import { Api } from "telegram";
 import type { Tool, ToolExecutor, ToolResult } from "../../types.js";
-import { validateReadPath, WorkspaceSecurityError } from "../../../../workspace/index.js";
 import { getErrorMessage } from "../../../../utils/errors.js";
 import { createLogger } from "../../../../utils/logger.js";
 
 const log = createLogger("Tools");
 
-/**
- * Parameters for telegram_send_gif tool
- */
 interface SendGifParams {
   chatId: string;
-  queryId?: string;
-  resultId?: string;
-  gifPath?: string;
+  gif: string;
   caption?: string;
   replyToId?: number;
 }
 
-/**
- * Tool definition for sending GIF animations
- */
 export const telegramSendGifTool: Tool = {
   name: "telegram_send_gif",
-  description:
-    "Send a GIF via queryId+resultId (from telegram_search_gifs) or a local GIF/MP4 file path.",
+  description: "Send a GIF animation to a Telegram chat. Provide a URL or file path.",
   parameters: Type.Object({
-    chatId: Type.String({
-      description: "The chat ID to send the GIF to",
-    }),
-    queryId: Type.Optional(
-      Type.String({
-        description: "Query ID from telegram_search_gifs results. Use with resultId.",
-      })
-    ),
-    resultId: Type.Optional(
-      Type.String({
-        description: "Result ID of the specific GIF from telegram_search_gifs. Use with queryId.",
-      })
-    ),
-    gifPath: Type.Optional(
-      Type.String({
-        description: "Local file path to a GIF or MP4 file. Alternative to queryId + resultId.",
-      })
-    ),
-    caption: Type.Optional(
-      Type.String({
-        description: "Optional caption/text to accompany the GIF",
-      })
-    ),
-    replyToId: Type.Optional(
-      Type.Number({
-        description: "Optional message ID to reply to",
-      })
-    ),
+    chatId: Type.String({ description: "The chat ID" }),
+    gif: Type.String({ description: "GIF URL or file path" }),
+    caption: Type.Optional(Type.String({ description: "Optional caption" })),
+    replyToId: Type.Optional(Type.Number({ description: "Message ID to reply to" })),
   }),
 };
 
-/**
- * Executor for telegram_send_gif tool
- */
 export const telegramSendGifExecutor: ToolExecutor<SendGifParams> = async (
   params,
   context
 ): Promise<ToolResult> => {
   try {
-    const { chatId, queryId, resultId, gifPath, caption, replyToId } = params;
-
-    // Validate input
-    const hasInlineResult = queryId !== undefined && resultId !== undefined;
-    const hasPath = gifPath !== undefined;
-
-    if (!hasInlineResult && !hasPath) {
-      return {
-        success: false,
-        error: "Must provide either (queryId + resultId) from search, or gifPath",
-      };
-    }
-
-    // Get underlying GramJS client
-    const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
-
-    // Method 1: Send GIF from inline bot result (@gif)
-    if (hasInlineResult) {
-      const _result = await gramJsClient.invoke(
-        new Api.messages.SendInlineBotResult({
-          peer: chatId,
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by hasInlineResult check
-          queryId: toLong(BigInt(queryId!)),
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by hasInlineResult check
-          id: resultId!,
-          randomId: randomLong(),
-          replyTo: replyToId ? new Api.InputReplyToMessage({ replyToMsgId: replyToId }) : undefined,
-        })
-      );
-
-      return {
-        success: true,
-        data: {
-          sentVia: "inline_bot",
-          queryId,
-          resultId,
-        },
-      };
-    }
-
-    // Method 2: Send local GIF file
-    // Validate workspace path
-    let validatedPath;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- reached only when gifPath is provided
-      validatedPath = validateReadPath(gifPath!);
-    } catch (error) {
-      if (error instanceof WorkspaceSecurityError) {
-        return {
-          success: false,
-          error: `Security Error: ${error.message}. GIFs must be in your workspace (downloads/ or uploads/).`,
-        };
-      }
-      throw error;
-    }
-
-    const result = await gramJsClient.sendFile(chatId, {
-      file: validatedPath.absolutePath,
-      caption: caption,
-      replyTo: replyToId,
-      attributes: [new Api.DocumentAttributeAnimated()],
+    const result = await context.bridge.sendAnimation(params.chatId, params.gif, {
+      caption: params.caption,
+      replyToId: params.replyToId,
     });
-
-    return {
-      success: true,
-      data: {
-        messageId: result.id,
-        date: result.date,
-      },
-    };
+    return { success: true, data: { messageId: result.id } };
   } catch (error) {
     log.error({ err: error }, "Error sending GIF");
-    return {
-      success: false,
-      error: getErrorMessage(error),
-    };
+    return { success: false, error: getErrorMessage(error) };
   }
 };
