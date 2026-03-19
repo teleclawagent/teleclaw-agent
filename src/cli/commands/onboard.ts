@@ -666,7 +666,7 @@ async function runInteractiveOnboarding(
       TON
     );
 
-    const tokenInput = await password({
+    const tokenInput = await input({
       message: "Bot token (from @BotFather)",
       theme,
       validate: (value) => {
@@ -952,7 +952,7 @@ async function runInteractiveOnboarding(
       TON
     );
 
-    const tokenInput = await password({
+    const tokenInput = await input({
       message: "Bot token (from @BotFather)",
       theme,
       validate: (value: string) => {
