@@ -65,9 +65,6 @@ export interface OnboardOptions {
   nonInteractive?: boolean;
   ui?: boolean;
   uiPort?: string;
-  apiId?: number;
-  apiHash?: string;
-  phone?: string;
   apiKey?: string;
   baseUrl?: string;
   userId?: number;

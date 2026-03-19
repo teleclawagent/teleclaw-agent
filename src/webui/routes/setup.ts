@@ -32,7 +32,6 @@ import {
 } from "../../ton/wallet-service.js";
 import { fetchWithTimeout } from "../../utils/fetch.js";
 import { TELEGRAM_MAX_MESSAGE_LENGTH } from "../../constants/limits.js";
-import { TelegramAuthManager } from "../setup-auth.js";
 import { createLogger } from "../../utils/logger.js";
 
 const log = createLogger("Setup");
@@ -50,7 +49,6 @@ function maskKey(key: string): string {
 
 export function createSetupRoutes(): Hono {
   const app = new Hono();
-  const authManager = new TelegramAuthManager();
 
   // ── GET /status ───────────────────────────────────────────────────
   app.get("/status", async (c) => {
@@ -278,192 +276,8 @@ export function createSetupRoutes(): Hono {
     }
   });
 
-  // ── POST /telegram/send-code ──────────────────────────────────────
-  app.post("/telegram/send-code", async (c) => {
-    try {
-      const body = await c.req.json<{
-        apiId: number;
-        apiHash: string;
-        phone: string;
-      }>();
-
-      if (!body.apiId || !body.apiHash || !body.phone) {
-        return c.json({ success: false, error: "Missing apiId, apiHash, or phone" }, 400);
-      }
-
-      const result = await authManager.sendCode(body.apiId, body.apiHash, body.phone);
-      return c.json({ success: true, data: result });
-    } catch (err: unknown) {
-      const error = err as { errorMessage?: string; seconds?: number; message?: string };
-      if (error.seconds) {
-        return c.json(
-          {
-            success: false,
-            error: `Rate limited. Please wait ${error.seconds} seconds.`,
-          },
-          429
-        );
-      }
-      return c.json(
-        { success: false, error: error.errorMessage || error.message || String(err) },
-        500
-      );
-    }
-  });
-
-  // ── POST /telegram/verify-code ────────────────────────────────────
-  app.post("/telegram/verify-code", async (c) => {
-    try {
-      const body = await c.req.json<{ authSessionId: string; code: string }>();
-      if (!body.authSessionId || !body.code) {
-        return c.json({ success: false, error: "Missing authSessionId or code" }, 400);
-      }
-
-      const result = await authManager.verifyCode(body.authSessionId, body.code);
-      return c.json({ success: true, data: result });
-    } catch (err: unknown) {
-      const error = err as { errorMessage?: string; seconds?: number; message?: string };
-      if (error.seconds) {
-        return c.json(
-          {
-            success: false,
-            error: `Rate limited. Please wait ${error.seconds} seconds.`,
-          },
-          429
-        );
-      }
-      return c.json(
-        { success: false, error: error.errorMessage || error.message || String(err) },
-        500
-      );
-    }
-  });
-
-  // ── POST /telegram/verify-password ────────────────────────────────
-  app.post("/telegram/verify-password", async (c) => {
-    try {
-      const body = await c.req.json<{ authSessionId: string; password: string }>();
-      if (!body.authSessionId || !body.password) {
-        return c.json({ success: false, error: "Missing authSessionId or password" }, 400);
-      }
-
-      const result = await authManager.verifyPassword(body.authSessionId, body.password);
-      return c.json({ success: true, data: result });
-    } catch (err: unknown) {
-      const error = err as { errorMessage?: string; seconds?: number; message?: string };
-      if (error.seconds) {
-        return c.json(
-          {
-            success: false,
-            error: `Rate limited. Please wait ${error.seconds} seconds.`,
-          },
-          429
-        );
-      }
-      return c.json(
-        { success: false, error: error.errorMessage || error.message || String(err) },
-        500
-      );
-    }
-  });
-
-  // ── POST /telegram/resend-code ────────────────────────────────────
-  app.post("/telegram/resend-code", async (c) => {
-    try {
-      const body = await c.req.json<{ authSessionId: string }>();
-      if (!body.authSessionId) {
-        return c.json({ success: false, error: "Missing authSessionId" }, 400);
-      }
-
-      const result = await authManager.resendCode(body.authSessionId);
-      if (!result) {
-        return c.json({ success: false, error: "Session expired or invalid" }, 400);
-      }
-      return c.json({ success: true, data: result });
-    } catch (err: unknown) {
-      const error = err as { errorMessage?: string; seconds?: number; message?: string };
-      if (error.seconds) {
-        return c.json(
-          {
-            success: false,
-            error: `Rate limited. Please wait ${error.seconds} seconds.`,
-          },
-          429
-        );
-      }
-      return c.json(
-        { success: false, error: error.errorMessage || error.message || String(err) },
-        500
-      );
-    }
-  });
-
-  // ── POST /telegram/qr-start ────────────────────────────────────
-  app.post("/telegram/qr-start", async (c) => {
-    try {
-      const body = await c.req.json<{ apiId: number; apiHash: string }>();
-      if (!body.apiId || !body.apiHash) {
-        return c.json({ success: false, error: "Missing apiId or apiHash" }, 400);
-      }
-
-      const result = await authManager.startQrSession(body.apiId, body.apiHash);
-      return c.json({ success: true, data: result });
-    } catch (err: unknown) {
-      const error = err as { errorMessage?: string; seconds?: number; message?: string };
-      if (error.seconds) {
-        return c.json(
-          { success: false, error: `Rate limited. Please wait ${error.seconds} seconds.` },
-          429
-        );
-      }
-      return c.json(
-        { success: false, error: error.errorMessage || error.message || String(err) },
-        500
-      );
-    }
-  });
-
-  // ── POST /telegram/qr-refresh ─────────────────────────────────
-  app.post("/telegram/qr-refresh", async (c) => {
-    try {
-      const body = await c.req.json<{ authSessionId: string }>();
-      if (!body.authSessionId) {
-        return c.json({ success: false, error: "Missing authSessionId" }, 400);
-      }
-
-      const result = await authManager.refreshQrToken(body.authSessionId);
-      return c.json({ success: true, data: result });
-    } catch (err: unknown) {
-      const error = err as { errorMessage?: string; seconds?: number; message?: string };
-      if (error.seconds) {
-        return c.json(
-          { success: false, error: `Rate limited. Please wait ${error.seconds} seconds.` },
-          429
-        );
-      }
-      return c.json(
-        { success: false, error: error.errorMessage || error.message || String(err) },
-        500
-      );
-    }
-  });
-
-  // ── DELETE /telegram/session ──────────────────────────────────────
-  app.delete("/telegram/session", async (c) => {
-    try {
-      const body = await c.req
-        .json<{ authSessionId: string }>()
-        .catch(() => ({ authSessionId: "" }));
-      await authManager.cancelSession(body.authSessionId);
-      return c.json({ success: true });
-    } catch (err) {
-      return c.json(
-        { success: false, error: err instanceof Error ? err.message : String(err) },
-        500
-      );
-    }
-  });
-
+  // Telegram userbot/MTProto endpoints removed — bot-only mode
+  // Use POST /validate/bot-token and pass bot_token in POST /config/save
   // ── POST /config/save ─────────────────────────────────────────────
   app.post("/config/save", async (c) => {
     try {
@@ -496,11 +310,7 @@ export function createSetupRoutes(): Hono {
           },
         },
         telegram: {
-          api_id: input.telegram.api_id,
-          api_hash: input.telegram.api_hash,
-          phone: input.telegram.phone,
-          session_name: "teleclaw_session",
-          session_path: workspace.sessionPath,
+          mode: "bot" as const,
           dm_policy: input.telegram.dm_policy ?? "open",
           allow_from: [],
           group_policy: input.telegram.group_policy ?? "open",

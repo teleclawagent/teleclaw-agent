@@ -39,9 +39,6 @@ program
   .option("--non-interactive", "Non-interactive mode")
   .option("--ui", "Launch web-based setup wizard")
   .option("--ui-port <port>", "Port for setup WebUI", "7777")
-  .option("--api-id <id>", "Telegram API ID")
-  .option("--api-hash <hash>", "Telegram API Hash")
-  .option("--phone <number>", "Phone number")
   .option("--api-key <key>", "LLM provider API key")
   .option("--base-url <url>", "Base URL for local LLM server")
   .option("--user-id <id>", "Telegram User ID")
@@ -54,9 +51,6 @@ program
         nonInteractive: options.nonInteractive,
         ui: options.ui,
         uiPort: options.uiPort,
-        apiId: options.apiId ? parseInt(options.apiId) : undefined,
-        apiHash: options.apiHash,
-        phone: options.phone,
         apiKey: options.apiKey,
         baseUrl: options.baseUrl,
         userId: options.userId ? parseInt(options.userId) : undefined,

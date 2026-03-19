@@ -81,12 +81,12 @@ export const AgentConfigSchema = z.object({
 
 export const TelegramConfigSchema = z.object({
   mode: z
-    .enum(["bot", "userbot"])
+    .enum(["bot"])
     .default("bot")
-    .describe("Telegram connection mode: 'bot' (Bot API) or 'userbot' (GramJS MTProto)"),
-  api_id: z.number().default(0),
-  api_hash: z.string().default(""),
-  phone: z.string().default(""),
+    .describe("Telegram connection mode: 'bot' (Bot API via @BotFather token)"),
+  api_id: z.number().default(0).describe("Deprecated — ignored in bot-only mode"),
+  api_hash: z.string().default("").describe("Deprecated — ignored in bot-only mode"),
+  phone: z.string().default("").describe("Deprecated — ignored in bot-only mode"),
   session_name: z.string().default("teleclaw_session"),
   session_path: z.string().default("~/.teleclaw"),
   dm_policy: DMPolicy.default("allowlist"),
