@@ -40,6 +40,33 @@ export function getDealBot(): DealBot | null {
 
 const withDealsDb = createDbWrapper(getDealsDb, "Deals");
 
+/**
+ * Wrap a deal executor with token gate check.
+ * Requires user to hold 0.1% $TELECLAW supply.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withTokenGate(executor: any): any {
+  return async (params: any, context: any) => {
+    try {
+      const { checkTokenGate } = await import("../agent/tools/fragment/token-gate.js");
+      const db = context.db as import("better-sqlite3").Database;
+      const userId = context.senderId as number;
+      if (db && userId) {
+        const gateResult = await checkTokenGate(db, userId);
+        if (!gateResult.allowed) {
+          return {
+            success: false,
+            error: `🔒 OTC özelliklerini kullanmak için minimum %0.1 $TELECLAW token tutman gerekiyor.\n\n${gateResult.reason}`,
+          };
+        }
+      }
+    } catch (err) {
+      log.warn({ err }, "Token gate check failed — allowing access (fail-open for deals)");
+    }
+    return executor(params, context);
+  };
+}
+
 const dealsModule: PluginModule = {
   name: "deals",
   version: "1.0.0",
@@ -53,7 +80,7 @@ const dealsModule: PluginModule = {
     return [
       {
         tool: dealProposeTool,
-        executor: withDealsDb(dealProposeExecutor),
+        executor: withTokenGate(withDealsDb(dealProposeExecutor)),
         scope: "dm-only" as const,
       },
       {
@@ -65,7 +92,7 @@ const dealsModule: PluginModule = {
       { tool: dealListTool, executor: withDealsDb(dealListExecutor) },
       {
         tool: dealCancelTool,
-        executor: withDealsDb(dealCancelExecutor),
+        executor: withTokenGate(withDealsDb(dealCancelExecutor)),
         scope: "dm-only" as const,
       },
     ];

@@ -28,6 +28,7 @@ import {
 } from "./security.js";
 import { getErrorMessage } from "../../../utils/errors.js";
 import { createLogger } from "../../../utils/logger.js";
+import { verifyWalletTool, verifyWalletExecutor } from "./verify-wallet.js";
 
 const log = createLogger("AgenticWallet");
 
@@ -747,4 +748,6 @@ export const tools: ToolEntry[] = [
   // 🔴 Auto Mode — Trade execution
   { tool: confirmTradeTool, executor: confirmTradeExecutor, scope: "dm-only" },
   { tool: tradeHistoryTool, executor: tradeHistoryExecutor, scope: "dm-only" },
+  // 🔐 Wallet Verification (token gate)
+  { tool: verifyWalletTool, executor: verifyWalletExecutor as unknown as ToolExecutor<Record<string, unknown>>, scope: "dm-only" },
 ];

@@ -170,6 +170,13 @@ async function fetchTeleclawBalance(walletAddress: string): Promise<bigint | nul
  */
 function getUserWalletAddress(db: Database.Database, userId: number): string | null {
   try {
+    // Check verified_wallets first (transaction-based verification)
+    const verified = db
+      .prepare("SELECT wallet_address FROM verified_wallets WHERE user_id = ?")
+      .get(userId) as { wallet_address: string } | undefined;
+    if (verified?.wallet_address) return verified.wallet_address;
+
+    // Fallback to agentic_wallets (TON Connect or setup)
     const row = db
       .prepare("SELECT address FROM agentic_wallets WHERE user_id = ?")
       .get(userId) as { address: string } | undefined;
