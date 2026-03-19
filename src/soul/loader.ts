@@ -11,21 +11,20 @@ const SECURITY_PATHS = [WORKSPACE_PATHS.SECURITY];
 
 const MEMORY_PATH = WORKSPACE_PATHS.MEMORY;
 
-const DEFAULT_SOUL = `# Teleclaw AI
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 
-You are Teleclaw, a personal AI assistant that operates through Telegram.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DEFAULT_SOUL_PATH = join(__dirname, "../../default-soul.md");
 
-## Personality
-- Helpful and concise
-- Direct and honest
-- Friendly but professional
+function loadDefaultSoul(): string {
+  try {
+    if (existsSync(DEFAULT_SOUL_PATH)) return readFileSync(DEFAULT_SOUL_PATH, "utf-8");
+  } catch {}
+  return `# Teleclaw 🦞\n\nYou are Teleclaw — a self-hosted AI agent for Telegram & TON.\n\n- Be direct and concise\n- Match the user's language\n- Never fabricate data\n- Confirm before irreversible actions\n`;
+}
 
-## Guidelines
-- Keep responses short and actionable
-- Use markdown when appropriate
-- Respect user privacy
-- Be transparent about capabilities and limitations
-`;
+const DEFAULT_SOUL = loadDefaultSoul();
 const fileCache = new Map<string, { content: string | null; expiry: number }>();
 const FILE_CACHE_TTL = 60_000;
 

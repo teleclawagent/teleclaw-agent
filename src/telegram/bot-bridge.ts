@@ -342,6 +342,7 @@ export class BotBridge implements TelegramTransport {
 
     bot.on("message", async (ctx) => {
       const msg = ctx.message;
+      log.info({ from: msg.from?.first_name, text: msg.text?.slice(0, 50), chatId: msg.chat.id }, "📩 Incoming message");
       const parsed = this.parseMessage(msg);
       await handler(parsed);
     });

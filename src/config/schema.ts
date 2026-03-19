@@ -25,6 +25,7 @@ export const AgentConfigSchema = z.object({
       "anthropic",
       "claude-code",
       "openai",
+      "openai-codex",
       "google",
       "xai",
       "groq",
@@ -37,6 +38,24 @@ export const AgentConfigSchema = z.object({
       "huggingface",
       "cocoon",
       "local",
+      "deepseek",
+      "together",
+      "venice",
+      "litellm",
+      "qwen",
+      "volcengine",
+      "byteplus",
+      "cloudflare-ai",
+      "copilot",
+      "chutes",
+      "kilo",
+      "qianfan",
+      "modelstudio",
+      "vercel-ai",
+      "opencode",
+      "xiaomi",
+      "synthetic",
+      "custom",
     ])
     .default("anthropic"),
   api_key: z.string().default(""),
@@ -179,6 +198,14 @@ const _TonProxyObject = z.object({
 });
 export const TonProxyConfigSchema = _TonProxyObject.default(_TonProxyObject.parse({}));
 
+// ── OTC Matchmaker ─────────────────────────────────────────────────────
+const _MatchmakerObject = z.object({
+  enabled: z.boolean().default(true).describe("Enable shared OTC matchmaker"),
+  api_url: z.string().default("https://otc.teleclaw.ai").describe("Matchmaker API URL"),
+  api_key: z.string().optional().describe("API key for matchmaker (optional)"),
+});
+export const MatchmakerConfigSchema = _MatchmakerObject.default(_MatchmakerObject.parse({}));
+
 const _DevObject = z.object({
   hot_reload: z
     .boolean()
@@ -288,6 +315,7 @@ export const ConfigSchema = z.object({
   tool_rag: ToolRagConfigSchema,
   capabilities: CapabilitiesConfigSchema,
   ton_proxy: TonProxyConfigSchema,
+  matchmaker: MatchmakerConfigSchema.optional(),
   mcp: McpConfigSchema,
   plugins: z
     .record(z.string(), z.unknown())

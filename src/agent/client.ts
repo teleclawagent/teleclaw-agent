@@ -19,6 +19,8 @@ import {
   getClaudeCodeApiKey,
   refreshClaudeCodeApiKey,
 } from "../providers/claude-code-credentials.js";
+import { getCodexOAuthToken } from "../providers/openai-codex-oauth.js";
+import { getCopilotApiKey } from "../providers/github-copilot-auth.js";
 
 const log = createLogger("LLM");
 
@@ -32,6 +34,8 @@ export function getEffectiveApiKey(provider: string, rawKey: string): string {
   if (provider === "local") return "local";
   if (provider === "cocoon") return "";
   if (provider === "claude-code") return getClaudeCodeApiKey(rawKey);
+  if (provider === "openai-codex") return getCodexOAuthToken(rawKey);
+  if (provider === "cloudflare-ai" || provider === "litellm") return rawKey || "none";
   return rawKey;
 }
 

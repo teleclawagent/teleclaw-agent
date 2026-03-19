@@ -2,6 +2,7 @@ export type SupportedProvider =
   | "anthropic"
   | "claude-code"
   | "openai"
+  | "openai-codex"
   | "google"
   | "xai"
   | "groq"
@@ -13,7 +14,25 @@ export type SupportedProvider =
   | "minimax"
   | "huggingface"
   | "cocoon"
-  | "local";
+  | "local"
+  | "deepseek"
+  | "together"
+  | "venice"
+  | "litellm"
+  | "qwen"
+  | "volcengine"
+  | "byteplus"
+  | "cloudflare-ai"
+  | "copilot"
+  | "chutes"
+  | "kilo"
+  | "qianfan"
+  | "modelstudio"
+  | "vercel-ai"
+  | "opencode"
+  | "xiaomi"
+  | "synthetic"
+  | "custom";
 
 export interface ProviderMetadata {
   id: SupportedProvider;
@@ -60,6 +79,18 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     keyPrefix: "sk-",
     keyHint: "sk-proj-...",
     consoleUrl: "https://platform.openai.com/api-keys",
+    defaultModel: "gpt-5.4",
+    utilityModel: "gpt-4o-mini",
+    toolLimit: 128,
+    piAiProvider: "openai",
+  },
+  "openai-codex": {
+    id: "openai-codex",
+    displayName: "OpenAI Codex (ChatGPT OAuth)",
+    envVar: "OPENAI_API_KEY",
+    keyPrefix: "sk-",
+    keyHint: "Auto-detected from Codex CLI",
+    consoleUrl: "https://platform.openai.com/",
     defaultModel: "gpt-5.4",
     utilityModel: "gpt-4o-mini",
     toolLimit: 128,
@@ -209,6 +240,222 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     toolLimit: 128,
     piAiProvider: "local",
   },
+  deepseek: {
+    id: "deepseek",
+    displayName: "DeepSeek",
+    envVar: "DEEPSEEK_API_KEY",
+    keyPrefix: "sk-",
+    keyHint: "sk-...",
+    consoleUrl: "https://platform.deepseek.com/api_keys",
+    defaultModel: "deepseek-chat",
+    utilityModel: "deepseek-chat",
+    toolLimit: 128,
+    piAiProvider: "deepseek",
+  },
+  together: {
+    id: "together",
+    displayName: "Together AI",
+    envVar: "TOGETHER_API_KEY",
+    keyPrefix: null,
+    keyHint: "...",
+    consoleUrl: "https://api.together.xyz/settings/api-keys",
+    defaultModel: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+    utilityModel: "meta-llama/Llama-3.1-8B-Instruct-Turbo",
+    toolLimit: 128,
+    piAiProvider: "together",
+  },
+  venice: {
+    id: "venice",
+    displayName: "Venice AI",
+    envVar: "VENICE_API_KEY",
+    keyPrefix: null,
+    keyHint: "...",
+    consoleUrl: "https://venice.ai/settings/api",
+    defaultModel: "deepseek-r1-671b",
+    utilityModel: "llama-3.3-70b",
+    toolLimit: 128,
+    piAiProvider: "venice",
+  },
+  litellm: {
+    id: "litellm",
+    displayName: "LiteLLM Gateway",
+    envVar: "LITELLM_API_KEY",
+    keyPrefix: null,
+    keyHint: "No API key needed",
+    consoleUrl: "https://docs.litellm.ai/",
+    defaultModel: "gpt-4o",
+    utilityModel: "gpt-4o-mini",
+    toolLimit: 128,
+    piAiProvider: "litellm",
+  },
+  qwen: {
+    id: "qwen",
+    displayName: "Qwen (Alibaba)",
+    envVar: "DASHSCOPE_API_KEY",
+    keyPrefix: null,
+    keyHint: "...",
+    consoleUrl: "https://bailian.console.alibabacloud.com/",
+    defaultModel: "qwen3-235b-a22b",
+    utilityModel: "qwen3-30b-a3b",
+    toolLimit: 128,
+    piAiProvider: "qwen",
+  },
+  volcengine: {
+    id: "volcengine",
+    displayName: "Volcano Engine",
+    envVar: "VOLCENGINE_API_KEY",
+    keyPrefix: null,
+    keyHint: "...",
+    consoleUrl: "https://console.volcengine.com/",
+    defaultModel: "deepseek-r1-250528",
+    utilityModel: "deepseek-v3-250324",
+    toolLimit: 128,
+    piAiProvider: "volcengine",
+  },
+  byteplus: {
+    id: "byteplus",
+    displayName: "BytePlus",
+    envVar: "BYTEPLUS_API_KEY",
+    keyPrefix: null,
+    keyHint: "...",
+    consoleUrl: "https://console.byteplus.com/",
+    defaultModel: "deepseek-r1-250528",
+    utilityModel: "deepseek-v3-250324",
+    toolLimit: 128,
+    piAiProvider: "byteplus",
+  },
+  "cloudflare-ai": {
+    id: "cloudflare-ai",
+    displayName: "Cloudflare AI Gateway",
+    envVar: "CF_AI_GATEWAY_API_KEY",
+    keyPrefix: null,
+    keyHint: "No API key needed",
+    consoleUrl: "https://dash.cloudflare.com/",
+    defaultModel: "workers-ai",
+    utilityModel: "workers-ai",
+    toolLimit: 128,
+    piAiProvider: "cloudflare-ai",
+  },
+  copilot: {
+    id: "copilot",
+    displayName: "GitHub Copilot",
+    envVar: "",
+    keyPrefix: null,
+    keyHint: "No API key needed — uses GitHub device login",
+    consoleUrl: "https://github.com/settings/copilot",
+    defaultModel: "claude-sonnet-4-6",
+    utilityModel: "gpt-4o-mini",
+    toolLimit: 128,
+    piAiProvider: "copilot",
+  },
+  chutes: {
+    id: "chutes",
+    displayName: "Chutes",
+    envVar: "",
+    keyPrefix: null,
+    keyHint: "No API key needed — OAuth login",
+    consoleUrl: "https://chutes.ai",
+    defaultModel: "chutes-default",
+    utilityModel: "chutes-default",
+    toolLimit: 128,
+    piAiProvider: "chutes",
+  },
+  kilo: {
+    id: "kilo",
+    displayName: "Kilo Gateway",
+    envVar: "KILO_API_KEY",
+    keyPrefix: null,
+    keyHint: "API key from Kilo",
+    consoleUrl: "https://kilo.health",
+    defaultModel: "anthropic/claude-opus-4.5",
+    utilityModel: "google/gemini-2.5-flash-lite",
+    toolLimit: 128,
+    piAiProvider: "openrouter",
+  },
+  qianfan: {
+    id: "qianfan",
+    displayName: "Qianfan (Baidu)",
+    envVar: "QIANFAN_API_KEY",
+    keyPrefix: null,
+    keyHint: "API key",
+    consoleUrl: "https://console.bce.baidu.com/qianfan/",
+    defaultModel: "ernie-4.5-8k",
+    utilityModel: "ernie-4.5-8k",
+    toolLimit: 128,
+    piAiProvider: "qianfan",
+  },
+  modelstudio: {
+    id: "modelstudio",
+    displayName: "Alibaba Cloud Model Studio",
+    envVar: "MODELSTUDIO_API_KEY",
+    keyPrefix: null,
+    keyHint: "API key",
+    consoleUrl: "https://bailian.console.alibabacloud.com/",
+    defaultModel: "qwen3-235b-a22b",
+    utilityModel: "qwen3-30b-a3b",
+    toolLimit: 128,
+    piAiProvider: "modelstudio",
+  },
+  "vercel-ai": {
+    id: "vercel-ai",
+    displayName: "Vercel AI Gateway",
+    envVar: "VERCEL_AI_API_KEY",
+    keyPrefix: null,
+    keyHint: "API key",
+    consoleUrl: "https://sdk.vercel.ai/",
+    defaultModel: "anthropic/claude-sonnet-4-6",
+    utilityModel: "anthropic/claude-haiku-4-5",
+    toolLimit: 128,
+    piAiProvider: "vercel-ai",
+  },
+  opencode: {
+    id: "opencode",
+    displayName: "OpenCode",
+    envVar: "OPENCODE_API_KEY",
+    keyPrefix: null,
+    keyHint: "Shared API key from opencode.ai",
+    consoleUrl: "https://opencode.ai",
+    defaultModel: "claude-sonnet-4-6",
+    utilityModel: "gpt-4o-mini",
+    toolLimit: 128,
+    piAiProvider: "opencode",
+  },
+  xiaomi: {
+    id: "xiaomi",
+    displayName: "Xiaomi",
+    envVar: "XIAOMI_API_KEY",
+    keyPrefix: null,
+    keyHint: "API key",
+    consoleUrl: "https://xiaoai.mi.com/",
+    defaultModel: "xiaomi-default",
+    utilityModel: "xiaomi-default",
+    toolLimit: 128,
+    piAiProvider: "xiaomi",
+  },
+  synthetic: {
+    id: "synthetic",
+    displayName: "Synthetic",
+    envVar: "SYNTHETIC_API_KEY",
+    keyPrefix: null,
+    keyHint: "API key",
+    consoleUrl: "https://synthetic.computer",
+    defaultModel: "claude-sonnet-4-6",
+    utilityModel: "claude-haiku-4-5",
+    toolLimit: 128,
+    piAiProvider: "anthropic",
+  },
+  custom: {
+    id: "custom",
+    displayName: "Custom Provider",
+    envVar: "CUSTOM_API_KEY",
+    keyPrefix: null,
+    keyHint: "Your API key",
+    consoleUrl: "",
+    defaultModel: "custom",
+    utilityModel: "custom",
+    toolLimit: 128,
+    piAiProvider: "openai",
+  },
 };
 
 export function getProviderMetadata(provider: SupportedProvider): ProviderMetadata {
@@ -226,7 +473,7 @@ export function getSupportedProviders(): ProviderMetadata[] {
 export function validateApiKeyFormat(provider: SupportedProvider, key: string): string | undefined {
   const meta = PROVIDER_REGISTRY[provider];
   if (!meta) return `Unknown provider: ${provider}`;
-  if (provider === "cocoon" || provider === "local" || provider === "claude-code") return undefined; // No API key needed (claude-code auto-detects)
+  if (provider === "cocoon" || provider === "local" || provider === "claude-code" || provider === "openai-codex" || provider === "copilot" || provider === "litellm" || provider === "cloudflare-ai" || provider === "chutes" || provider === "custom") return undefined; // No API key needed (auto-detects or device login)
   if (!key || key.trim().length === 0) return "API key is required";
   if (meta.keyPrefix && !key.startsWith(meta.keyPrefix)) {
     return `Invalid format (should start with ${meta.keyPrefix})`;

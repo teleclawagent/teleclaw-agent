@@ -240,6 +240,209 @@ export const MODEL_OPTIONS: Record<string, ModelOption[]> = {
     },
     { value: "zai-org/GLM-5", name: "GLM-5", description: "202K ctx, $1/$3.20" },
   ],
+  deepseek: [
+    {
+      value: "deepseek-r1-0528",
+      name: "DeepSeek R1",
+      description: "Reasoning, 64K ctx",
+    },
+    {
+      value: "deepseek-v3.2",
+      name: "DeepSeek V3.2",
+      description: "General, 163K ctx",
+    },
+    {
+      value: "deepseek-chat",
+      name: "DeepSeek Chat",
+      description: "Cheap, balanced",
+    },
+  ],
+  together: [
+    {
+      value: "meta-llama/Llama-4-Maverick",
+      name: "Llama 4 Maverick",
+      description: "Latest Llama",
+    },
+    {
+      value: "meta-llama/Llama-3.3-70B",
+      name: "Llama 3.3 70B",
+      description: "General purpose",
+    },
+    {
+      value: "deepseek-ai/DeepSeek-R1",
+      name: "DeepSeek R1",
+      description: "Reasoning",
+    },
+    {
+      value: "Qwen/Qwen3-235B",
+      name: "Qwen3 235B",
+      description: "Large model",
+    },
+  ],
+  venice: [
+    {
+      value: "deepseek-r1-671b",
+      name: "DeepSeek R1",
+      description: "Reasoning",
+    },
+    {
+      value: "llama-3.3-70b",
+      name: "Llama 3.3 70B",
+      description: "General purpose",
+    },
+    {
+      value: "qwen3-235b",
+      name: "Qwen3 235B",
+      description: "Large model",
+    },
+  ],
+  qwen: [
+    {
+      value: "qwen3-235b-a22b",
+      name: "Qwen3 235B",
+      description: "Most capable",
+    },
+    {
+      value: "qwen3-coder",
+      name: "Qwen3 Coder",
+      description: "Coding specialist",
+    },
+    {
+      value: "qwen3-30b-a3b",
+      name: "Qwen3 30B",
+      description: "Balanced",
+    },
+  ],
+  volcengine: [
+    {
+      value: "deepseek-r1-250528",
+      name: "DeepSeek R1",
+      description: "Reasoning",
+    },
+    {
+      value: "deepseek-v3-250324",
+      name: "DeepSeek V3",
+      description: "General purpose",
+    },
+  ],
+  byteplus: [
+    {
+      value: "deepseek-r1-250528",
+      name: "DeepSeek R1",
+      description: "Reasoning",
+    },
+    {
+      value: "deepseek-v3-250324",
+      name: "DeepSeek V3",
+      description: "General purpose",
+    },
+  ],
+  chutes: [
+    {
+      value: "chutes-default",
+      name: "Chutes Default",
+      description: "OAuth-based inference",
+    },
+  ],
+  kilo: [
+    { value: "anthropic/claude-opus-4.5", name: "Claude Opus 4.5", description: "200K ctx, $5/M" },
+    {
+      value: "anthropic/claude-sonnet-4-6",
+      name: "Claude Sonnet 4.6",
+      description: "200K ctx, $3/M",
+    },
+    { value: "openai/gpt-5", name: "GPT-5", description: "400K ctx, $1.25/M" },
+    { value: "google/gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite", description: "1M ctx, ultra cheap" },
+    {
+      value: "deepseek/deepseek-r1",
+      name: "DeepSeek R1",
+      description: "Reasoning, 64K ctx, $0.70/M",
+    },
+    {
+      value: "qwen/qwen3-235b-a22b",
+      name: "Qwen3 235B",
+      description: "235B params, MoE",
+    },
+  ],
+  qianfan: [
+    {
+      value: "ernie-4.5-8k",
+      name: "ERNIE 4.5",
+      description: "Baidu's flagship",
+    },
+  ],
+  modelstudio: [
+    {
+      value: "qwen3-235b-a22b",
+      name: "Qwen3 235B",
+      description: "Most capable",
+    },
+    {
+      value: "qwen3-coder",
+      name: "Qwen3 Coder",
+      description: "Coding specialist",
+    },
+    {
+      value: "qwen3-30b-a3b",
+      name: "Qwen3 30B",
+      description: "Balanced",
+    },
+  ],
+  "vercel-ai": [
+    {
+      value: "anthropic/claude-sonnet-4-6",
+      name: "Claude Sonnet 4.6",
+      description: "Via Vercel",
+    },
+    {
+      value: "openai/gpt-4o",
+      name: "GPT-4o",
+      description: "Via Vercel",
+    },
+  ],
+  opencode: [
+    {
+      value: "claude-sonnet-4-6",
+      name: "Claude Sonnet 4.6",
+      description: "Via OpenCode",
+    },
+    {
+      value: "gpt-4o-mini",
+      name: "GPT-4o Mini",
+      description: "Via OpenCode",
+    },
+  ],
+  xiaomi: [
+    {
+      value: "xiaomi-default",
+      name: "Xiaomi Default",
+      description: "Xiaomi AI",
+    },
+  ],
+  synthetic: [
+    {
+      value: "claude-opus-4-6",
+      name: "Claude Opus 4.6",
+      description: "Most capable, 1M ctx, $5/M",
+    },
+    {
+      value: "claude-sonnet-4-6",
+      name: "Claude Sonnet 4.6",
+      description: "Balanced, 200K ctx, $3/M",
+    },
+    {
+      value: "claude-haiku-4-5",
+      name: "Claude Haiku 4.5",
+      description: "Fast & cheap, $1/M",
+    },
+  ],
+  custom: [
+    {
+      value: "custom",
+      name: "Custom Model",
+      description: "Your model",
+    },
+  ],
 };
 
 /** Get models for a provider (claude-code maps to anthropic) */

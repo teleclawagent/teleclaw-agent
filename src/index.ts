@@ -45,6 +45,7 @@ import { setBotPreMiddleware, getDealBot } from "./deals/module.js";
 import type { TaskDependencyResolver } from "./telegram/task-dependency-resolver.js";
 import type { WebUIServer } from "./webui/server.js";
 import { checkStaleListings, expireOldListings } from "./agent/tools/fragment/stale-checker.js";
+import { createMatchmakerClient, type MatchmakerAPIClient } from "./agent/tools/fragment/matchmaker-api.js";
 
 const log = createLogger("App");
 
@@ -72,12 +73,23 @@ export class TeleclawApp {
   private startTime: number = 0;
   private messagesProcessed: number = 0;
   private staleCheckerInterval: ReturnType<typeof setInterval> | null = null;
+  private matchmakerApi: MatchmakerAPIClient | null = null;
 
   private configPath: string;
 
   constructor(configPath?: string) {
     this.configPath = configPath ?? getDefaultConfigPath();
     this.config = loadConfig(this.configPath);
+
+    // Startup check — encryption secret
+    if (!process.env.TELECLAW_ENCRYPT_SECRET ||
+        process.env.TELECLAW_ENCRYPT_SECRET.length !== 64) {
+      console.error(
+        "\n✗ TELECLAW_ENCRYPT_SECRET eksik.\n" +
+        "  Çalıştır: source ~/.teleclaw/.env && teleclaw start\n"
+      );
+      process.exit(1);
+    }
 
     // Wire YAML logging config to pino (H2 fix)
     initLoggerFromConfig(this.config.logging);
@@ -490,6 +502,18 @@ ${blue}  ┌──────────────────────�
 
     const username = await this.bridge.getUsername();
     const walletAddress = getWalletAddress();
+
+    // Initialize shared OTC matchmaker API
+    const mmConfig = this.config.matchmaker;
+    if (mmConfig?.enabled !== false) {
+      const botId = ownUserId?.toString() ?? username ?? "unknown";
+      this.matchmakerApi = createMatchmakerClient({
+        matchmakerApiUrl: mmConfig?.api_url,
+        botId,
+        apiKey: mmConfig?.api_key,
+      });
+      this.messageHandler.setMatchmakerApi(this.matchmakerApi);
+    }
 
     // Set up inline router for plugin bot SDK (before modules start)
     const inlineRouter = new InlineRouter();

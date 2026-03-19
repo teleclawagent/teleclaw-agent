@@ -114,6 +114,7 @@ export class MessageHandler {
   private chatStore: ChatStore;
   private userStore: UserStore;
   private ownUserId?: string;
+  private matchmakerApi?: import("../agent/tools/fragment/matchmaker-api.js").MatchmakerAPIClient;
   private pendingHistory: PendingHistory;
   private db: Database.Database;
   private chatQueue: ChatQueue = new ChatQueue();
@@ -144,6 +145,10 @@ export class MessageHandler {
     this.chatStore = new ChatStore(db);
     this.userStore = new UserStore(db);
     this.pendingHistory = new PendingHistory();
+  }
+
+  setMatchmakerApi(api: import("../agent/tools/fragment/matchmaker-api.js").MatchmakerAPIClient | undefined): void {
+    this.matchmakerApi = api ?? undefined;
   }
 
   setOwnUserId(userId: string | undefined): void {
@@ -414,6 +419,7 @@ export class MessageHandler {
             senderId: message.senderId,
             senderUsername: message.senderUsername ?? undefined,
             config: this.fullConfig,
+            matchmakerApi: this.matchmakerApi ?? undefined,
           };
 
           // 7. Get response from agent (with tools)

@@ -231,6 +231,19 @@ export const giftMmListExecutor: ToolExecutor<GiftListParams> = async (
         expiresAt
       );
 
+    // ── Publish to shared OTC matchmaker API ──
+    if (context.matchmakerApi) {
+      context.matchmakerApi.publishListing({
+        type: "gift",
+        item_name: `${collection} #${gift_num ?? "?"}`,
+        item_details: { model, backdrop, symbol, rarity: rarity.rarityTier },
+        price: asking_price ?? null,
+        currency,
+        price_usd: null,
+        expires_days,
+      }).catch((err) => log.warn({ err }, "Failed to publish gift to shared matchmaker"));
+    }
+
     // Find matching buyers
     const interests = context.db
       .prepare(`SELECT * FROM gift_interests WHERE active = 1`)

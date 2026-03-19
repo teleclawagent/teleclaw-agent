@@ -31,8 +31,6 @@ import {
 
 import { ensureWorkspace, isNewWorkspace } from "../../workspace/manager.js";
 import { writeFileSync, readFileSync, existsSync } from "fs";
-import { randomBytes } from "crypto";
-import { homedir } from "os";
 import { join } from "path";
 import { TELECLAW_ROOT } from "../../workspace/paths.js";
 // TelegramUserClient import removed — bot-only mode
@@ -1086,39 +1084,6 @@ async function runInteractiveOnboarding(
   writeFileSync(workspace.configPath, configYaml, { encoding: "utf-8", mode: 0o600 });
   spinner.succeed(DIM(`Configuration saved: ${workspace.configPath}`));
 
-  // Generate + save encryption secret for API key storage
-  const envFilePath = join(homedir(), ".teleclaw", ".env");
-  if (!existsSync(envFilePath)) {
-    const secret = randomBytes(32).toString("hex");
-    const envContent =
-      "# Teleclaw encryption secret — paylaşma, commit etme\n" +
-      `# Oluşturuldu: ${new Date().toISOString()}\n` +
-      `export TELECLAW_ENCRYPT_SECRET=${secret}\n`;
-
-    writeFileSync(envFilePath, envContent, { encoding: "utf-8", mode: 0o600 });
-    spinner.succeed(DIM(`Encryption secret: ${envFilePath}`));
-
-    // Shell rc'ye loader ekle
-    const shellRcCandidates = [
-      join(homedir(), ".bashrc"),
-      join(homedir(), ".zshrc"),
-      join(homedir(), ".profile"),
-    ];
-    const loaderLine = `\n# Teleclaw\n[ -f "${envFilePath}" ] && source "${envFilePath}"\n`;
-    for (const rc of shellRcCandidates) {
-      if (existsSync(rc)) {
-        const content = readFileSync(rc, "utf-8");
-        if (!content.includes("TELECLAW_ENCRYPT_SECRET")) {
-          writeFileSync(rc, content + loaderLine, "utf-8");
-        }
-        break;
-      }
-    }
-
-    // Bu session için yükle
-    process.env.TELECLAW_ENCRYPT_SECRET = secret;
-  }
-
   // Bot mode — already validated token above, no further auth needed
   const telegramConnected = true;
 
@@ -1139,18 +1104,6 @@ async function runInteractiveOnboarding(
       "\n" +
       "This code can only be used once. Save it!",
     "🔐 Admin Claim",
-    TON
-  );
-  noteBox(
-    "API key'lerin şifreli saklanıyor.\n" +
-      "\n" +
-      `Secret dosyası: ~/.teleclaw/.env\n` +
-      "\n" +
-      "Bot her başladığında bu dosyayı yüklemeli:\n" +
-      "  source ~/.teleclaw/.env && teleclaw start\n" +
-      "\n" +
-      "veya shell rc dosyan zaten güncellendi (yeni terminal aç).",
-    "🔑 Encryption Secret",
     TON
   );
   console.log();
@@ -1283,17 +1236,4 @@ async function runNonInteractiveOnboarding(
   writeFileSync(workspace.configPath, configYaml, { encoding: "utf-8", mode: 0o600 });
 
   prompter.success(`Configuration created: ${workspace.configPath}`);
-
-  // Encryption secret (non-interactive mode)
-  const niEnvFile = join(homedir(), ".teleclaw", ".env");
-  if (!existsSync(niEnvFile)) {
-    const niSecret = randomBytes(32).toString("hex");
-    writeFileSync(
-      niEnvFile,
-      `# Teleclaw encryption secret\nexport TELECLAW_ENCRYPT_SECRET=${niSecret}\n`,
-      { encoding: "utf-8", mode: 0o600 }
-    );
-    process.env.TELECLAW_ENCRYPT_SECRET = niSecret;
-    prompter.success(`Encryption secret: ${niEnvFile}`);
-  }
 }

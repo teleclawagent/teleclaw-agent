@@ -50,7 +50,8 @@ export class BotClient {
   startPolling(): void {
     if (this.polling) return;
     void this.bot.start({
-      drop_pending_updates: true,
+      drop_pending_updates: false,
+      allowed_updates: ["message", "edited_message", "callback_query", "inline_query", "chosen_inline_result", "channel_post"],
       onStart: () => {
         log.info("Bot polling started");
       },

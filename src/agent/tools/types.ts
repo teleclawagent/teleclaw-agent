@@ -21,6 +21,8 @@ export interface ToolContext {
   isGroup: boolean;
   /** Full config for accessing API key, model, etc. (optional) */
   config?: Config;
+  /** Shared OTC matchmaker API client (optional) */
+  matchmakerApi?: import("../tools/fragment/matchmaker-api.js").MatchmakerAPIClient;
 }
 
 /**

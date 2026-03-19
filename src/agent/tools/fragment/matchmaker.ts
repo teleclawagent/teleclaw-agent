@@ -167,6 +167,19 @@ export const mmListExecutor: ToolExecutor<ListForSaleParams> = async (
         expiresAt
       );
 
+    // ── Publish to shared OTC matchmaker API ──
+    if (context.matchmakerApi) {
+      context.matchmakerApi.publishListing({
+        type: "username",
+        item_name: clean,
+        item_details: { categories, estimated: valuation.estimated },
+        price: asking_price ?? null,
+        currency: currency.toUpperCase(),
+        price_usd: null,
+        expires_days,
+      }).catch((err) => log.warn({ err }, "Failed to publish to shared matchmaker"));
+    }
+
     // ── Match via Taste Profiles (AI-powered) ──
     const tasteMatches = findMatchingBuyers(
       context,
@@ -701,6 +714,33 @@ export const mmBrowseExecutor: ToolExecutor<BrowseListingsParams> = async (
       });
     }
 
+    // ── Fetch shared listings from matchmaker API ──
+    if (context.matchmakerApi) {
+      try {
+        const shared = await context.matchmakerApi.browseListings({
+          type: "username",
+          max_price_usd: max_price ? max_price * 3 : undefined, // rough TON→USD
+          limit,
+        });
+        for (const sl of shared) {
+          // Don't duplicate local listings
+          if (!listings.some((l) => l.username === sl.item_name)) {
+            listings.push({
+              id: `shared:${sl.id}`,
+              username: sl.item_name,
+              asking_price: sl.price,
+              categories: JSON.stringify(Object.keys(sl.item_details)),
+              estimated_value: null,
+              match_count: 0,
+              created_at: sl.created_at,
+            });
+          }
+        }
+      } catch (err) {
+        log.debug({ err }, "Shared matchmaker browse failed — local-only");
+      }
+    }
+
     if (listings.length === 0) {
       return {
         success: true,
@@ -843,6 +883,11 @@ export const mmCancelExecutor: ToolExecutor<CancelListingParams> = async (
       return { success: false, error: "No matching active listing found." };
     }
 
+    // Remove from shared matchmaker API
+    if (context.matchmakerApi && listing_id) {
+      context.matchmakerApi.removeListing(listing_id).catch(() => {});
+    }
+
     return {
       success: true,
       data: { message: "✅ Listing cancelled." },
@@ -908,6 +953,11 @@ export const mmSoldExecutor: ToolExecutor<SoldParams> = async (
     context.db
       .prepare(`UPDATE mm_listings SET status = 'sold', sold_at = datetime('now') WHERE id = ?`)
       .run(listing.id);
+
+    // Remove from shared matchmaker API
+    if (context.matchmakerApi) {
+      context.matchmakerApi.removeListing(listing.id as string).catch(() => {});
+    }
 
     // Get interested buyers to notify
     const interestedBuyers = context.db
