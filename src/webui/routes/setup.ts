@@ -160,7 +160,8 @@ export function createSetupRoutes(): Hono {
   app.post("/validate/bot-token", async (c) => {
     try {
       const body = await c.req.json<{ token: string }>();
-      if (!body.token || !body.token.includes(":")) {
+      const cleanToken = (body.token || "").replace(/[^\x20-\x7E]/g, "").trim();
+      if (!cleanToken.match(/^\d{8,15}:[A-Za-z0-9_-]{30,50}$/)) {
         return c.json({
           success: true,
           data: { valid: false, networkError: false, error: "Invalid format (expected id:hash)" },
@@ -168,7 +169,7 @@ export function createSetupRoutes(): Hono {
       }
 
       try {
-        const res = await fetchWithTimeout(`https://api.telegram.org/bot${body.token}/getMe`);
+        const res = await fetchWithTimeout(`https://api.telegram.org/bot${cleanToken}/getMe`);
         const data = await res.json();
         if (!data.ok) {
           return c.json({

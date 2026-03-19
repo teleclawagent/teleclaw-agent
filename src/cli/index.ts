@@ -46,6 +46,7 @@ program
   .option("--base-url <url>", "Base URL for local LLM server")
   .option("--user-id <id>", "Telegram User ID")
   .option("--tavily-api-key <key>", "Tavily API key for web search")
+  .option("--bot-token <token>", "Telegram bot token from @BotFather")
   .action(async (options) => {
     try {
       await onboardCommand({
@@ -60,6 +61,7 @@ program
         baseUrl: options.baseUrl,
         userId: options.userId ? parseInt(options.userId) : undefined,
         tavilyApiKey: options.tavilyApiKey,
+        botToken: options.botToken,
       });
     } catch (error) {
       console.error("Error:", getErrorMessage(error));

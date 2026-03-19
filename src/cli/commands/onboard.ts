@@ -73,6 +73,7 @@ export interface OnboardOptions {
   userId?: number;
   provider?: SupportedProvider;
   tavilyApiKey?: string;
+  botToken?: string;
 }
 
 // ── Progress steps ────────────────────────────────────────────────────
@@ -184,6 +185,30 @@ async function runInteractiveOnboarding(
   options: OnboardOptions,
   prompter: ReturnType<typeof createPrompter>
 ): Promise<void> {
+  // ── PowerShell detection ──
+  const isPowerShell =
+    !!process.env.PSModulePath ||
+    (process.env.ComSpec || "").toLowerCase().includes("powershell");
+  if (isPowerShell) {
+    console.log();
+    console.log(
+      `  ${RED("⚠")}  PowerShell detected — interactive input may not work correctly.`
+    );
+    console.log(
+      `     Use ${CYAN("teleclaw setup --ui")} for browser-based setup or switch to Git Bash.`
+    );
+    console.log();
+    const continueAnyway = await confirm({
+      message: "Continue with interactive setup anyway?",
+      default: false,
+      theme,
+    });
+    if (!continueAnyway) {
+      console.log(`\n  ${DIM("Run")} ${CYAN("teleclaw setup --ui")} ${DIM("to use the web wizard.")}\n`);
+      process.exit(0);
+    }
+  }
+
   // ── Shared state ──
   let selectedProvider: SupportedProvider = "anthropic";
   let selectedModel = "";
@@ -1260,7 +1285,7 @@ async function runNonInteractiveOnboarding(
       owner_id: options.userId,
       agent_channel: null,
       debounce_ms: 1500,
-      bot_token: undefined,
+      bot_token: options.botToken,
       bot_username: undefined,
     },
     storage: {
@@ -1269,7 +1294,7 @@ async function runNonInteractiveOnboarding(
       history_limit: 100,
     },
     embedding: { provider: "local" },
-    deals: DealsConfigSchema.parse({}),
+    deals: DealsConfigSchema.parse({ enabled: !!options.botToken }),
     webui: {
       enabled: false,
       port: 7777,
@@ -1313,16 +1338,19 @@ async function runNonInteractiveOnboarding(
 
   prompter.success(`Configuration created: ${workspace.configPath}`);
 
-  // Encryption secret (non-interactive mode)
+  // Secrets (non-interactive mode)
   const niEnvFile = join(homedir(), ".teleclaw", ".env");
   if (!existsSync(niEnvFile)) {
     const niSecret = randomBytes(32).toString("hex");
-    writeFileSync(
-      niEnvFile,
-      `# Teleclaw encryption secret\nexport TELECLAW_ENCRYPT_SECRET=${niSecret}\n`,
-      { encoding: "utf-8", mode: 0o600 }
-    );
+    const niSigningKey = randomBytes(32).toString("hex");
+    const niEnvContent =
+      "# Teleclaw secrets\n" +
+      `export TELECLAW_ENCRYPT_SECRET=${niSecret}\n` +
+      `export TELECLAW_SIGNING_KEY=${niSigningKey}\n` +
+      (options.apiKey ? `export TELECLAW_API_KEY=${options.apiKey}\n` : "") +
+      (options.botToken ? `export TELECLAW_BOT_TOKEN=${options.botToken}\n` : "");
+    writeFileSync(niEnvFile, niEnvContent, { encoding: "utf-8", mode: 0o600 });
     process.env.TELECLAW_ENCRYPT_SECRET = niSecret;
-    prompter.success(`Encryption secret: ${niEnvFile}`);
+    prompter.success(`Secrets saved: ${niEnvFile}`);
   }
 }
