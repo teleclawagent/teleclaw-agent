@@ -384,6 +384,10 @@ export function createSetupRoutes(): Hono {
       const configPath = workspace.configPath;
       writeFileSync(configPath, YAML.stringify(config), { encoding: "utf-8", mode: 0o600 });
 
+      // Ensure .env exists with secrets (cross-platform, no shell required)
+      const { ensureAndLoadEnv } = await import("../../config/env.js");
+      ensureAndLoadEnv();
+
       log.info(`Configuration saved: ${configPath}`);
       return c.json({ success: true, data: { path: configPath } });
     } catch (err) {

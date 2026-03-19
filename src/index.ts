@@ -1,6 +1,7 @@
 import type { Api } from "telegram";
 import type { PluginMessageEvent, PluginCallbackEvent } from "@teleclaw-agent/sdk";
 import { loadConfig, getDefaultConfigPath } from "./config/index.js";
+import { ensureAndLoadEnv } from "./config/env.js";
 import { loadSoul } from "./soul/index.js";
 import { AgentRuntime } from "./agent/runtime.js";
 import { TelegramBridge, type TelegramMessage } from "./telegram/bridge.js";
@@ -81,15 +82,8 @@ export class TeleclawApp {
     this.configPath = configPath ?? getDefaultConfigPath();
     this.config = loadConfig(this.configPath);
 
-    // Startup check — encryption secret
-    if (!process.env.TELECLAW_ENCRYPT_SECRET ||
-        process.env.TELECLAW_ENCRYPT_SECRET.length !== 64) {
-      console.error(
-        "\n✗ TELECLAW_ENCRYPT_SECRET eksik.\n" +
-        "  Çalıştır: source ~/.teleclaw/.env && teleclaw start\n"
-      );
-      process.exit(1);
-    }
+    // Auto-load ~/.teleclaw/.env (creates if missing, cross-platform)
+    ensureAndLoadEnv();
 
     // Wire YAML logging config to pino (H2 fix)
     initLoggerFromConfig(this.config.logging);
