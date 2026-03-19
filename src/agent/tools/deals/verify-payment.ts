@@ -4,6 +4,7 @@ import type { Deal } from "../../../deals/types.js";
 import { verifyPayment } from "../../../ton/payment-verifier.js";
 import { GiftDetector } from "../../../deals/gift-detector.js";
 import { getWalletAddress } from "../../../ton/wallet-service.js";
+import { checkTokenGate } from "../fragment/token-gate.js";
 import { autoExecuteAfterVerification } from "../../../deals/executor.js";
 import { getErrorMessage } from "../../../utils/errors.js";
 import { createLogger } from "../../../utils/logger.js";
@@ -27,6 +28,11 @@ export const dealVerifyPaymentExecutor: ToolExecutor<DealVerifyPaymentParams> = 
   params,
   context
 ): Promise<ToolResult> => {
+  const gate = await checkTokenGate(context.db, context.senderId);
+  if (!gate.allowed) {
+    return { success: false, error: gate.reason };
+  }
+
   try {
     // Load deal from database
     const deal = context.db.prepare(`SELECT * FROM deals WHERE id = ?`).get(params.dealId) as

@@ -1,10 +1,13 @@
 /**
- * OTC Consent Gate — Users must opt-in before using OTC matchmaker features.
- * Stores consent in SQLite per user. Explains how the system works before asking.
+ * OTC Consent Gate — Users must opt-in AND hold $TELECLAW tokens before using OTC features.
+ * Stores consent in SQLite per user. Token gate is checked on every OTC tool call.
+ *
+ * Flow: 1. Wallet verification (verified_wallets) → 2. Token gate ($TELECLAW balance) → 3. Consent
  */
 
 import { Type } from "@sinclair/typebox";
 import type { Tool, ToolExecutor, ToolResult, ToolContext } from "../types.js";
+import { checkTokenGate } from "./token-gate.js";
 import { createLogger } from "../../../utils/logger.js";
 
 const log = createLogger("OTCConsent");
@@ -32,24 +35,58 @@ export function hasOtcConsent(ctx: ToolContext): boolean {
 }
 
 /**
- * Check OTC consent and return error message if not consented.
+ * Check OTC consent + token gate. Returns error ToolResult if blocked, null if OK.
  * Use this at the top of every OTC tool executor.
+ *
+ * Check order:
+ * 1. Wallet verified? (verified_wallets table)
+ * 2. $TELECLAW token balance >= 0.1% supply?
+ * 3. OTC consent given?
+ *
+ * SECURITY: This runs in code, not LLM — cannot be bypassed by prompt injection.
  */
-export function requireOtcConsent(ctx: ToolContext): ToolResult | null {
-  if (hasOtcConsent(ctx)) return null; // Has consent, proceed
-  return {
-    success: false,
-    error:
-      "⚠️ You need to opt into the OTC Matchmaker first.\n\n" +
-      "The OTC system connects buyers and sellers across Teleclaw bots. " +
-      "Here's how it works:\n\n" +
-      "• You list items (usernames, gifts, numbers) for sale or register buying interest\n" +
-      "• Active listings are shared anonymously with other Teleclaw bots\n" +
-      "• Only item details and price are shared — your identity stays private\n" +
-      "• When someone is interested, the seller decides whether to share contact info\n" +
-      "• All trades happen directly between parties — Teleclaw never handles funds\n\n" +
-      "To opt in, use the otc_join command.",
-  };
+export async function requireOtcConsent(ctx: ToolContext): Promise<ToolResult | null> {
+  // Step 1+2: Token gate (includes wallet verification check)
+  const gateResult = await checkTokenGate(ctx.db, ctx.senderId);
+  if (!gateResult.allowed) {
+    // Distinguish: no wallet vs insufficient balance
+    if (!gateResult.walletAddress) {
+      return {
+        success: false,
+        error:
+          "🔐 OTC erişimi için önce cüzdanını doğrula.\n\n" +
+          "Cüzdan doğrulama için: /verify veya 'cüzdanımı doğrula' yaz.\n" +
+          "(0.01 TON doğrulama ücreti alınır, iade edilmez — spam koruması.)",
+      };
+    }
+    return {
+      success: false,
+      error:
+        `🔐 OTC erişimi için minimum %0.1 TELECLAW supply tutman gerekli.\n\n` +
+        `Bakiyen: ${gateResult.balance || "0"} $TELECLAW\n` +
+        `Gerekli: ${gateResult.required || "100,000"} $TELECLAW\n\n` +
+        `$TELECLAW al: https://dedust.io/swap/TON/EQD01TwE1plYpYKvRwWOLwAzzAJaDKwpB2bR3nfg-wkJJwks`,
+    };
+  }
+
+  // Step 3: OTC consent
+  if (!hasOtcConsent(ctx)) {
+    return {
+      success: false,
+      error:
+        "⚠️ You need to opt into the OTC Matchmaker first.\n\n" +
+        "The OTC system connects buyers and sellers across Teleclaw bots. " +
+        "Here's how it works:\n\n" +
+        "• You list items (usernames, gifts, numbers) for sale or register buying interest\n" +
+        "• Active listings are shared anonymously with other Teleclaw bots\n" +
+        "• Only item details and price are shared — your identity stays private\n" +
+        "• When someone is interested, the seller decides whether to share contact info\n" +
+        "• All trades happen directly between parties — Teleclaw never handles funds\n\n" +
+        "To opt in, use the otc_join command.",
+    };
+  }
+
+  return null; // All checks passed
 }
 
 // ─── Tool: Join OTC ──────────────────────────────────────────────────
@@ -69,6 +106,28 @@ export const otcJoinExecutor: ToolExecutor<Record<string, never>> = async (
   ctx
 ): Promise<ToolResult> => {
   try {
+    // Token gate check BEFORE allowing join
+    const gateResult = await checkTokenGate(ctx.db, ctx.senderId);
+    if (!gateResult.allowed) {
+      if (!gateResult.walletAddress) {
+        return {
+          success: false,
+          error:
+            "🔐 OTC'ye katılmak için önce cüzdanını doğrula.\n\n" +
+            "Cüzdan doğrulama için: /verify veya 'cüzdanımı doğrula' yaz.\n" +
+            "(0.01 TON doğrulama ücreti alınır, iade edilmez — spam koruması.)",
+        };
+      }
+      return {
+        success: false,
+        error:
+          `🔐 OTC'ye katılmak için minimum %0.1 TELECLAW supply tutman gerekli.\n\n` +
+          `Bakiyen: ${gateResult.balance || "0"} $TELECLAW\n` +
+          `Gerekli: ${gateResult.required || "100,000"} $TELECLAW\n\n` +
+          `$TELECLAW al: https://dedust.io/swap/TON/EQD01TwE1plYpYKvRwWOLwAzzAJaDKwpB2bR3nfg-wkJJwks`,
+      };
+    }
+
     ensureConsentTable(ctx);
 
     ctx.db
@@ -79,7 +138,7 @@ export const otcJoinExecutor: ToolExecutor<Record<string, never>> = async (
       )
       .run(ctx.senderId);
 
-    log.info({ userId: ctx.senderId }, "User joined OTC");
+    log.info({ userId: ctx.senderId, wallet: gateResult.walletAddress }, "User joined OTC (token gate passed)");
 
     return {
       success: true,

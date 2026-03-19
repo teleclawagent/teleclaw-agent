@@ -189,6 +189,17 @@ export const verifyWalletExecutor: ToolExecutor<VerifyWalletParams> = async (
 
           const txHash = event.event_id || "";
 
+          // Check if this wallet is already linked to a different user
+          const existingOwner = db
+            .prepare("SELECT user_id FROM verified_wallets WHERE wallet_address = ? AND user_id != ?")
+            .get(senderAddress, userId) as { user_id: number } | undefined;
+          if (existingOwner) {
+            return {
+              success: false,
+              error: "Bu cüzdan başka bir hesaba bağlı. Her cüzdan sadece bir Telegram hesabına bağlanabilir.",
+            };
+          }
+
           // Save to DB
           db.prepare(
             `INSERT OR REPLACE INTO verified_wallets (user_id, wallet_address, verified_at, tx_hash)

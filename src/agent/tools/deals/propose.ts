@@ -7,6 +7,7 @@ import {
   formatStrategyCheckJSON,
   type AssetValue,
 } from "../../../deals/strategy-checker.js";
+import { checkTokenGate } from "../fragment/token-gate.js";
 import { getErrorMessage } from "../../../utils/errors.js";
 import { createLogger } from "../../../utils/logger.js";
 
@@ -71,6 +72,12 @@ export const dealProposeExecutor: ToolExecutor<DealProposeParams> = async (
   params,
   context
 ): Promise<ToolResult> => {
+  // Token gate check
+  const gate = await checkTokenGate(context.db, context.senderId);
+  if (!gate.allowed) {
+    return { success: false, error: gate.reason };
+  }
+
   try {
     const userGives: AssetValue = {
       type: params.userGivesType,

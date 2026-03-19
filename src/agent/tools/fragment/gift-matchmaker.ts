@@ -159,7 +159,7 @@ export const giftMmListExecutor: ToolExecutor<GiftListParams> = async (
     ensureGiftMatchmakerTables(context);
 
     // Token gate
-    const consentError = requireOtcConsent(context);
+    const consentError = await requireOtcConsent(context);
     if (consentError) return consentError;
     const gate = await checkTokenGate(context.db, context.senderId);
     if (!gate.allowed) return { success: false, error: gate.reason };
@@ -424,7 +424,7 @@ export const giftMmInterestExecutor: ToolExecutor<GiftInterestParams> = async (
   try {
     ensureGiftMatchmakerTables(context);
 
-    const consentError = requireOtcConsent(context);
+    const consentError = await requireOtcConsent(context);
     if (consentError) return consentError;
     const gate = await checkTokenGate(context.db, context.senderId);
     if (!gate.allowed) return { success: false, error: gate.reason };
@@ -771,7 +771,7 @@ export const giftMmExpressExecutor: ToolExecutor<GiftExpressParams> = async (
   try {
     ensureGiftMatchmakerTables(context);
 
-    const consentError = requireOtcConsent(context);
+    const consentError = await requireOtcConsent(context);
     if (consentError) return consentError;
     const gate = await checkTokenGate(context.db, context.senderId);
     if (!gate.allowed) return { success: false, error: gate.reason };
