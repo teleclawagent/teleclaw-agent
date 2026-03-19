@@ -356,7 +356,7 @@ export function setSchemaVersion(db: Database.Database, version: string): void {
   ).run(version);
 }
 
-export const CURRENT_SCHEMA_VERSION = "1.15.0";
+export const CURRENT_SCHEMA_VERSION = "1.16.0";
 
 export function runMigrations(db: Database.Database): void {
   const currentVersion = getSchemaVersion(db);
@@ -647,6 +647,30 @@ export function runMigrations(db: Database.Database): void {
       log.info("Migration 1.15.0 complete: user_hook_config table created");
     } catch (error) {
       log.error({ err: error }, "Migration 1.15.0 failed");
+      throw error;
+    }
+  }
+
+  if (!currentVersion || versionLessThan(currentVersion, "1.16.0")) {
+    log.info("Running migration 1.16.0: Relax tool_config scope constraint");
+    try {
+      db.transaction(() => {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS tool_config_v2 (
+            tool_name TEXT PRIMARY KEY,
+            enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0, 1)),
+            scope TEXT,
+            updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+            updated_by INTEGER
+          );
+          INSERT OR IGNORE INTO tool_config_v2 SELECT * FROM tool_config;
+          DROP TABLE IF EXISTS tool_config;
+          ALTER TABLE tool_config_v2 RENAME TO tool_config;
+        `);
+      })();
+      log.info("Migration 1.16.0 complete: tool_config scope constraint relaxed");
+    } catch (error) {
+      log.error({ err: error }, "Migration 1.16.0 failed");
       throw error;
     }
   }
