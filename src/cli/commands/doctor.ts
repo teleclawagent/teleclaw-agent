@@ -423,9 +423,9 @@ export async function doctorCommand(): Promise<void> {
 
   // ASCII banner (blue)
   console.log(`
-${blue}  ┌─────────────────────────────────────────────────────────────┐
-  │  TELECLAW DOCTOR - System Health Check                       │
-  └─────────────────────────────────────────────────────────────┘${reset}
+${blue}  +-------------------------------------------------------------+
+  |  TELECLAW DOCTOR - System Health Check                       |
+  +-------------------------------------------------------------+${reset}
 `);
 
   console.log(`  Workspace: ${workspaceDir}\n`);

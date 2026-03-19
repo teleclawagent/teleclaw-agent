@@ -82,11 +82,11 @@ export interface StepDef {
 
 function frameRow(content: string, border = TON): string {
   const pad = FRAME_WIDTH - stripAnsi(content).length;
-  return `  ${border("║")}${content}${" ".repeat(Math.max(0, pad))}${border("║")}`;
+  return `  ${border("|")}${content}${" ".repeat(Math.max(0, pad))}${border("|")}`;
 }
 
 function emptyRow(border = TON): string {
-  return `  ${border("║")}${" ".repeat(FRAME_WIDTH)}${border("║")}`;
+  return `  ${border("|")}${" ".repeat(FRAME_WIDTH)}${border("|")}`;
 }
 
 /** Renders the unified banner + progress frame for the setup wizard */
@@ -94,7 +94,7 @@ export function wizardFrame(currentStep: number, steps: StepDef[]): string {
   const W = FRAME_WIDTH;
   const out: string[] = [];
 
-  out.push(`  ${TON("╔" + "═".repeat(W) + "╗")}`);
+  out.push(`  ${TON("+" + "-".repeat(W) + "+")}`);
   out.push(emptyRow());
 
   for (const line of ASCII_ART) {
@@ -107,7 +107,7 @@ export function wizardFrame(currentStep: number, steps: StepDef[]): string {
   out.push(frameRow(DIM(centerIn(subtitle, W))));
   out.push(frameRow(DIM(centerIn("t.me/TeleclawAgents  |  v0.7.0", W))));
 
-  out.push(`  ${TON("╠" + "═".repeat(W) + "╣")}`);
+  out.push(`  ${TON("+" + "-".repeat(W) + "+")}`);
   out.push(emptyRow());
 
   const labelWidth = 14;
@@ -129,12 +129,12 @@ export function wizardFrame(currentStep: number, steps: StepDef[]): string {
   const pct = Math.round((currentStep / steps.length) * 100);
   const barLen = Math.max(10, W - 36);
   const filled = Math.round((currentStep / steps.length) * barLen);
-  const bar = TON("█".repeat(filled)) + DIM("░".repeat(barLen - filled));
+  const bar = TON("#".repeat(filled)) + DIM("-".repeat(barLen - filled));
   const footer = `  ${bar}  ${DIM(`${pct}%  ·  Step ${currentStep + 1} of ${steps.length}`)}`;
   out.push(frameRow(padRightAnsi(footer, W)));
 
   out.push(emptyRow());
-  out.push(`  ${TON("╚" + "═".repeat(W) + "╝")}`);
+  out.push(`  ${TON("+" + "-".repeat(W) + "+")}`);
 
   return out.join("\n");
 }
@@ -165,15 +165,15 @@ export function finalSummaryBox(steps: StepDef[], connected: boolean): string {
 
   const gRow = (content: string) => {
     const pad = W - stripAnsi(content).length;
-    return `  ${B("║")}${content}${" ".repeat(Math.max(0, pad))}${B("║")}`;
+    return `  ${B("|")}${content}${" ".repeat(Math.max(0, pad))}${B("|")}`;
   };
-  const gEmpty = () => `  ${B("║")}${" ".repeat(W)}${B("║")}`;
+  const gEmpty = () => `  ${B("|")}${" ".repeat(W)}${B("|")}`;
 
   const out: string[] = [];
 
   const t1 = " Configuration Summary ";
   const t1Pad = W - stripAnsi(t1).length - 1;
-  out.push(`  ${B("╔═" + B.bold(t1) + "═".repeat(Math.max(0, t1Pad)) + "╗")}`);
+  out.push(`  ${B("+-" + B.bold(t1) + "-".repeat(Math.max(0, t1Pad)) + "+")}`);
   out.push(gEmpty());
 
   for (const s of steps) {
@@ -185,7 +185,7 @@ export function finalSummaryBox(steps: StepDef[], connected: boolean): string {
   const t2 = " Next Steps ";
   const t2Pad = W - stripAnsi(t2).length - 1;
   out.push(gEmpty());
-  out.push(`  ${B("╠═" + B.bold(t2) + "═".repeat(Math.max(0, t2Pad)) + "╣")}`);
+  out.push(`  ${B("+-" + B.bold(t2) + "-".repeat(Math.max(0, t2Pad)) + "+")}`);
   out.push(gEmpty());
 
   const items = connected
@@ -215,11 +215,11 @@ export function finalSummaryBox(steps: StepDef[], connected: boolean): string {
 
   for (const item of items) {
     const pad = W - stripAnsi(item).length - 2;
-    out.push(`  ${B("║")}  ${item}${" ".repeat(Math.max(0, pad))}${B("║")}`);
+    out.push(`  ${B("|")}  ${item}${" ".repeat(Math.max(0, pad))}${B("|")}`);
   }
 
   out.push(gEmpty());
-  out.push(`  ${B("╚" + "═".repeat(W) + "╝")}`);
+  out.push(`  ${B("+" + "-".repeat(W) + "+")}`);
 
   return out.join("\n");
 }

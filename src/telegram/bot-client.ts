@@ -47,10 +47,19 @@ export class BotClient {
    * Phase 2: Start long polling.
    * Call this AFTER all handlers (onNewMessage, etc.) are registered.
    */
-  startPolling(): void {
+  async startPolling(): Promise<void> {
     if (this.polling) return;
+
+    // Clean up any stale webhook/polling session before starting
+    try {
+      await this.bot.api.deleteWebhook({ drop_pending_updates: true });
+      log.info("Cleaned up stale webhook/polling session");
+    } catch (err) {
+      log.warn({ err }, "Failed to delete webhook (non-fatal)");
+    }
+
     void this.bot.start({
-      drop_pending_updates: false,
+      drop_pending_updates: true,
       allowed_updates: ["message", "edited_message", "callback_query", "inline_query", "chosen_inline_result", "channel_post"],
       onStart: () => {
         log.info("Bot polling started");
