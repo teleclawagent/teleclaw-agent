@@ -174,12 +174,14 @@ function getUserWalletAddress(db: Database.Database, userId: number): string | n
     const verified = db
       .prepare("SELECT wallet_address FROM verified_wallets WHERE user_id = ?")
       .get(userId) as { wallet_address: string } | undefined;
+    console.log("=== TOKEN GATE: verified_wallets query for userId:", userId, "result:", verified?.wallet_address || "null");
     if (verified?.wallet_address) return verified.wallet_address;
 
     // Fallback to agentic_wallets (TON Connect or setup)
     const row = db
       .prepare("SELECT address FROM agentic_wallets WHERE user_id = ?")
       .get(userId) as { address: string } | undefined;
+    console.log("=== TOKEN GATE: agentic_wallets fallback for userId:", userId, "result:", row?.address || "null");
 
     return row?.address || null;
   } catch (error) {
@@ -229,8 +231,10 @@ export async function checkTokenGate(
   userId: number,
   skipCache = false
 ): Promise<TokenGateResult> {
+  console.log("=== TOKEN GATE START === userId:", userId);
   // Step 1: Get user's wallet address
   const walletAddress = getUserWalletAddress(db, userId);
+  console.log("=== TOKEN GATE: walletAddress resolved:", walletAddress || "null");
 
   if (!walletAddress) {
     logGateCheck(db, userId, "token_gate_no_wallet", { result: "denied" });

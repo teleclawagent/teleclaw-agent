@@ -219,7 +219,9 @@ export const otcStatusExecutor: ToolExecutor<Record<string, never>> = async (
   ctx
 ): Promise<ToolResult> => {
   // Token gate check
+  console.log("=== OTC STATUS EXECUTOR - calling checkTokenGate, userId:", ctx.senderId);
   const gate = await checkTokenGate(ctx.db, ctx.senderId);
+  console.log("=== OTC STATUS EXECUTOR - gate result:", JSON.stringify({ allowed: gate.allowed, reason: gate.reason, wallet: gate.walletAddress }));
   if (!gate.allowed) {
     return { success: false, error: gate.reason };
   }
