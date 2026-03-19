@@ -8,8 +8,7 @@ export const STEPS = [
   { id: 'provider', label: 'Provider' },
   { id: 'config',   label: 'Config' },
   { id: 'wallet',   label: 'Wallet' },
-  { id: 'telegram', label: 'Telegram' },
-  { id: 'connect',  label: 'Connect' },
+  { id: 'connect',  label: 'Start Agent' },
 ];
 
 // ── Shared types ────────────────────────────────────────────────────
@@ -128,12 +127,8 @@ export function validateStep(step: number, data: WizardData): boolean {
       if (!data.walletAddress) return false;
       return data.mnemonicSaved;
     case 4:
-      // Telegram — phone required only for phone auth mode
-      if (data.apiId <= 0 || data.apiHash.length < 10) return false;
-      if (data.authMode === 'phone') return data.phone.startsWith('+');
+      // Start Agent — always ready (config auto-saves)
       return true;
-    case 5:
-      return data.telegramUser !== null || data.skipConnect;
     default:
       return false;
   }
@@ -204,9 +199,6 @@ export function SetupProvider({ children }: { children: ReactNode }) {
           max_agentic_iterations: data.maxIterations,
         },
         telegram: {
-          api_id: data.apiId,
-          api_hash: data.apiHash,
-          phone: data.phone,
           admin_ids: [data.userId],
           owner_id: data.userId,
           dm_policy: data.dmPolicy,
@@ -253,14 +245,14 @@ export function SetupProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Auto-save when Telegram connects on the last step
+  // Auto-save when reaching the last step
   const saveRef = useRef(handleSave);
   saveRef.current = handleSave;
   useEffect(() => {
-    if (step === STEPS.length - 1 && data.telegramUser && !saved && !loading) {
+    if (step === STEPS.length - 1 && !saved && !loading) {
       saveRef.current();
     }
-  }, [step, data.telegramUser, saved, loading]);
+  }, [step, saved, loading]);
 
   return (
     <SetupContext.Provider

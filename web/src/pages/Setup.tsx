@@ -1,6 +1,5 @@
 import { WelcomeStep } from '../components/setup/WelcomeStep';
 import { ProviderStep } from '../components/setup/ProviderStep';
-import { TelegramStep } from '../components/setup/TelegramStep';
 import { ConfigStep } from '../components/setup/ConfigStep';
 import { WalletStep } from '../components/setup/WalletStep';
 import { ConnectStep } from '../components/setup/ConnectStep';
@@ -15,7 +14,6 @@ const STEP_COMPONENTS = [
   ProviderStep,
   ConfigStep,
   WalletStep,
-  TelegramStep,
   ConnectStep,
 ];
 
