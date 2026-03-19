@@ -174,6 +174,12 @@ export const otcLeaveExecutor: ToolExecutor<Record<string, never>> = async (
   _params,
   ctx
 ): Promise<ToolResult> => {
+  // Token gate check
+  const gate = await checkTokenGate(ctx.db, ctx.senderId);
+  if (!gate.allowed) {
+    return { success: false, error: gate.reason };
+  }
+
   try {
     ensureConsentTable(ctx);
 
@@ -212,6 +218,12 @@ export const otcStatusExecutor: ToolExecutor<Record<string, never>> = async (
   _params,
   ctx
 ): Promise<ToolResult> => {
+  // Token gate check
+  const gate = await checkTokenGate(ctx.db, ctx.senderId);
+  if (!gate.allowed) {
+    return { success: false, error: gate.reason };
+  }
+
   try {
     ensureConsentTable(ctx);
     const consent = hasOtcConsent(ctx);
