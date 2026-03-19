@@ -56,20 +56,8 @@ function getVerifiedWallet(db: Database.Database, userId: number): string | null
   return row?.wallet_address || null;
 }
 
-function getBotWalletAddress(db: Database.Database): string | null {
-  // Primary: get from wallet.json (bot's own wallet via wallet-service)
-  const walletAddr = getWalletAddress();
-  if (walletAddr) return walletAddr;
-
-  // Fallback: check agentic_wallets table (legacy)
-  try {
-    const row = db
-      .prepare("SELECT address FROM agentic_wallets LIMIT 1")
-      .get() as { address: string } | undefined;
-    return row?.address || null;
-  } catch {
-    return null;
-  }
+function getBotWalletAddress(): string | null {
+  return getWalletAddress();
 }
 
 // ─── Executor ────────────────────────────────────────────────────────
@@ -98,7 +86,7 @@ export const verifyWalletExecutor: ToolExecutor<VerifyWalletParams> = async (
         };
       }
 
-      const botWallet = getBotWalletAddress(db);
+      const botWallet = getBotWalletAddress();
       if (!botWallet) {
         return {
           success: false,
@@ -135,11 +123,11 @@ export const verifyWalletExecutor: ToolExecutor<VerifyWalletParams> = async (
       };
     }
 
-    const botWallet = getBotWalletAddress(db);
+    const botWallet = getBotWalletAddress();
     if (!botWallet) {
       return {
         success: false,
-        error: "Bot cüzdanı bulunamadı.",
+        error: "Bot cüzdanı bulunamadı. Wallet setup'ı tamamlayın.",
       };
     }
 
