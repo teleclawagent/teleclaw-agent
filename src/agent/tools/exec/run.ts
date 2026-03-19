@@ -24,8 +24,30 @@ export function createExecRunExecutor(
   db: Database.Database,
   execConfig: ExecConfig
 ): ToolExecutor<ExecRunParams> {
+  const BLOCKED_PATTERNS = [
+    /\brm\s+(-[a-zA-Z]*\s+)*\/\s*$/,
+    /\bmkfs\b/,
+    /\bdd\s+.*of=\/dev\//,
+    /\bchmod\s+.*777\s+\//,
+    /\bcurl\b.*\|\s*bash/,
+    /\bwget\b.*\|\s*bash/,
+    />\s*\/etc\//,
+    /\bshutdown\b/,
+    /\breboot\b/,
+  ];
+
   return async (params, context): Promise<ToolResult> => {
     const { command } = params;
+
+    // Safety: block dangerous command patterns
+    for (const pattern of BLOCKED_PATTERNS) {
+      if (pattern.test(command)) {
+        return {
+          success: false,
+          error: `Command blocked by safety filter: ${pattern.source}`,
+        };
+      }
+    }
     const { timeout, max_output } = execConfig.limits;
 
     let auditId: number | undefined;

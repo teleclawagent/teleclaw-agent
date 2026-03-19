@@ -60,14 +60,21 @@ function generateId(): string {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 }
 
+function escapeSqlLike(input: string): string {
+  return input.replace(/[%_\\]/g, (char) => `\\${char}`);
+}
+
 function getBotId(request: Request): string | null {
   return request.headers.get("X-Bot-Id");
 }
 
-function jsonResponse(data: unknown, status = 200): Response {
+function jsonResponse(data: unknown, status = 200, corsOrigin = "*"): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": corsOrigin,
+    },
   });
 }
 
@@ -77,17 +84,22 @@ function errorResponse(message: string, status = 400): Response {
 
 // ─── Routes ──────────────────────────────────────────────────────────
 
+let schemaInitialized = false;
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
 
-    // Ensure schema
-    try {
-      await env.DB.exec(SCHEMA);
-    } catch {
-      // Schema already exists
+    // Ensure schema (lazy — runs once per cold start)
+    if (!schemaInitialized) {
+      try {
+        await env.DB.exec(SCHEMA);
+        schemaInitialized = true;
+      } catch {
+        schemaInitialized = true;
+      }
     }
 
     // Auto-expire old listings
@@ -96,10 +108,14 @@ export default {
     ).run();
 
     // CORS
+    const allowedOrigins = ((env as Record<string, unknown>).ALLOWED_ORIGINS as string || "").split(",").filter(Boolean);
+    const origin = request.headers.get("Origin") || "";
+    const corsOrigin = allowedOrigins.length === 0 || allowedOrigins.includes(origin) ? (origin || "*") : "";
+
     if (method === "OPTIONS") {
       return new Response(null, {
         headers: {
-          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Origin": corsOrigin,
           "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type, X-Bot-Id, Authorization",
         },
@@ -181,7 +197,7 @@ export default {
 
       if (type) { query += ` AND type = ?`; binds.push(type); }
       if (maxPriceUsd) { query += ` AND (price_usd IS NULL OR price_usd <= ?)`; binds.push(parseFloat(maxPriceUsd)); }
-      if (search) { query += ` AND item_name LIKE ?`; binds.push(`%${search}%`); }
+      if (search) { query += ` AND item_name LIKE ? ESCAPE '\\'`; binds.push(`%${escapeSqlLike(search)}%`); }
       if (excludeBot) { query += ` AND bot_id != ?`; binds.push(excludeBot); }
 
       query += ` ORDER BY created_at DESC LIMIT ?`;
@@ -209,6 +225,14 @@ export default {
 
     // ── POST /api/interests — Signal interest ──
     if (path === "/api/interests" && method === "POST") {
+      // Rate limit: max 5 interests per minute per bot
+      const recentInterests = await env.DB.prepare(
+        `SELECT COUNT(*) as c FROM interests WHERE buyer_bot_id = ? AND created_at > datetime('now', '-1 minute')`
+      ).bind(botId).first<{ c: number }>();
+      if ((recentInterests?.c ?? 0) >= 5) {
+        return errorResponse("Rate limit: max 5 interest signals per minute", 429);
+      }
+
       const body = (await request.json()) as {
         listing_id: string;
         buyer_bot_id: string;

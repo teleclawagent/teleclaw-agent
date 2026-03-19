@@ -670,7 +670,11 @@ async function runInteractiveOnboarding(
       message: "Bot token (from @BotFather)",
       theme,
       validate: (value) => {
-        if (!value || !value.trim().includes(":")) return "Invalid format (expected id:hash)";
+        const clean = (value || "").replace(/[^\x20-\x7E]/g, "").trim();
+        if (!clean) return "Bot token is required";
+        if (!clean.match(/^\d{8,15}:[A-Za-z0-9_-]{30,50}$/)) {
+          return "Invalid format. Expected: 1234567890:ABCdefGHIjklMNO (numeric ID, colon, alphanumeric hash)";
+        }
         return true;
       },
     });
@@ -683,24 +687,32 @@ async function runInteractiveOnboarding(
       if (!data.ok) {
         spinner.warn(DIM("Bot token is invalid — skipping bot setup"));
       } else {
-        botToken = tokenInput.trim();
+        botToken = tokenInput.replace(/[^\x20-\x7E]/g, "").trim();
         botUsername = data.result.username;
         spinner.succeed(DIM(`Bot verified: @${botUsername}`));
         extras.push("Bot");
       }
     } catch {
-      spinner.warn(DIM("Could not validate bot token (network error) — saving anyway"));
-      botToken = tokenInput.trim();
-      const usernameInput = await input({
-        message: "Bot username (without @)",
+      spinner.warn(DIM("Could not validate bot token (network error)"));
+      const saveAnyway = await confirm({
+        message: "Network error — save token anyway? (Re-validate later with 'teleclaw doctor')",
+        default: true,
         theme,
-        validate: (value) => {
-          if (!value || value.length < 3) return "Username too short";
-          return true;
-        },
       });
-      botUsername = usernameInput;
-      extras.push("Bot");
+      if (saveAnyway) {
+        botToken = tokenInput.replace(/[^\x20-\x7E]/g, "").trim();
+        const usernameInput = await input({
+          message: "Bot username (without @)",
+          theme,
+          validate: (value) => {
+            if (!value || value.length < 3) return "Username too short";
+            if (!/^[a-zA-Z][a-zA-Z0-9_]{2,}$/.test(value)) return "Invalid username format";
+            return true;
+          },
+        });
+        botUsername = usernameInput;
+        extras.push("Bot (unverified)");
+      }
     }
   }
 
@@ -956,7 +968,11 @@ async function runInteractiveOnboarding(
       message: "Bot token (from @BotFather)",
       theme,
       validate: (value: string) => {
-        if (!value || !value.trim().includes(":")) return "Invalid format (expected id:hash)";
+        const clean = (value || "").replace(/[^\x20-\x7E]/g, "").trim();
+        if (!clean) return "Bot token is required";
+        if (!clean.match(/^\d{8,15}:[A-Za-z0-9_-]{30,50}$/)) {
+          return "Invalid format. Expected: 1234567890:ABCdefGHIjklMNO (numeric ID, colon, alphanumeric hash)";
+        }
         return true;
       },
     });
@@ -971,13 +987,13 @@ async function runInteractiveOnboarding(
         spinner.fail("Bot token is invalid. Please check and try again.");
         process.exit(1);
       }
-      botToken = tokenInput.trim();
+      botToken = tokenInput.replace(/[^\x20-\x7E]/g, "").trim();
       botUsername = data.result.username;
       spinner.succeed(`Bot verified: @${botUsername}`);
       STEPS[STEPS.length - 1].value = `@${botUsername}`;
     } catch {
       spinner.warn(DIM("Could not validate (network error) — saving anyway"));
-      botToken = tokenInput.trim();
+      botToken = tokenInput.replace(/[^\x20-\x7E]/g, "").trim();
       STEPS[STEPS.length - 1].value = "saved";
     }
   }
@@ -995,7 +1011,7 @@ async function runInteractiveOnboarding(
     },
     agent: {
       provider: selectedProvider,
-      api_key: apiKey,
+      api_key: "", // Key stored in .env file, loaded at runtime
       ...(selectedProvider === "local" && localBaseUrl ? { base_url: localBaseUrl } : {}),
       model: selectedModel,
       max_tokens: 4096,
@@ -1090,13 +1106,17 @@ async function runInteractiveOnboarding(
   const envFilePath = join(homedir(), ".teleclaw", ".env");
   if (!existsSync(envFilePath)) {
     const secret = randomBytes(32).toString("hex");
+    const signingKey = randomBytes(32).toString("hex");
     const envContent =
-      "# Teleclaw encryption secret — paylaşma, commit etme\n" +
+      "# Teleclaw secrets — paylaşma, commit etme\n" +
       `# Oluşturuldu: ${new Date().toISOString()}\n` +
-      `export TELECLAW_ENCRYPT_SECRET=${secret}\n`;
+      `export TELECLAW_ENCRYPT_SECRET=${secret}\n` +
+      `export TELECLAW_SIGNING_KEY=${signingKey}\n` +
+      (apiKey ? `export TELECLAW_API_KEY=${apiKey}\n` : "") +
+      (botToken ? `export TELECLAW_BOT_TOKEN=${botToken}\n` : "");
 
     writeFileSync(envFilePath, envContent, { encoding: "utf-8", mode: 0o600 });
-    spinner.succeed(DIM(`Encryption secret: ${envFilePath}`));
+    spinner.succeed(DIM(`Secrets saved: ${envFilePath}`));
 
     // Shell rc'ye loader ekle
     const shellRcCandidates = [
@@ -1117,6 +1137,15 @@ async function runInteractiveOnboarding(
 
     // Bu session için yükle
     process.env.TELECLAW_ENCRYPT_SECRET = secret;
+  } else {
+    // Ensure signing key exists in existing env file
+    const existingEnv = readFileSync(envFilePath, "utf-8");
+    if (!existingEnv.includes("TELECLAW_SIGNING_KEY")) {
+      const signingKey = randomBytes(32).toString("hex");
+      const appendContent = `export TELECLAW_SIGNING_KEY=${signingKey}\n`;
+      writeFileSync(envFilePath, existingEnv + appendContent, { encoding: "utf-8", mode: 0o600 });
+      spinner.succeed(DIM(`Signing key added to: ${envFilePath}`));
+    }
   }
 
   // Bot mode — already validated token above, no further auth needed

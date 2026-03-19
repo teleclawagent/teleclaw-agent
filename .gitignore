@@ -23,6 +23,7 @@ config.yaml
 
 # Sensitive data
 wallet.json
+.secrets/
 *.db
 telegram_session.txt
 telegram-offset.json
