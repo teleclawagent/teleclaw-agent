@@ -8,6 +8,7 @@
 import { Type } from "@sinclair/typebox";
 import type { Tool, ToolExecutor, ToolResult } from "../types.js";
 import { tonapiFetch } from "../../../constants/api-endpoints.js";
+import { getWalletAddress } from "../../../ton/wallet-service.js";
 import { createLogger } from "../../../utils/logger.js";
 import type Database from "better-sqlite3";
 
@@ -56,11 +57,19 @@ function getVerifiedWallet(db: Database.Database, userId: number): string | null
 }
 
 function getBotWalletAddress(db: Database.Database): string | null {
-  // Get the bot's own wallet address from agentic_wallets or config
-  const row = db
-    .prepare("SELECT address FROM agentic_wallets LIMIT 1")
-    .get() as { address: string } | undefined;
-  return row?.address || null;
+  // Primary: get from wallet.json (bot's own wallet via wallet-service)
+  const walletAddr = getWalletAddress();
+  if (walletAddr) return walletAddr;
+
+  // Fallback: check agentic_wallets table (legacy)
+  try {
+    const row = db
+      .prepare("SELECT address FROM agentic_wallets LIMIT 1")
+      .get() as { address: string } | undefined;
+    return row?.address || null;
+  } catch {
+    return null;
+  }
 }
 
 // ─── Executor ────────────────────────────────────────────────────────
@@ -131,6 +140,14 @@ export const verifyWalletExecutor: ToolExecutor<VerifyWalletParams> = async (
       return {
         success: false,
         error: "Bot cüzdanı bulunamadı.",
+      };
+    }
+
+    // Check TonAPI key availability
+    if (!process.env.TELECLAW_TONAPI_KEY) {
+      return {
+        success: false,
+        error: "Cüzdan doğrulaması için TonAPI key gerekli. Setup'ta ekleyin.",
       };
     }
 
