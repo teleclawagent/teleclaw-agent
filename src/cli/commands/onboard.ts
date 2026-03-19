@@ -670,7 +670,7 @@ async function runInteractiveOnboarding(
       message: "Bot token (from @BotFather)",
       theme,
       validate: (value) => {
-        if (!value || !value.includes(":")) return "Invalid format (expected id:hash)";
+        if (!value || !value.trim().includes(":")) return "Invalid format (expected id:hash)";
         return true;
       },
     });
@@ -683,14 +683,14 @@ async function runInteractiveOnboarding(
       if (!data.ok) {
         spinner.warn(DIM("Bot token is invalid — skipping bot setup"));
       } else {
-        botToken = tokenInput;
+        botToken = tokenInput.trim();
         botUsername = data.result.username;
         spinner.succeed(DIM(`Bot verified: @${botUsername}`));
         extras.push("Bot");
       }
     } catch {
       spinner.warn(DIM("Could not validate bot token (network error) — saving anyway"));
-      botToken = tokenInput;
+      botToken = tokenInput.trim();
       const usernameInput = await input({
         message: "Bot username (without @)",
         theme,
@@ -956,7 +956,7 @@ async function runInteractiveOnboarding(
       message: "Bot token (from @BotFather)",
       theme,
       validate: (value: string) => {
-        if (!value || !value.includes(":")) return "Invalid format (expected id:hash)";
+        if (!value || !value.trim().includes(":")) return "Invalid format (expected id:hash)";
         return true;
       },
     });
@@ -971,13 +971,13 @@ async function runInteractiveOnboarding(
         spinner.fail("Bot token is invalid. Please check and try again.");
         process.exit(1);
       }
-      botToken = tokenInput;
+      botToken = tokenInput.trim();
       botUsername = data.result.username;
       spinner.succeed(`Bot verified: @${botUsername}`);
       STEPS[STEPS.length - 1].value = `@${botUsername}`;
     } catch {
       spinner.warn(DIM("Could not validate (network error) — saving anyway"));
-      botToken = tokenInput;
+      botToken = tokenInput.trim();
       STEPS[STEPS.length - 1].value = "saved";
     }
   }
