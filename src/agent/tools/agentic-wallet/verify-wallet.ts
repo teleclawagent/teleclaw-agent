@@ -7,7 +7,7 @@
 
 import { Type } from "@sinclair/typebox";
 import type { Tool, ToolExecutor, ToolResult } from "../types.js";
-import { tonapiFetch } from "../../../constants/api-endpoints.js";
+import { tonapiFetch, tonapiHeaders } from "../../../constants/api-endpoints.js";
 import { getWalletAddress } from "../../../ton/wallet-service.js";
 import { createLogger } from "../../../utils/logger.js";
 import type Database from "better-sqlite3";
@@ -131,8 +131,10 @@ export const verifyWalletExecutor: ToolExecutor<VerifyWalletParams> = async (
       };
     }
 
-    // Check TonAPI key availability
-    if (!process.env.TELECLAW_TONAPI_KEY) {
+    // Check TonAPI key availability (check both env and in-memory config)
+    const hasTonapiKey = !!process.env.TELECLAW_TONAPI_KEY || !!tonapiHeaders()["Authorization"];
+    console.log("=== VERIFY WALLET: TonAPI key present:", hasTonapiKey, "env:", !!process.env.TELECLAW_TONAPI_KEY, "header:", !!tonapiHeaders()["Authorization"]);
+    if (!hasTonapiKey) {
       return {
         success: false,
         error: "Cüzdan doğrulaması için TonAPI key gerekli. Setup'ta ekleyin.",
