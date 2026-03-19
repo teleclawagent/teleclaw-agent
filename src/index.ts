@@ -521,7 +521,7 @@ export class TeleclawApp {
       db: moduleDb,
       config: this.config,
     };
-    const startedModules: typeof this.modules = [];
+    const startedModules: PluginModule[] = [];
     try {
       for (const mod of this.modules) {
         await mod.start?.(pluginContext);

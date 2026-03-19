@@ -129,7 +129,7 @@ export const mmListExecutor: ToolExecutor<ListForSaleParams> = async (
 
     // 🔒 Token Gate: verify $TELECLAW holdings
     // 🤝 OTC Consent check
-    const consentError = await requireOtcConsent(context);
+    const consentError = requireOtcConsent(context);
     if (consentError) return consentError;
     const gateResult = await checkTokenGate(context.db, context.senderId);
     if (!gateResult.allowed) {
@@ -410,7 +410,7 @@ export const mmInterestExecutor: ToolExecutor<RegisterInterestParams> = async (
 
     // 🔒 Token Gate: verify $TELECLAW holdings
     // 🤝 OTC Consent check
-    const consentError = await requireOtcConsent(context);
+    const consentError = requireOtcConsent(context);
     if (consentError) return consentError;
     const gateResult = await checkTokenGate(context.db, context.senderId);
     if (!gateResult.allowed) {
@@ -529,7 +529,7 @@ export const mmExpressInterestExecutor: ToolExecutor<ExpressInterestParams> = as
 
     // 🔒 Token Gate: verify $TELECLAW holdings
     // 🤝 OTC Consent check
-    const consentError = await requireOtcConsent(context);
+    const consentError = requireOtcConsent(context);
     if (consentError) return consentError;
     const gateResult = await checkTokenGate(context.db, context.senderId);
     if (!gateResult.allowed) {

@@ -256,7 +256,7 @@ export const numberProfileSetExecutor: ToolExecutor<SetProfileParams> = async (
     ensureNumberProfileTables(ctx);
 
     // 🔒 Token Gate: verify $TELECLAW holdings for matchmaker features
-    const consentError = await requireOtcConsent(ctx);
+    const consentError = requireOtcConsent(ctx);
     if (consentError) return consentError;
     const gateResult = await checkTokenGate(ctx.db, ctx.senderId);
     if (!gateResult.allowed) {
@@ -414,7 +414,7 @@ export const numberListForSaleExecutor: ToolExecutor<ListNumberParams> = async (
     ensureNumberProfileTables(ctx);
 
     // 🔒 Token Gate: verify $TELECLAW holdings for matchmaker features
-    const consentError = await requireOtcConsent(ctx);
+    const consentError = requireOtcConsent(ctx);
     if (consentError) return consentError;
     const gateResult = await checkTokenGate(ctx.db, ctx.senderId);
     if (!gateResult.allowed) {
@@ -718,7 +718,7 @@ export const numberExpressInterestExecutor: ToolExecutor<NumberExpressParams> = 
   try {
     ensureNumberProfileTables(ctx);
 
-    const consentError = await requireOtcConsent(ctx);
+    const consentError = requireOtcConsent(ctx);
     if (consentError) return consentError;
     const gateResult = await checkTokenGate(ctx.db, ctx.senderId);
     if (!gateResult.allowed) {
