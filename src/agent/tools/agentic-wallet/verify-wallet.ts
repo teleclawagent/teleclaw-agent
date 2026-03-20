@@ -7,7 +7,7 @@
 
 import { Type } from "@sinclair/typebox";
 import type { Tool, ToolExecutor, ToolResult } from "../types.js";
-import { tonapiFetch, tonapiHeaders } from "../../../constants/api-endpoints.js";
+import { tonapiFetch } from "../../../constants/api-endpoints.js";
 import { getWalletAddress } from "../../../ton/wallet-service.js";
 import { createLogger } from "../../../utils/logger.js";
 import type Database from "better-sqlite3";
@@ -131,111 +131,102 @@ export const verifyWalletExecutor: ToolExecutor<VerifyWalletParams> = async (
       };
     }
 
-    // Check TonAPI key availability (check both env and in-memory config)
-    const hasTonapiKey = !!process.env.TELECLAW_TONAPI_KEY || !!tonapiHeaders()["Authorization"];
-    console.log("=== VERIFY WALLET: TonAPI key present:", hasTonapiKey, "env:", !!process.env.TELECLAW_TONAPI_KEY, "header:", !!tonapiHeaders()["Authorization"]);
-    if (!hasTonapiKey) {
-      return {
-        success: false,
-        error: "Cüzdan doğrulaması için TonAPI key gerekli. Setup'ta ekleyin.",
-      };
-    }
-
     // Fetch recent transactions to bot wallet via TonAPI
+    // Note: TonAPI works without key (1 RPS), key just gives higher limits (5 RPS)
     try {
+      console.log("=== VERIFY WALLET: fetching transactions for bot wallet:", botWallet);
+
+      // Use /blockchain/accounts/{addr}/transactions — returns raw TX data with decoded messages
       const response = await tonapiFetch(
-        `/accounts/${encodeURIComponent(botWallet)}/events?limit=50`
+        `/blockchain/accounts/${encodeURIComponent(botWallet)}/transactions?limit=50`
       );
 
+      console.log("=== VERIFY WALLET: TonAPI response status:", response.status);
+
       if (!response.ok) {
-        log.error({ status: response.status }, "TonAPI error fetching transactions");
+        const body = await response.text().catch(() => "");
+        log.error({ status: response.status, body }, "TonAPI error fetching transactions");
         return {
           success: false,
-          error: "İşlemler kontrol edilemedi. Lütfen biraz bekleyip tekrar deneyin.",
+          error: `İşlemler kontrol edilemedi (HTTP ${response.status}). Lütfen biraz bekleyip tekrar deneyin.`,
         };
       }
 
       const data = await response.json();
-      const events = data.events || [];
+      const transactions = data.transactions || [];
+      console.log("=== VERIFY WALLET: found", transactions.length, "transactions");
 
       // Search for a matching transaction
-      for (const event of events) {
-        for (const action of event.actions || []) {
-          if (action.type !== "TonTransfer") continue;
+      for (const tx of transactions) {
+        const inMsg = tx.in_msg;
+        if (!inMsg) continue;
 
-          const transfer = action.TonTransfer;
-          if (!transfer) continue;
+        // Check: it's an internal message (user→bot transfer)
+        if (inMsg.msg_type !== "int_msg") continue;
 
-          // Check: destination is bot wallet
-          const dest = transfer.recipient?.address;
-          if (!dest) continue;
+        // Check: amount >= 0.01 TON (10,000,000 nanoTON)
+        const amount = BigInt(inMsg.value || "0");
+        if (amount < 10_000_000n) continue;
 
-          // Normalize addresses for comparison
-          const destNorm = dest.replace(/[^A-Za-z0-9]/g, "");
-          const botNorm = botWallet.replace(/[^A-Za-z0-9]/g, "");
-          if (destNorm !== botNorm && !dest.includes(botWallet) && !botWallet.includes(dest)) {
-            continue;
-          }
+        // Check: memo/comment contains user ID
+        // TonAPI decoded_body.text has the comment for text_comment messages
+        const comment = inMsg.decoded_body?.text || "";
+        const userIdStr = String(userId);
+        console.log("=== VERIFY WALLET: TX memo:", JSON.stringify(comment), "looking for:", userIdStr, "amount:", amount.toString());
 
-          // Check: amount >= 0.01 TON (10,000,000 nanoTON)
-          const amount = BigInt(transfer.amount || "0");
-          if (amount < 10_000_000n) continue;
+        if (!comment.includes(userIdStr)) continue;
 
-          // Check: memo contains user ID
-          const comment = transfer.comment || "";
-          if (!comment.includes(String(userId))) continue;
+        // Match found! Get sender address
+        const senderAddress = inMsg.source?.address;
+        if (!senderAddress) continue;
 
-          // Match found! Link wallet
-          const senderAddress = transfer.sender?.address;
-          if (!senderAddress) continue;
+        const txHash = tx.hash || "";
+        console.log("=== VERIFY WALLET: MATCH FOUND! sender:", senderAddress, "txHash:", txHash);
 
-          const txHash = event.event_id || "";
-
-          // Check if this wallet is already linked to a different user
-          const existingOwner = db
-            .prepare("SELECT user_id FROM verified_wallets WHERE wallet_address = ? AND user_id != ?")
-            .get(senderAddress, userId) as { user_id: number } | undefined;
-          if (existingOwner) {
-            return {
-              success: false,
-              error: "Bu cüzdan başka bir hesaba bağlı. Her cüzdan sadece bir Telegram hesabına bağlanabilir.",
-            };
-          }
-
-          // Save to DB
-          db.prepare(
-            `INSERT OR REPLACE INTO verified_wallets (user_id, wallet_address, verified_at, tx_hash)
-             VALUES (?, ?, unixepoch(), ?)`
-          ).run(userId, senderAddress, txHash);
-
-          // Also update agentic_wallets if user doesn't have one
-          const existingAgenticWallet = db
-            .prepare("SELECT id FROM agentic_wallets WHERE user_id = ?")
-            .get(userId);
-
-          if (!existingAgenticWallet) {
-            const walletId = `verified_${userId}`;
-            db.prepare(
-              `INSERT OR IGNORE INTO agentic_wallets (id, user_id, chat_id, address, encrypted_secret, label)
-               VALUES (?, ?, '', ?, '', 'Verified Wallet')`
-            ).run(walletId, userId, senderAddress);
-          }
-
-          log.info(
-            { userId, wallet: senderAddress, txHash },
-            "Wallet verified successfully"
-          );
-
+        // Check if this wallet is already linked to a different user
+        const existingOwner = db
+          .prepare("SELECT user_id FROM verified_wallets WHERE wallet_address = ? AND user_id != ?")
+          .get(senderAddress, userId) as { user_id: number } | undefined;
+        if (existingOwner) {
           return {
-            success: true,
-            data: {
-              status: "verified",
-              wallet: senderAddress,
-              txHash,
-              message: `✅ Cüzdan doğrulandı!\n\nAdres: \`${senderAddress}\`\nTx: \`${txHash}\``,
-            },
+            success: false,
+            error: "Bu cüzdan başka bir hesaba bağlı. Her cüzdan sadece bir Telegram hesabına bağlanabilir.",
           };
         }
+
+        // Save to DB
+        db.prepare(
+          `INSERT OR REPLACE INTO verified_wallets (user_id, wallet_address, verified_at, tx_hash)
+           VALUES (?, ?, unixepoch(), ?)`
+        ).run(userId, senderAddress, txHash);
+
+        // Also update agentic_wallets if user doesn't have one
+        const existingAgenticWallet = db
+          .prepare("SELECT id FROM agentic_wallets WHERE user_id = ?")
+          .get(userId);
+
+        if (!existingAgenticWallet) {
+          const walletId = `verified_${userId}`;
+          db.prepare(
+            `INSERT OR IGNORE INTO agentic_wallets (id, user_id, chat_id, address, encrypted_secret, label)
+             VALUES (?, ?, '', ?, '', 'Verified Wallet')`
+          ).run(walletId, userId, senderAddress);
+        }
+
+        log.info(
+          { userId, wallet: senderAddress, txHash },
+          "Wallet verified successfully"
+        );
+
+        return {
+          success: true,
+          data: {
+            status: "verified",
+            wallet: senderAddress,
+            txHash,
+            message: `✅ Cüzdan doğrulandı!\n\nAdres: \`${senderAddress}\`\nTx: \`${txHash}\``,
+          },
+        };
       }
 
       return {
