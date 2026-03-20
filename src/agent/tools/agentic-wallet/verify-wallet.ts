@@ -132,20 +132,26 @@ export const verifyWalletExecutor: ToolExecutor<VerifyWalletParams> = async (
     }
 
     // Fetch recent transactions to bot wallet via TonAPI
-    // Note: TonAPI works without key (1 RPS), key just gives higher limits (5 RPS)
     try {
-      console.log("=== VERIFY WALLET: fetching transactions for bot wallet:", botWallet);
+      console.log("=== VERIFY START: userId=", userId, "botWallet=", botWallet);
 
-      // Use /blockchain/accounts/{addr}/transactions — returns raw TX data with decoded messages
-      const response = await tonapiFetch(
-        `/blockchain/accounts/${encodeURIComponent(botWallet)}/transactions?limit=50`
-      );
+      const txUrl = `/blockchain/accounts/${encodeURIComponent(botWallet)}/transactions?limit=50`;
+      console.log("=== VERIFY: fetching from URL:", txUrl);
 
-      console.log("=== VERIFY WALLET: TonAPI response status:", response.status);
+      // Attempt with retry on 502/429
+      let response = await tonapiFetch(txUrl);
+      console.log("=== VERIFY: TonAPI response status:", response.status);
+
+      if (response.status === 502 || response.status === 429) {
+        console.log("=== VERIFY: retrying after 2s...");
+        await new Promise((r) => setTimeout(r, 2000));
+        response = await tonapiFetch(txUrl);
+        console.log("=== VERIFY: retry response status:", response.status);
+      }
 
       if (!response.ok) {
         const body = await response.text().catch(() => "");
-        log.error({ status: response.status, body }, "TonAPI error fetching transactions");
+        log.error({ status: response.status, body, botWallet }, "TonAPI error fetching transactions");
         return {
           success: false,
           error: `İşlemler kontrol edilemedi (HTTP ${response.status}). Lütfen biraz bekleyip tekrar deneyin.`,
@@ -154,9 +160,10 @@ export const verifyWalletExecutor: ToolExecutor<VerifyWalletParams> = async (
 
       const data = await response.json();
       const transactions = data.transactions || [];
-      console.log("=== VERIFY WALLET: found", transactions.length, "transactions");
+      console.log("=== VERIFY: found", transactions.length, "transactions");
 
       // Search for a matching transaction
+      const userIdStr = String(userId);
       for (const tx of transactions) {
         const inMsg = tx.in_msg;
         if (!inMsg) continue;
@@ -169,10 +176,8 @@ export const verifyWalletExecutor: ToolExecutor<VerifyWalletParams> = async (
         if (amount < 10_000_000n) continue;
 
         // Check: memo/comment contains user ID
-        // TonAPI decoded_body.text has the comment for text_comment messages
-        const comment = inMsg.decoded_body?.text || "";
-        const userIdStr = String(userId);
-        console.log("=== VERIFY WALLET: TX memo:", JSON.stringify(comment), "looking for:", userIdStr, "amount:", amount.toString());
+        const comment = (inMsg.decoded_body?.text || "").trim();
+        console.log("=== VERIFY: memo check — got:", JSON.stringify(comment), "expected:", userIdStr, "amount:", amount.toString(), "nanoTON");
 
         if (!comment.includes(userIdStr)) continue;
 
@@ -181,7 +186,7 @@ export const verifyWalletExecutor: ToolExecutor<VerifyWalletParams> = async (
         if (!senderAddress) continue;
 
         const txHash = tx.hash || "";
-        console.log("=== VERIFY WALLET: MATCH FOUND! sender:", senderAddress, "txHash:", txHash);
+        console.log("=== VERIFY: MATCH FOUND! sender:", senderAddress, "txHash:", txHash);
 
         // Check if this wallet is already linked to a different user
         const existingOwner = db

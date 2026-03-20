@@ -124,9 +124,19 @@ async function fetchTeleclawBalance(walletAddress: string): Promise<bigint | nul
       return null;
     }
 
-    const response = await tonapiFetch(
-      `/accounts/${encodeURIComponent(walletAddress)}/jettons/${encodeURIComponent(TELECLAW_JETTON_ADDRESS)}`
-    );
+    const jettonUrl = `/accounts/${encodeURIComponent(walletAddress)}/jettons/${encodeURIComponent(TELECLAW_JETTON_ADDRESS)}`;
+    console.log("=== TOKEN GATE: checking jetton balance for wallet:", walletAddress);
+    
+    let response = await tonapiFetch(jettonUrl);
+    console.log("=== TOKEN GATE: TonAPI response:", response.status);
+
+    // Retry on 502/429
+    if (response.status === 502 || response.status === 429) {
+      console.log("=== TOKEN GATE: retrying after 2s...");
+      await new Promise((r) => setTimeout(r, 2000));
+      response = await tonapiFetch(jettonUrl);
+      console.log("=== TOKEN GATE: retry response:", response.status);
+    }
 
     if (response.status === 404) {
       // User doesn't hold this jetton at all
@@ -338,6 +348,7 @@ export async function checkTokenGate(
     walletAddress,
   });
 
+  console.log("=== TOKEN GATE: balance =", humanBalance, "required =", formatBalance(REQUIRED_AMOUNT_RAW), "allowed =", hasAccess);
   log.info(
     { userId, walletAddress, balance: humanBalance, hasAccess },
     `Token gate ${hasAccess ? "PASSED" : "DENIED"}`
