@@ -554,16 +554,15 @@ async function runInteractiveOnboarding(
       );
 
       apiKey = (
-        await password({
-          message: "Paste setup-token (sk-ant-oat01-...)",
+        await input({
+          message: "Paste setup-token here",
           theme,
           validate: (value = "") => {
             const trimmed = value.trim();
             if (!trimmed) return "Token is required — follow the steps above";
-            if (!trimmed.startsWith("sk-ant-oat01-"))
-              return "Token should start with sk-ant-oat01- (run 'claude setup-token' to get it)";
-            if (trimmed.length < 80)
-              return "Token looks too short — copy the ENTIRE output of 'claude setup-token'";
+            if (!trimmed.startsWith("sk-ant-"))
+              return "Token should start with sk-ant- (copy from 'claude setup-token' output)";
+            if (trimmed.length < 50) return "Token looks too short — copy the ENTIRE token";
             return true;
           },
         })
