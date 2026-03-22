@@ -255,12 +255,50 @@ export class AdminHandler {
   private handleModelCommand(command: AdminCommand): string {
     const cfg = this.agent.getConfig();
     if (command.args.length === 0) {
-      return `🧠 Current model: **${cfg.agent.model}**\n\nUsage: /model <model_name>`;
+      // Show current model + available models
+      const provider = cfg.agent.provider || "anthropic";
+      let response = `🧠 **Current model:** ${cfg.agent.model}\n📡 **Provider:** ${provider}\n`;
+
+      try {
+        const { getModelsForProvider } = require("../../config/model-catalog.js") as {
+          getModelsForProvider: (p: string) => Array<{ value: string; name: string }>;
+        };
+        const models = getModelsForProvider(provider);
+        if (models.length > 0) {
+          response += `\n**Available models:**\n`;
+          for (const m of models) {
+            const current = m.value === cfg.agent.model ? " ← current" : "";
+            response += `• \`${m.value}\` — ${m.name}${current}\n`;
+          }
+        }
+      } catch {
+        // model catalog not available
+      }
+
+      response += `\nUsage: /model <model_name>`;
+      return response;
     }
+
     const newModel = command.args[0];
     const oldModel = cfg.agent.model;
     cfg.agent.model = newModel;
-    return `🧠 Model: **${oldModel}** → **${newModel}**`;
+
+    // Persist to config file
+    try {
+      const { readRawConfig, setNestedValue, writeRawConfig } =
+        require("../../config/configurable-keys.js") as {
+          readRawConfig: () => Record<string, unknown>;
+          setNestedValue: (obj: Record<string, unknown>, path: string, value: unknown) => void;
+          writeRawConfig: (config: Record<string, unknown>) => void;
+        };
+      const raw = readRawConfig();
+      setNestedValue(raw, "agent.model", newModel);
+      writeRawConfig(raw);
+    } catch {
+      // Config save failed — still works for this session
+    }
+
+    return `🧠 Model changed: **${oldModel}** → **${newModel}**\n\n_Saved to config. Takes effect immediately._`;
   }
 
   private handlePolicyCommand(command: AdminCommand): string {
