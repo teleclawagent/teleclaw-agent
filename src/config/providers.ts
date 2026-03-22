@@ -62,10 +62,10 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
   },
   "claude-code": {
     id: "claude-code",
-    displayName: "Claude Code (Auto)",
+    displayName: "Claude (via Claude Code)",
     envVar: "ANTHROPIC_API_KEY",
     keyPrefix: "sk-ant-",
-    keyHint: "Auto-detected from Claude Code",
+    keyHint: "Auto-detected from Claude Code CLI",
     consoleUrl: "https://console.anthropic.com/",
     defaultModel: "claude-opus-4-6",
     utilityModel: "claude-haiku-4-5-20251001",
@@ -473,7 +473,18 @@ export function getSupportedProviders(): ProviderMetadata[] {
 export function validateApiKeyFormat(provider: SupportedProvider, key: string): string | undefined {
   const meta = PROVIDER_REGISTRY[provider];
   if (!meta) return `Unknown provider: ${provider}`;
-  if (provider === "cocoon" || provider === "local" || provider === "claude-code" || provider === "openai-codex" || provider === "copilot" || provider === "litellm" || provider === "cloudflare-ai" || provider === "chutes" || provider === "custom") return undefined; // No API key needed (auto-detects or device login)
+  if (
+    provider === "cocoon" ||
+    provider === "local" ||
+    provider === "claude-code" ||
+    provider === "openai-codex" ||
+    provider === "copilot" ||
+    provider === "litellm" ||
+    provider === "cloudflare-ai" ||
+    provider === "chutes" ||
+    provider === "custom"
+  )
+    return undefined; // No API key needed (auto-detects or device login)
   if (!key || key.trim().length === 0) return "API key is required";
   if (meta.keyPrefix && !key.startsWith(meta.keyPrefix)) {
     return `Invalid format (should start with ${meta.keyPrefix})`;

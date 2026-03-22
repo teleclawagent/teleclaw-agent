@@ -179,8 +179,9 @@ export class AgentRuntime {
     this.toolRegistry = toolRegistry ?? null;
 
     const provider = (config.agent.provider || "anthropic") as SupportedProvider;
+    const resolvedModelId = config.agent.model || getProviderMetadata(provider).defaultModel;
     try {
-      const model = getProviderModel(provider, config.agent.model);
+      const model = getProviderModel(provider, resolvedModelId);
       const ctx = model.contextWindow;
       this.compactionManager = new CompactionManager({
         enabled: true,
