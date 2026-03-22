@@ -540,42 +540,68 @@ async function runInteractiveOnboarding(
 
     if (authMethod === "subscription") {
       noteBox(
-        "Use your Claude Pro/Max subscription with Teleclaw\n\n" +
-          "IMPORTANT: Open a SECOND terminal window and follow these steps.\n" +
-          "Keep this setup window open — you'll paste the token here.\n\n" +
-          "━━━ In your second terminal: ━━━\n\n" +
-          "Step 1 — Install Claude Code CLI:\n" +
-          "  npm install -g @anthropic-ai/claude-code\n" +
-          "  (Wait for 'added X packages' message)\n\n" +
-          "Step 2 — Login to your Claude account:\n" +
-          "  claude login --method browser\n" +
-          "  (Browser opens → sign in → return to terminal)\n" +
-          "  (You'll see 'Successfully logged in')\n\n" +
-          "Step 3 — Generate your setup token:\n" +
-          "  claude setup-token\n" +
-          "  (This prints a long token starting with 'sk-ant-...')\n" +
-          "  (Copy the ENTIRE token)\n\n" +
-          "Step 4 — Come back to THIS window and paste it below.\n\n" +
-          "━━━ Troubleshooting: ━━━\n" +
-          "- If 'claude login' opens Claude Code instead of logging in:\n" +
-          "  Press Ctrl+C to exit, then try: claude login --method browser\n" +
-          "- If 'claude setup-token' is not recognized:\n" +
-          "  Try: npx @anthropic-ai/claude-code setup-token\n" +
-          "- Token starts with 'sk-ant-' and is very long — copy ALL of it",
+        "Connect your Claude Pro/Max subscription\n\n" +
+          "Your browser will open to sign in with your Claude account.\n" +
+          "After signing in, you'll be redirected back automatically.\n" +
+          "No extra tools or CLI needed — just sign in and you're done!",
         "Claude Subscription",
         TON
       );
-      apiKey = await password({
-        message: "Setup Token (paste the sk-ant-... token here)",
+
+      const proceed = await confirm({
+        message: "Open browser to sign in with Claude?",
+        default: true,
         theme,
-        validate: (value = "") => {
-          if (!value || value.trim().length === 0)
-            return "Token is required — follow the steps above in a second terminal";
-          if (!value.trim().startsWith("sk-ant-"))
-            return "Token should start with 'sk-ant-...' — make sure you copied the full token from 'claude setup-token'";
-          return true;
-        },
       });
+      if (!proceed) throw new CancelledError();
+
+      try {
+        const { runClaudeOAuthFlow } = await import("../../providers/claude-oauth-flow.js");
+
+        // Cross-platform browser open
+        const openBrowser = async (url: string) => {
+          const { exec: cpExec } = await import("child_process");
+          const cmd =
+            process.platform === "win32"
+              ? `start "" "${url}"`
+              : process.platform === "darwin"
+                ? `open "${url}"`
+                : `xdg-open "${url}"`;
+          cpExec(cmd);
+        };
+
+        prompter.log("Opening browser... Sign in with your Claude account.");
+        prompter.log("Waiting for authorization...\n");
+
+        const result = await runClaudeOAuthFlow(openBrowser, (url) => {
+          prompter.log(`If browser didn't open, visit:\n${CYAN(url)}\n`);
+        });
+
+        apiKey = result.accessToken;
+        prompter.log(GREEN("✓ Claude subscription connected!"));
+      } catch (err) {
+        if (err instanceof CancelledError) throw err;
+        prompter.warn(`OAuth flow failed: ${err instanceof Error ? err.message : String(err)}`);
+        prompter.log("Falling back to manual token entry...\n");
+
+        noteBox(
+          "Manual fallback — get a token from Claude Code CLI:\n\n" +
+            "1. npm install -g @anthropic-ai/claude-code\n" +
+            "2. claude login --method browser\n" +
+            "3. claude setup-token\n" +
+            "4. Copy the sk-ant-... token and paste below",
+          "Manual Token",
+          TON
+        );
+        apiKey = await password({
+          message: "Setup Token (sk-ant-...)",
+          theme,
+          validate: (value = "") => {
+            if (!value || value.trim().length === 0) return "Token is required";
+            return true;
+          },
+        });
+      }
       STEPS[1].value = `${providerMeta.displayName}  ${DIM("subscription ✓")}`;
     } else {
       noteBox(`Anthropic API key required.\nGet it at: ${providerMeta.consoleUrl}`, "API Key", TON);
