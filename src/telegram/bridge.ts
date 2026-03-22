@@ -22,6 +22,9 @@ export interface TelegramMessage {
   _rawPeer?: Api.TypePeer;
   hasMedia: boolean;
   mediaType?: "photo" | "document" | "video" | "audio" | "voice" | "sticker";
+  /** Base64-encoded image data (set after downloading photo from Bot API) */
+  imageBase64?: string;
+  imageMimeType?: string;
   replyToId?: number;
   _rawMessage?: Api.Message;
 }
@@ -553,7 +556,11 @@ export class TelegramBridge implements TelegramTransport {
     await this.client.getClient().deleteMessages(peer, messageIds, { revoke: true });
   }
 
-  async forwardMessage(fromChatId: string, toChatId: string, messageId: number): Promise<{ id: number }> {
+  async forwardMessage(
+    fromChatId: string,
+    toChatId: string,
+    messageId: number
+  ): Promise<{ id: number }> {
     const fromPeer = this.peerCache.get(fromChatId) || fromChatId;
     const toPeer = this.peerCache.get(toChatId) || toChatId;
     const result = await this.client.getClient().forwardMessages(toPeer, {
@@ -574,7 +581,11 @@ export class TelegramBridge implements TelegramTransport {
     await this.client.getClient().unpinMessage(peer, messageId);
   }
 
-  async sendPhoto(chatId: string, photo: string | Buffer, options?: { caption?: string; replyToId?: number }): Promise<{ id: number }> {
+  async sendPhoto(
+    chatId: string,
+    photo: string | Buffer,
+    options?: { caption?: string; replyToId?: number }
+  ): Promise<{ id: number }> {
     const peer = this.peerCache.get(chatId) || chatId;
     const msg = await this.client.getClient().sendFile(peer, {
       file: photo,
@@ -584,7 +595,11 @@ export class TelegramBridge implements TelegramTransport {
     return { id: msg.id };
   }
 
-  async sendAnimation(chatId: string, animation: string | Buffer, options?: { caption?: string; replyToId?: number }): Promise<{ id: number }> {
+  async sendAnimation(
+    chatId: string,
+    animation: string | Buffer,
+    options?: { caption?: string; replyToId?: number }
+  ): Promise<{ id: number }> {
     const peer = this.peerCache.get(chatId) || chatId;
     const msg = await this.client.getClient().sendFile(peer, {
       file: animation,
@@ -595,7 +610,11 @@ export class TelegramBridge implements TelegramTransport {
     return { id: msg.id };
   }
 
-  async sendSticker(chatId: string, sticker: string | Buffer, options?: { replyToId?: number }): Promise<{ id: number }> {
+  async sendSticker(
+    chatId: string,
+    sticker: string | Buffer,
+    options?: { replyToId?: number }
+  ): Promise<{ id: number }> {
     const peer = this.peerCache.get(chatId) || chatId;
     const msg = await this.client.getClient().sendFile(peer, {
       file: sticker,
@@ -604,7 +623,11 @@ export class TelegramBridge implements TelegramTransport {
     return { id: msg.id };
   }
 
-  async sendVoice(chatId: string, voice: string | Buffer, options?: { caption?: string; replyToId?: number; duration?: number }): Promise<{ id: number }> {
+  async sendVoice(
+    chatId: string,
+    voice: string | Buffer,
+    options?: { caption?: string; replyToId?: number; duration?: number }
+  ): Promise<{ id: number }> {
     const peer = this.peerCache.get(chatId) || chatId;
     const msg = await this.client.getClient().sendFile(peer, {
       file: voice,
@@ -615,7 +638,11 @@ export class TelegramBridge implements TelegramTransport {
     return { id: msg.id };
   }
 
-  async sendDocument(chatId: string, document: string | Buffer, options?: { caption?: string; replyToId?: number; filename?: string }): Promise<{ id: number }> {
+  async sendDocument(
+    chatId: string,
+    document: string | Buffer,
+    options?: { caption?: string; replyToId?: number; filename?: string }
+  ): Promise<{ id: number }> {
     const peer = this.peerCache.get(chatId) || chatId;
     const msg = await this.client.getClient().sendFile(peer, {
       file: document,
@@ -635,7 +662,12 @@ export class TelegramBridge implements TelegramTransport {
     throw new Error("Failed to download file");
   }
 
-  async sendPoll(chatId: string, question: string, options: string[], opts?: { isAnonymous?: boolean; allowsMultiple?: boolean; replyToId?: number }): Promise<{ id: number }> {
+  async sendPoll(
+    chatId: string,
+    question: string,
+    options: string[],
+    opts?: { isAnonymous?: boolean; allowsMultiple?: boolean; replyToId?: number }
+  ): Promise<{ id: number }> {
     const peer = this.peerCache.get(chatId) || chatId;
     const { Api: TgApi } = await import("telegram");
     const { randomLong } = await import("../utils/gramjs-bigint.js");
@@ -646,8 +678,12 @@ export class TelegramBridge implements TelegramTransport {
           poll: new TgApi.Poll({
             id: randomLong(),
             question: new TgApi.TextWithEntities({ text: question, entities: [] }),
-            answers: options.map((opt, i) =>
-              new TgApi.PollAnswer({ text: new TgApi.TextWithEntities({ text: opt, entities: [] }), option: Buffer.from([i]) })
+            answers: options.map(
+              (opt, i) =>
+                new TgApi.PollAnswer({
+                  text: new TgApi.TextWithEntities({ text: opt, entities: [] }),
+                  option: Buffer.from([i]),
+                })
             ),
             publicVoters: !(opts?.isAnonymous ?? true),
             multipleChoice: opts?.allowsMultiple,
@@ -659,13 +695,19 @@ export class TelegramBridge implements TelegramTransport {
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- extracting message ID from Updates
     const updates = result as any;
-    const msgId = updates?.updates?.find?.((u: { className: string; message?: { id: number } }) =>
-      u.className === "UpdateNewMessage" || u.className === "UpdateNewChannelMessage"
-    )?.message?.id ?? 0;
+    const msgId =
+      updates?.updates?.find?.(
+        (u: { className: string; message?: { id: number } }) =>
+          u.className === "UpdateNewMessage" || u.className === "UpdateNewChannelMessage"
+      )?.message?.id ?? 0;
     return { id: msgId };
   }
 
-  async sendDice(chatId: string, emoji?: string, replyToId?: number): Promise<{ id: number; value?: number }> {
+  async sendDice(
+    chatId: string,
+    emoji?: string,
+    replyToId?: number
+  ): Promise<{ id: number; value?: number }> {
     const peer = this.peerCache.get(chatId) || chatId;
     const { Api: TgApi } = await import("telegram");
     const { randomLong } = await import("../utils/gramjs-bigint.js");
@@ -680,8 +722,9 @@ export class TelegramBridge implements TelegramTransport {
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- extracting from Updates
     const updates = result as any;
-    const msg = updates?.updates?.find?.((u: { className: string }) =>
-      u.className === "UpdateNewMessage" || u.className === "UpdateNewChannelMessage"
+    const msg = updates?.updates?.find?.(
+      (u: { className: string }) =>
+        u.className === "UpdateNewMessage" || u.className === "UpdateNewChannelMessage"
     )?.message;
     return { id: msg?.id ?? 0, value: msg?.media?.value };
   }
@@ -699,9 +742,7 @@ export class TelegramBridge implements TelegramTransport {
 
   // ── TelegramTransport interface methods ──
 
-  addCallbackQueryHandler(
-    handler: (event: CallbackQueryEvent) => Promise<void>
-  ): void {
+  addCallbackQueryHandler(handler: (event: CallbackQueryEvent) => Promise<void>): void {
     this.client.addCallbackQueryHandler(async (update: unknown) => {
       if (!update || typeof update !== "object") return;
 

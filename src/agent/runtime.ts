@@ -148,6 +148,9 @@ export interface ProcessMessageOptions {
   senderRank?: string;
   hasMedia?: boolean;
   mediaType?: string;
+  /** Base64-encoded image data for vision */
+  imageBase64?: string;
+  imageMimeType?: string;
   messageId?: number;
   replyContext?: { senderName?: string; text: string; isAgent?: boolean };
 }
@@ -223,6 +226,8 @@ export class AgentRuntime {
       senderRank,
       hasMedia,
       mediaType,
+      imageBase64,
+      imageMimeType,
       messageId,
       replyContext,
     } = opts;
@@ -489,11 +494,22 @@ export class AgentRuntime {
         await this.hookRunner.runObservingHook("prompt:after", promptAfterEvent);
       }
 
-      const userMsg: UserMessage = {
-        role: "user",
-        content: formattedMessage,
-        timestamp: now,
-      };
+      // Build user message — include image content for vision if available
+      const userMsg: UserMessage =
+        imageBase64 && imageMimeType
+          ? {
+              role: "user",
+              content: [
+                { type: "text" as const, text: formattedMessage },
+                { type: "image" as const, data: imageBase64, mimeType: imageMimeType },
+              ],
+              timestamp: now,
+            }
+          : {
+              role: "user",
+              content: formattedMessage,
+              timestamp: now,
+            };
 
       context.messages.push(userMsg);
 

@@ -78,7 +78,7 @@ export class BotBridge implements TelegramTransport {
    * Must be called after onNewMessage/onServiceMessage/addCallbackQueryHandler.
    */
   startPolling(): void {
-    this.client.startPolling();
+    void this.client.startPolling();
   }
 
   async disconnect(): Promise<void> {
@@ -352,8 +352,25 @@ export class BotBridge implements TelegramTransport {
 
     bot.on("message", async (ctx) => {
       const msg = ctx.message;
-      log.info({ from: msg.from?.first_name, text: msg.text?.slice(0, 50), chatId: msg.chat.id }, "📩 Incoming message");
+      log.info(
+        { from: msg.from?.first_name, text: msg.text?.slice(0, 50), chatId: msg.chat.id },
+        "📩 Incoming message"
+      );
       const parsed = this.parseMessage(msg);
+      // Download photo for vision (if present)
+      if (msg.photo && msg.photo.length > 0) {
+        try {
+          const largestPhoto = msg.photo[msg.photo.length - 1];
+          const buf = await this.downloadFile(largestPhoto.file_id);
+          parsed.imageBase64 = buf.toString("base64");
+          parsed.imageMimeType = "image/jpeg";
+          log.debug(
+            `📷 Downloaded photo (${Math.round(buf.length / 1024)}KB) for msg ${msg.message_id}`
+          );
+        } catch (err) {
+          log.warn({ err }, `Failed to download photo for msg ${msg.message_id}`);
+        }
+      }
       await handler(parsed);
     });
 

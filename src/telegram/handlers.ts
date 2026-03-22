@@ -12,6 +12,7 @@ import { TELEGRAM_SEND_TOOLS } from "../constants/tools.js";
 import { telegramTranscribeAudioExecutor } from "../agent/tools/telegram/media/transcribe-audio.js";
 import { TYPING_REFRESH_MS } from "../constants/timeouts.js";
 import { createLogger } from "../utils/logger.js";
+import type { MatchmakerAPIClient } from "../agent/tools/fragment/matchmaker-api.js";
 
 const log = createLogger("Telegram");
 import type { PluginMessageEvent } from "@teleclaw-agent/sdk";
@@ -114,7 +115,7 @@ export class MessageHandler {
   private chatStore: ChatStore;
   private userStore: UserStore;
   private ownUserId?: string;
-  private matchmakerApi?: import("../agent/tools/fragment/matchmaker-api.js").MatchmakerAPIClient;
+  private matchmakerApi?: MatchmakerAPIClient;
   private pendingHistory: PendingHistory;
   private db: Database.Database;
   private chatQueue: ChatQueue = new ChatQueue();
@@ -147,7 +148,7 @@ export class MessageHandler {
     this.pendingHistory = new PendingHistory();
   }
 
-  setMatchmakerApi(api: import("../agent/tools/fragment/matchmaker-api.js").MatchmakerAPIClient | undefined): void {
+  setMatchmakerApi(api: MatchmakerAPIClient | undefined): void {
     this.matchmakerApi = api ?? undefined;
   }
 
@@ -441,6 +442,8 @@ export class MessageHandler {
             senderRank: message.senderRank,
             hasMedia: message.hasMedia,
             mediaType: message.mediaType,
+            imageBase64: message.imageBase64,
+            imageMimeType: message.imageMimeType,
             messageId: message.id,
             replyContext,
           });
@@ -478,7 +481,10 @@ export class MessageHandler {
                 isChannel: message.isChannel,
                 isBot: false,
                 mentionsMe: false,
-                timestamp: new Date(((sentMessage as Record<string, unknown>).date as number ?? Math.floor(Date.now() / 1000)) * 1000),
+                timestamp: new Date(
+                  (((sentMessage as Record<string, unknown>).date as number) ??
+                    Math.floor(Date.now() / 1000)) * 1000
+                ),
                 hasMedia: false,
               },
               true
