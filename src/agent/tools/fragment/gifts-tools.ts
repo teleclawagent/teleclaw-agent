@@ -24,7 +24,7 @@ import {
 export const giftCollectionsTool: Tool = {
   name: "gift_collections",
   description:
-    "List all Telegram gift collections with their model, backdrop, and symbol counts. Returns 109 collections.",
+    "List all Telegram gift collections with supply, upgraded/not-upgraded counts, model/backdrop/symbol counts, and Fragment URLs. Returns 109 collections with full details.",
   category: "data-bearing",
   parameters: Type.Object({}),
 };
@@ -35,13 +35,18 @@ export const giftCollectionsExecutor: ToolExecutor = async (): Promise<ToolResul
     const names = getAllCollections();
 
     const summary = names.map((name) => {
-      const col = getCollection(name)!;
+      const col = getCollection(name);
       return {
-        name: col.name,
-        id: col.id,
-        models: col.totalModels,
-        backdrops: col.totalBackdrops,
-        symbols: col.totalSymbols,
+        name: col?.name ?? name,
+        id: col?.id,
+        slug: col?.slug,
+        totalSupply: col?.totalSupply,
+        upgraded: col?.upgraded,
+        notUpgraded: col?.notUpgraded,
+        models: col?.totalModels ?? 0,
+        backdrops: col?.totalBackdrops ?? 0,
+        symbols: col?.totalSymbols ?? 0,
+        url: col?.url,
       };
     });
 
@@ -52,8 +57,7 @@ export const giftCollectionsExecutor: ToolExecutor = async (): Promise<ToolResul
         totalModels: stats.totalModels,
         totalBackdrops: stats.totalBackdrops,
         totalSymbols: stats.totalSymbols,
-        source: stats.source,
-        fetchedAt: stats.fetchedAt,
+        totalGiftsMinted: stats.totalGiftsMinted,
         collections: summary,
       },
     };
@@ -70,7 +74,7 @@ export const giftCollectionsExecutor: ToolExecutor = async (): Promise<ToolResul
 export const giftCollectionDetailTool: Tool = {
   name: "gift_collection_detail",
   description:
-    "Get full details for a gift collection: all models with names & rarity %, all backdrops with names, colors & rarity %, all symbols with names & rarity %. Use collection name like 'Plush Pepe', 'Santa Hat', etc.",
+    "Get full details for a gift collection: supply (total, upgraded, not-upgraded), all models with names, rarity %, and count, all backdrops with names, colors, rarity % & count, all symbols with names, rarity % & count. Use collection name like 'Plush Pepe', 'Santa Hat', etc.",
   category: "data-bearing",
   parameters: Type.Object({
     collection: Type.String({
@@ -112,7 +116,12 @@ export const giftCollectionDetailExecutor: ToolExecutor<CollectionDetailParams> 
       data: {
         name: col.name,
         id: col.id,
+        slug: col.slug,
         customEmojiId: col.customEmojiId,
+        url: col.url,
+        totalSupply: col.totalSupply,
+        upgraded: col.upgraded,
+        notUpgraded: col.notUpgraded,
         totalModels: col.totalModels,
         totalBackdrops: col.totalBackdrops,
         totalSymbols: col.totalSymbols,
@@ -120,17 +129,23 @@ export const giftCollectionDetailExecutor: ToolExecutor<CollectionDetailParams> 
           name: m.name,
           rarity: `${m.rarityPercent}%`,
           rarityPermille: m.rarity,
+          count: m.count,
+          estimatedTotal: m.estimatedTotalCount,
         })),
         backdrops: backdrops.map((b) => ({
           name: b.name,
           rarity: `${b.rarityPercent}%`,
           rarityPermille: b.rarity,
+          count: b.count,
+          estimatedTotal: b.estimatedTotalCount,
           colors: b.colors,
         })),
         symbols: symbols.map((s) => ({
           name: s.name,
           rarity: `${s.rarityPercent}%`,
           rarityPermille: s.rarity,
+          count: s.count,
+          estimatedTotal: s.estimatedTotalCount,
         })),
       },
     };
@@ -231,9 +246,13 @@ export const giftSearchExecutor: ToolExecutor<GiftSearchParams> = async (
         collections: results.map((c) => ({
           name: c.name,
           id: c.id,
+          slug: c.slug,
+          totalSupply: c.totalSupply,
+          upgraded: c.upgraded,
           models: c.totalModels,
           backdrops: c.totalBackdrops,
           symbols: c.totalSymbols,
+          url: c.url,
         })),
       },
     };
