@@ -539,87 +539,84 @@ async function runInteractiveOnboarding(
     });
 
     if (authMethod === "subscription") {
-      noteBox(
-        "Connect your Claude Pro/Max subscription\n\n" +
-          "Your browser will open to sign in with your Claude account.\n" +
-          "After signing in, you'll be redirected back automatically.\n" +
-          "No extra tools or CLI needed — just sign in and you're done!",
-        "Claude Subscription",
-        TON
-      );
+      const { hasCredentials, getAccessToken } =
+        await import("../../providers/generate-setup-token.js");
 
-      const { hasClaudeCodeCredentials, getClaudeAccessToken } =
-        await import("../../providers/claude-oauth-flow.js");
-
-      // Check if already logged in
-      if (hasClaudeCodeCredentials()) {
-        const token = getClaudeAccessToken();
-        if (token) {
-          apiKey = token;
-          prompter.log(GREEN("✓ Claude subscription detected automatically!"));
+      // Step 1: Check if already logged in via Claude Code
+      if (hasCredentials()) {
+        prompter.log("Claude Code credentials found. Getting access token...");
+        try {
+          apiKey = await getAccessToken();
+          prompter.log(GREEN("✓ Claude subscription connected!"));
+        } catch (err) {
+          prompter.warn(
+            `Failed to read token: ${err instanceof Error ? err.message : String(err)}`
+          );
         }
       }
 
+      // Step 2: If no credentials, guide user to login
       if (!apiKey) {
         noteBox(
           "Connect your Claude Pro/Max subscription\n\n" +
-            "Step 1: Open a SECOND terminal/PowerShell window\n\n" +
-            "Step 2: Run this command:\n" +
-            "   npx @anthropic-ai/claude-code auth login\n\n" +
-            "   (If that doesn't work, try:)\n" +
+            "You need to login with Claude Code CLI once.\n" +
+            "Open a SECOND terminal/PowerShell and run:\n\n" +
             "   npx @anthropic-ai/claude-code login\n\n" +
-            "Step 3: Browser opens → sign in with your Claude account\n" +
-            "        Wait for 'Successfully logged in' message\n\n" +
-            "Step 4: Come back HERE and press Enter",
+            "Browser opens → sign in → wait for 'Successfully logged in'\n" +
+            "Then come back HERE and press Enter.",
           "Claude Subscription",
           TON
         );
 
         let retries = 0;
-        while (!apiKey && retries < 3) {
+        while (!apiKey && retries < 5) {
           await input({
             message:
               retries === 0
                 ? "Press Enter after you've logged in..."
-                : "Credentials not found yet. Login in other terminal, then press Enter...",
+                : "Not found yet. Complete login in other terminal, then press Enter...",
             theme,
           });
 
-          if (hasClaudeCodeCredentials()) {
-            const token = getClaudeAccessToken();
-            if (token) {
-              apiKey = token;
+          if (hasCredentials()) {
+            try {
+              apiKey = await getAccessToken();
               prompter.log(GREEN("✓ Claude subscription connected!"));
               break;
+            } catch {
+              prompter.warn("Token read failed. Try again...");
             }
-          }
-
-          retries++;
-          if (retries < 3) {
+          } else {
             prompter.warn(
-              "Claude credentials not found at ~/.claude/.credentials.json\n" +
-                "Make sure you ran the login command and saw 'Successfully logged in'"
+              "Credentials not found. Make sure you:\n" +
+                "  1. Ran: npx @anthropic-ai/claude-code login\n" +
+                "  2. Signed in via browser\n" +
+                "  3. Saw 'Successfully logged in' in the other terminal"
             );
           }
+          retries++;
         }
+      }
 
-        if (!apiKey) {
-          prompter.warn("Could not detect Claude credentials after 3 attempts.");
-          const useFallback = await confirm({
-            message: "Use an API key instead?",
-            default: true,
-            theme,
-          });
-          if (useFallback) {
-            apiKey = await password({
-              message: "Anthropic API Key",
-              theme,
-              validate: (value = "") => validateApiKeyFormat("anthropic", value) ?? true,
-            });
-          } else {
-            throw new CancelledError();
-          }
-        }
+      // Step 3: Final fallback — paste token manually
+      if (!apiKey) {
+        prompter.warn("Could not auto-detect credentials.");
+        noteBox(
+          "You can still connect by pasting a token manually.\n\n" +
+            "In another terminal, run:\n" +
+            "   npx @anthropic-ai/claude-code setup-token\n\n" +
+            "Or get an API key from: https://console.anthropic.com/",
+          "Manual Entry",
+          TON
+        );
+        apiKey = await password({
+          message: "Paste token or API key",
+          theme,
+          validate: (value = "") => {
+            if (!value || value.trim().length === 0) return "Required";
+            return true;
+          },
+        });
       }
       STEPS[1].value = `${providerMeta.displayName}  ${DIM("subscription ✓")}`;
     } else {
