@@ -69,7 +69,8 @@ export interface OnboardOptions {
   baseUrl?: string;
   userId?: number;
   provider?: SupportedProvider;
-  tavilyApiKey?: string;
+  searchApiKey?: string;
+  searchProvider?: string;
   botToken?: string;
 }
 
@@ -214,7 +215,8 @@ async function runInteractiveOnboarding(
   let _userId = 0;
   let tonapiKey: string | undefined;
   let toncenterApiKey: string | undefined;
-  let tavilyApiKey: string | undefined;
+  let searchApiKey: string | undefined;
+  let searchProvider: "brave" | "gemini" | "grok" | "kimi" | "perplexity" | undefined;
   let botToken: string | undefined;
   let botUsername: string | undefined;
   let dmPolicy: "open" | "allowlist" | "admin-only" | "disabled" = "admin-only";
@@ -797,38 +799,51 @@ async function runInteractiveOnboarding(
     extras.push("TonCenter");
   }
 
-  // Tavily key
-  const setupTavily = await confirm({
-    message: `Enable web search? ${DIM("(free Tavily key — 1,000 req/month)")}`,
+  // Web Search provider
+  const setupSearch = await confirm({
+    message: `Enable web search? ${DIM("(Brave, Gemini, Grok, Kimi, or Perplexity)")}`,
     default: false,
     theme,
   });
 
-  if (setupTavily) {
+  if (setupSearch) {
+    const providerChoice = await select({
+      message: "Search provider",
+      choices: [
+        { name: "Brave Search (1,000 free queries/month)", value: "brave" },
+        { name: "Gemini (Google Search grounding)", value: "gemini" },
+        { name: "Grok (xAI web search)", value: "grok" },
+        { name: "Kimi (Moonshot web search)", value: "kimi" },
+        { name: "Perplexity Search API", value: "perplexity" },
+      ],
+      theme,
+    });
+    searchProvider = providerChoice as "brave" | "gemini" | "grok" | "kimi" | "perplexity";
+
+    const providerInfo: Record<string, { url: string; prefix: string; hint: string }> = {
+      brave: { url: "https://brave.com/search/api/", prefix: "BSA", hint: "Brave Search API key" },
+      gemini: { url: "https://aistudio.google.com/apikey", prefix: "AIza", hint: "Gemini API key" },
+      grok: { url: "https://console.x.ai/", prefix: "xai-", hint: "xAI API key" },
+      kimi: { url: "https://platform.moonshot.cn/console/api-keys", prefix: "", hint: "Moonshot API key" },
+      perplexity: { url: "https://www.perplexity.ai/settings/api", prefix: "pplx-", hint: "Perplexity API key" },
+    };
+
+    const info = providerInfo[providerChoice];
     noteBox(
-      "Web search lets your agent search the internet and read web pages.\n" +
-        "\n" +
-        "To get your free API key (takes 30 seconds):\n" +
-        "\n" +
-        "  1. Go to https://app.tavily.com/sign-in\n" +
-        "  2. Create an account (email or Google/GitHub)\n" +
-        "  3. Your API key is displayed on the dashboard\n" +
-        "     (starts with tvly-)\n" +
-        "\n" +
-        "Free plan: 1,000 requests/month — no credit card required.",
-      "Tavily — Web Search API",
+      `Get your API key:\n\n  ${info.url}\n\nPaste it below.`,
+      `${providerChoice.charAt(0).toUpperCase() + providerChoice.slice(1)} — Web Search`,
       TON
     );
     const keyInput = await input({
-      message: "Tavily API key (starts with tvly-)",
+      message: info.hint,
       theme,
       validate: (v) => {
-        if (!v || !v.startsWith("tvly-")) return "Should start with tvly-";
+        if (!v || v.trim().length < 5) return "API key is too short";
         return true;
       },
     });
-    tavilyApiKey = keyInput;
-    extras.push("Tavily");
+    searchApiKey = keyInput;
+    extras.push(`Web Search (${providerChoice})`);
   }
 
   STEPS[3].value = extras.length ? extras.join(", ") : "defaults";
@@ -1116,7 +1131,12 @@ async function runInteractiveOnboarding(
     ...(selectedProvider === "cocoon" ? { cocoon: { port: cocoonInstance } } : {}),
     tonapi_key: tonapiKey,
     toncenter_api_key: toncenterApiKey,
-    tavily_api_key: tavilyApiKey,
+    search_provider: searchProvider ?? "auto",
+    ...(searchProvider === "brave" && searchApiKey ? { brave_api_key: searchApiKey } : {}),
+    ...(searchProvider === "gemini" && searchApiKey ? { gemini_api_key: searchApiKey } : {}),
+    ...(searchProvider === "grok" && searchApiKey ? { xai_api_key: searchApiKey } : {}),
+    ...(searchProvider === "kimi" && searchApiKey ? { kimi_api_key: searchApiKey } : {}),
+    ...(searchProvider === "perplexity" && searchApiKey ? { perplexity_api_key: searchApiKey } : {}),
   };
 
   // Save config
@@ -1328,7 +1348,12 @@ async function runNonInteractiveOnboarding(
     ton_proxy: { enabled: false, port: 8080 },
     mcp: { servers: {} },
     plugins: {},
-    tavily_api_key: options.tavilyApiKey,
+    search_provider: (options.searchProvider as "brave" | "gemini" | "grok" | "kimi" | "perplexity") ?? "auto",
+    ...(options.searchApiKey && options.searchProvider === "brave" ? { brave_api_key: options.searchApiKey } : {}),
+    ...(options.searchApiKey && options.searchProvider === "gemini" ? { gemini_api_key: options.searchApiKey } : {}),
+    ...(options.searchApiKey && options.searchProvider === "grok" ? { xai_api_key: options.searchApiKey } : {}),
+    ...(options.searchApiKey && options.searchProvider === "kimi" ? { kimi_api_key: options.searchApiKey } : {}),
+    ...(options.searchApiKey && options.searchProvider === "perplexity" ? { perplexity_api_key: options.searchApiKey } : {}),
   };
 
   const configYaml = YAML.stringify(config);

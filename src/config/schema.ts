@@ -340,10 +340,30 @@ export const ConfigSchema = z.object({
     .string()
     .optional()
     .describe("TonCenter API key for dedicated RPC endpoint (free at https://toncenter.com)"),
-  tavily_api_key: z
+  search_provider: z
+    .enum(["brave", "gemini", "grok", "kimi", "perplexity", "auto"])
+    .default("auto")
+    .describe("Web search provider: auto-detect from available API keys, or force a specific one"),
+  brave_api_key: z
     .string()
     .optional()
-    .describe("Tavily API key for web search & extract (free at https://tavily.com)"),
+    .describe("Brave Search API key (from https://brave.com/search/api/)"),
+  gemini_api_key: z
+    .string()
+    .optional()
+    .describe("Google Gemini API key for search grounding"),
+  xai_api_key: z
+    .string()
+    .optional()
+    .describe("xAI (Grok) API key for web search"),
+  kimi_api_key: z
+    .string()
+    .optional()
+    .describe("Moonshot/Kimi API key for web search"),
+  perplexity_api_key: z
+    .string()
+    .optional()
+    .describe("Perplexity API key for web search"),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

@@ -117,8 +117,20 @@ export function loadConfig(configPath: string = DEFAULT_CONFIG_PATH): Config {
   }
 
   // Optional API key overrides
-  if (process.env.TELECLAW_TAVILY_API_KEY) {
-    config.tavily_api_key = process.env.TELECLAW_TAVILY_API_KEY;
+  if (process.env.TELECLAW_BRAVE_API_KEY || process.env.BRAVE_API_KEY) {
+    config.brave_api_key = process.env.TELECLAW_BRAVE_API_KEY || process.env.BRAVE_API_KEY;
+  }
+  if (process.env.TELECLAW_GEMINI_API_KEY || process.env.GEMINI_API_KEY) {
+    config.gemini_api_key = process.env.TELECLAW_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  }
+  if (process.env.TELECLAW_XAI_API_KEY || process.env.XAI_API_KEY) {
+    config.xai_api_key = process.env.TELECLAW_XAI_API_KEY || process.env.XAI_API_KEY;
+  }
+  if (process.env.TELECLAW_KIMI_API_KEY || process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY) {
+    config.kimi_api_key = process.env.TELECLAW_KIMI_API_KEY || process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY;
+  }
+  if (process.env.TELECLAW_PERPLEXITY_API_KEY || process.env.PERPLEXITY_API_KEY) {
+    config.perplexity_api_key = process.env.TELECLAW_PERPLEXITY_API_KEY || process.env.PERPLEXITY_API_KEY;
   }
   if (process.env.TELECLAW_TONAPI_KEY) {
     config.tonapi_key = process.env.TELECLAW_TONAPI_KEY;

@@ -36,8 +36,13 @@ telegram:
 # Optional: TonAPI key for higher rate limits
 # tonapi_key: "YOUR_TONAPI_KEY"      # From @tonapi_bot
 
-# Optional: Tavily API key for web search/fetch tools
-# tavily_api_key: "YOUR_TAVILY_KEY"  # From https://tavily.com
+# Web Search — auto-detects provider from available API keys
+# search_provider: "auto"             # auto | brave | gemini | grok | kimi | perplexity
+# brave_api_key: "YOUR_BRAVE_KEY"     # From https://brave.com/search/api/
+# gemini_api_key: "YOUR_GEMINI_KEY"   # From https://aistudio.google.com/
+# xai_api_key: "YOUR_XAI_KEY"         # From https://console.x.ai/
+# kimi_api_key: "YOUR_KIMI_KEY"       # From https://platform.moonshot.cn/
+# perplexity_api_key: "YOUR_PPLX_KEY" # From https://www.perplexity.ai/settings/api
 
 # Embedding provider for RAG vector search
 embedding:

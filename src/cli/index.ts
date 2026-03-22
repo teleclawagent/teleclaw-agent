@@ -42,7 +42,8 @@ program
   .option("--api-key <key>", "LLM provider API key")
   .option("--base-url <url>", "Base URL for local LLM server")
   .option("--user-id <id>", "Telegram User ID")
-  .option("--tavily-api-key <key>", "Tavily API key for web search")
+  .option("--search-provider <provider>", "Search provider: brave, gemini, grok, kimi, perplexity")
+  .option("--search-api-key <key>", "API key for web search provider")
   .option("--bot-token <token>", "Telegram bot token from @BotFather")
   .action(async (options) => {
     try {
@@ -54,7 +55,8 @@ program
         apiKey: options.apiKey,
         baseUrl: options.baseUrl,
         userId: options.userId ? parseInt(options.userId) : undefined,
-        tavilyApiKey: options.tavilyApiKey,
+        searchProvider: options.searchProvider,
+        searchApiKey: options.searchApiKey,
         botToken: options.botToken,
       });
     } catch (error) {

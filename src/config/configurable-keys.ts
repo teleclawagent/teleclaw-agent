@@ -81,15 +81,29 @@ export const CONFIGURABLE_KEYS: Record<string, ConfigKeyMeta> = {
     mask: (v) => v.slice(0, 8) + "****",
     parse: identity,
   },
-  tavily_api_key: {
+  brave_api_key: {
     type: "string",
     category: "API Keys",
-    label: "Tavily API Key",
-    description: "Tavily API key for web search",
+    label: "Brave Search API Key",
+    description: "Brave Search API key for web search",
     sensitive: true,
     hotReload: "instant",
-    validate: (v) => (v.startsWith("tvly-") ? undefined : "Must start with 'tvly-'"),
-    mask: (v) => v.slice(0, 9) + "****",
+    validate: (v) => (v.length >= 10 ? undefined : "Must be at least 10 characters"),
+    mask: (v) => v.slice(0, 8) + "****",
+    parse: identity,
+  },
+  search_provider: {
+    type: "string",
+    category: "API Keys",
+    label: "Search Provider",
+    description: "Web search provider (auto, brave, gemini, grok, kimi, perplexity)",
+    sensitive: false,
+    hotReload: "instant",
+    validate: (v) =>
+      ["auto", "brave", "gemini", "grok", "kimi", "perplexity"].includes(v)
+        ? undefined
+        : "Must be one of: auto, brave, gemini, grok, kimi, perplexity",
+    mask: (v) => v,
     parse: identity,
   },
   tonapi_key: {
