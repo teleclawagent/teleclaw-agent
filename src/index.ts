@@ -624,6 +624,11 @@ export class TeleclawApp {
     log.info(`${ok} DEXs: STON.fi, DeDust connected`);
     log.info(`${ok} Wallet: ${walletAddress || "not configured"}`);
     log.info(`${ok} Model: ${provider}/${this.config.agent.model}`);
+    // Debug: confirm API key is loaded
+    const apiKeyStatus = this.config.agent.api_key
+      ? `${ok} API Key: ${this.config.agent.api_key.substring(0, 12)}...${this.config.agent.api_key.includes("oat") ? " (OAuth subscription)" : " (API key)"}`
+      : "⚠️  API Key: NOT SET — authentication will fail!";
+    log.info(apiKeyStatus);
     log.info(`${ok} Admins: ${this.config.telegram.admin_ids.join(", ")}`);
     log.info(
       `${ok} Policy: DM ${this.config.telegram.dm_policy}, Groups ${this.config.telegram.group_policy}, Debounce ${this.config.telegram.debounce_ms}ms\n`
