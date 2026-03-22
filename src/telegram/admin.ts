@@ -254,33 +254,58 @@ export class AdminHandler {
 
   private handleModelCommand(command: AdminCommand): string {
     const cfg = this.agent.getConfig();
-    if (command.args.length === 0) {
-      // Show current model + available models
-      const provider = cfg.agent.provider || "anthropic";
-      let response = `🧠 **Current model:** ${cfg.agent.model}\n📡 **Provider:** ${provider}\n`;
+    const provider = cfg.agent.provider || "anthropic";
 
+    // Import model catalog
+    const allModels: Array<{ value: string; name: string; description: string }> = [];
+    try {
+      const catalog = require("../../config/model-catalog.js") as {
+        MODEL_OPTIONS: Record<string, Array<{ value: string; name: string; description: string }>>;
+      };
+      // Show ALL providers' models
+      for (const [prov, models] of Object.entries(catalog.MODEL_OPTIONS)) {
+        for (const m of models) {
+          allModels.push({ ...m, description: `${prov} — ${m.description}` });
+        }
+      }
+    } catch {
+      // catalog unavailable
+    }
+
+    if (command.args.length === 0) {
+      let response = `🧠 **Current model:** \`${cfg.agent.model}\`\n📡 **Provider:** ${provider}\n`;
+
+      // Group by provider
       try {
-        const { getModelsForProvider } = require("../../config/model-catalog.js") as {
-          getModelsForProvider: (p: string) => Array<{ value: string; name: string }>;
+        const catalog = require("../../config/model-catalog.js") as {
+          MODEL_OPTIONS: Record<
+            string,
+            Array<{ value: string; name: string; description: string }>
+          >;
         };
-        const models = getModelsForProvider(provider);
-        if (models.length > 0) {
-          response += `\n**Available models:**\n`;
+        for (const [prov, models] of Object.entries(catalog.MODEL_OPTIONS)) {
+          response += `\n**${prov.charAt(0).toUpperCase() + prov.slice(1)}:**\n`;
           for (const m of models) {
-            const current = m.value === cfg.agent.model ? " ← current" : "";
-            response += `• \`${m.value}\` — ${m.name}${current}\n`;
+            const marker = m.value === cfg.agent.model ? " ✅" : "";
+            response += `• \`${m.value}\`${marker}\n  ${m.name} — ${m.description}\n`;
           }
         }
       } catch {
-        // model catalog not available
+        // catalog unavailable
       }
 
-      response += `\nUsage: /model <model_name>`;
+      response += `\n**Usage:** \`/model <model_name>\``;
       return response;
     }
 
     const newModel = command.args[0];
     const oldModel = cfg.agent.model;
+
+    // Validate model exists in any provider
+    if (allModels.length > 0 && !allModels.find((m) => m.value === newModel)) {
+      return `❌ Unknown model: \`${newModel}\`\n\n` + `Use /model to see available models.`;
+    }
+
     cfg.agent.model = newModel;
 
     // Persist to config file
@@ -298,7 +323,7 @@ export class AdminHandler {
       // Config save failed — still works for this session
     }
 
-    return `🧠 Model changed: **${oldModel}** → **${newModel}**\n\n_Saved to config. Takes effect immediately._`;
+    return `🧠 Model: \`${oldModel}\` → \`${newModel}\`\n_Saved. Active immediately._`;
   }
 
   private handlePolicyCommand(command: AdminCommand): string {
