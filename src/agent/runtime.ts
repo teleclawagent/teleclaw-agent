@@ -479,6 +479,7 @@ export class AgentRuntime {
         includeMemory: !effectiveIsGroup,
         includeStrategy: !effectiveIsGroup,
         memoryFlushWarning: needsMemoryFlush,
+        modelInfo: `${this.config.agent.provider || "anthropic"}/${this.config.agent.model}`,
       });
 
       // Hook: prompt:after — observing, analytics on prompt size

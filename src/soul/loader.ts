@@ -118,6 +118,7 @@ export function buildSystemPrompt(options: {
   includeMemory?: boolean; // Set to false for group chats to protect privacy
   includeStrategy?: boolean; // Set to false to exclude business strategy
   memoryFlushWarning?: boolean;
+  modelInfo?: string; // e.g. "anthropic/claude-opus-4-6"
 }): string {
   const soul = options.soul ?? loadSoul();
   const parts = [soul];
@@ -211,6 +212,12 @@ You have a personal workspace at \`~/.teleclaw/workspace/\` where you can store 
         : primary
       : idTag || "unknown";
     parts.push(`\n## Current User\nYou are chatting with: ${userLabel}`);
+  }
+
+  if (options.modelInfo) {
+    parts.push(
+      `\n## Your Model\nYou are running on: ${sanitizeForPrompt(options.modelInfo)}\nWhen asked about your model, ALWAYS refer to this — don't guess from training data.`
+    );
   }
 
   if (options.context) {
