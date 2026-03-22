@@ -53,19 +53,20 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     displayName: "Anthropic (Claude)",
     envVar: "ANTHROPIC_API_KEY",
     keyPrefix: "sk-ant-",
-    keyHint: "sk-ant-api03-...",
+    keyHint: "sk-ant-api03-... or setup-token",
     consoleUrl: "https://console.anthropic.com/",
     defaultModel: "claude-opus-4-6",
     utilityModel: "claude-haiku-4-5-20251001",
     toolLimit: null,
     piAiProvider: "anthropic",
   },
+  // claude-code kept for backward compat (existing configs) — maps to anthropic
   "claude-code": {
     id: "claude-code",
-    displayName: "Claude (via Claude Code)",
+    displayName: "Anthropic (Claude)", // hidden from setup UI
     envVar: "ANTHROPIC_API_KEY",
     keyPrefix: "sk-ant-",
-    keyHint: "Auto-detected from Claude Code CLI",
+    keyHint: "sk-ant-api03-...",
     consoleUrl: "https://console.anthropic.com/",
     defaultModel: "claude-opus-4-6",
     utilityModel: "claude-haiku-4-5-20251001",
@@ -84,12 +85,13 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     toolLimit: 128,
     piAiProvider: "openai",
   },
+  // openai-codex kept for backward compat — maps to openai
   "openai-codex": {
     id: "openai-codex",
-    displayName: "OpenAI Codex (ChatGPT OAuth)",
+    displayName: "OpenAI (GPT-5.4)", // hidden from setup UI
     envVar: "OPENAI_API_KEY",
     keyPrefix: "sk-",
-    keyHint: "Auto-detected from Codex CLI",
+    keyHint: "sk-proj-...",
     consoleUrl: "https://platform.openai.com/",
     defaultModel: "gpt-5.4",
     utilityModel: "gpt-4o-mini",

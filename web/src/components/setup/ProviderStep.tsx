@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { setup, SetupProvider, SetupModelOption, ClaudeCodeKeyDetection } from '../../lib/api';
+import { setup, SetupProvider, SetupModelOption } from '../../lib/api';
 import { Select } from '../Select';
 import type { StepProps } from '../../pages/Setup';
+
+type AuthMethod = 'subscription' | 'api-key';
 
 export function ProviderStep({ data, onChange }: StepProps) {
   const [providers, setProviders] = useState<SetupProvider[]>([]);
@@ -11,11 +13,9 @@ export function ProviderStep({ data, onChange }: StepProps) {
   const [keyError, setKeyError] = useState('');
   const [validating, setValidating] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [ccDetection, setCcDetection] = useState<ClaudeCodeKeyDetection | null>(null);
-  const [ccDetecting, setCcDetecting] = useState(false);
-  const [ccShowFallback, setCcShowFallback] = useState(false);
   const [models, setModels] = useState<SetupModelOption[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [authMethod, setAuthMethod] = useState<AuthMethod>('subscription');
 
   useEffect(() => {
     setup.getProviders()
@@ -25,25 +25,6 @@ export function ProviderStep({ data, onChange }: StepProps) {
   }, []);
 
   const selected = providers.find((p) => p.id === data.provider);
-
-  // Auto-detect Claude Code credentials when provider is selected
-  useEffect(() => {
-    if (selected?.autoDetectsKey) {
-      setCcDetecting(true);
-      setCcDetection(null);
-      setCcShowFallback(false);
-      setup.detectClaudeCodeKey()
-        .then((result) => {
-          setCcDetection(result);
-          if (result.found) {
-            // Clear manual key — auto-detected key will be used at runtime
-            onChange({ ...data, apiKey: '' });
-          }
-        })
-        .catch(() => setCcDetection({ found: false, maskedKey: null, valid: false }))
-        .finally(() => setCcDetecting(false));
-    }
-  }, [selected?.id]);
 
   // Load models when provider changes
   useEffect(() => {
@@ -67,13 +48,12 @@ export function ProviderStep({ data, onChange }: StepProps) {
     onChange({ ...data, provider: id, apiKey: '', model: '', customModel: '' });
     setKeyValid(null);
     setKeyError('');
-    setCcDetection(null);
-    setCcShowFallback(false);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    // Reset auth method based on provider
+    const prov = providers.find((p) => p.id === id);
+    setAuthMethod(prov?.supportsSetupToken ? 'subscription' : 'api-key');
   };
 
   const validateKey = async (provider: string, key: string) => {
-    if (!key || !provider) return;
     setValidating(true);
     try {
       const result = await setup.validateApiKey(provider, key);
@@ -81,7 +61,6 @@ export function ProviderStep({ data, onChange }: StepProps) {
       setKeyError(result.error || '');
     } catch {
       setKeyValid(null);
-      setKeyError('');
     } finally {
       setValidating(false);
     }
@@ -91,6 +70,7 @@ export function ProviderStep({ data, onChange }: StepProps) {
     onChange({ ...data, apiKey: value });
     setKeyValid(null);
     setKeyError('');
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (value.length > 0 && data.provider) {
       debounceRef.current = setTimeout(() => validateKey(data.provider, value), 500);
@@ -104,7 +84,7 @@ export function ProviderStep({ data, onChange }: StepProps) {
     <div className="step-content">
       <h2 className="step-title">Choose Your LLM Provider</h2>
       <p className="step-description">
-        This is the AI model that powers your agent's intelligence. Pick the one you have an API key for.
+        This is the AI model that powers your agent's intelligence.
       </p>
 
       <div className="provider-grid">
@@ -116,7 +96,12 @@ export function ProviderStep({ data, onChange }: StepProps) {
           >
             <h3>{p.displayName}</h3>
             <div className="provider-meta">{p.defaultModel}</div>
-            {p.toolLimit === null && (
+            {p.supportsSetupToken && (
+              <span className="badge always" style={{ marginTop: '6px' }}>
+                ⭐ Recommended
+              </span>
+            )}
+            {!p.supportsSetupToken && p.toolLimit === null && (
               <span className="badge always" style={{ marginTop: '6px' }}>
                 Recommended
               </span>
@@ -131,96 +116,117 @@ export function ProviderStep({ data, onChange }: StepProps) {
         </div>
       )}
 
-      {selected && selected.autoDetectsKey && (
+      {/* Auth method selection for providers that support setup-token */}
+      {selected && selected.supportsSetupToken && (
         <div style={{ marginTop: '16px' }}>
-          {ccDetecting && (
-            <div className="info-panel">
-              <span className="spinner sm" /> Detecting Claude Code credentials...
-            </div>
-          )}
-          {!ccDetecting && ccDetection?.found && (
-            <div className="info-panel">
-              <div style={{ marginBottom: '4px', color: 'var(--color-success, #4caf50)' }}>
-                <strong>Credentials auto-detected from Claude Code</strong>
-              </div>
-              <code style={{ fontSize: '0.85em', opacity: 0.8 }}>{ccDetection.maskedKey}</code>
-              <div className="helper-text" style={{ marginTop: '6px' }}>
-                Token will auto-refresh when it expires. No configuration needed.
-              </div>
-            </div>
-          )}
-          {!ccDetecting && ccDetection && !ccDetection.found && !ccShowFallback && (
-            <div className="info-panel" style={{ borderColor: 'var(--color-warning, #ff9800)' }}>
-              <div style={{ marginBottom: '8px' }}>
-                Claude Code credentials not found. Make sure Claude Code is installed and authenticated
-                (<code>claude login</code>).
-              </div>
-              <button
-                className="btn btn-sm"
-                onClick={() => setCcShowFallback(true)}
-              >
-                Enter API key manually instead
-              </button>
-            </div>
-          )}
-          {!ccDetecting && ccShowFallback && (
-            <div className="form-group" style={{ marginTop: '8px' }}>
-              <label>API Key (fallback)</label>
-              <input
-                type="password"
-                value={data.apiKey}
-                onChange={(e) => handleKeyChange(e.target.value)}
-                placeholder={selected.keyPrefix ? `${selected.keyPrefix}...` : 'Enter API key'}
-                className="w-full"
-              />
-              {validating && (
-                <div className="helper-text"><span className="spinner sm" /> Validating...</div>
-              )}
-              {!validating && keyValid === true && (
-                <div className="helper-text success">Key format looks valid.</div>
-              )}
-              {!validating && keyValid === false && keyError && (
-                <div className="helper-text error">{keyError}</div>
-              )}
-              <div className="helper-text">
-                Get your key at:{' '}
-                <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer">
-                  https://console.anthropic.com/
-                </a>
-              </div>
-            </div>
-          )}
+          <label style={{ marginBottom: '8px', display: 'block', fontWeight: 600 }}>Authentication Method</label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              className={`btn ${authMethod === 'subscription' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setAuthMethod('subscription')}
+              style={{ flex: 1 }}
+            >
+              ⭐ Claude Subscription
+              <div style={{ fontSize: '0.75em', opacity: 0.8, marginTop: '2px' }}>Free with Pro/Max plan</div>
+            </button>
+            <button
+              className={`btn ${authMethod === 'api-key' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setAuthMethod('api-key')}
+              style={{ flex: 1 }}
+            >
+              API Key
+              <div style={{ fontSize: '0.75em', opacity: 0.8, marginTop: '2px' }}>Pay-as-you-go</div>
+            </button>
+          </div>
         </div>
       )}
 
-      {selected && selected.requiresApiKey && (
-        <div className="form-group" style={{ marginTop: '16px' }}>
-          <label>API Key</label>
-          <input
-            type="password"
-            value={data.apiKey}
-            onChange={(e) => handleKeyChange(e.target.value)}
-            placeholder={selected.keyPrefix ? `${selected.keyPrefix}...` : 'Enter API key'}
-            className="w-full"
-          />
-          {validating && (
-            <div className="helper-text"><span className="spinner sm" /> Validating...</div>
-          )}
-          {!validating && keyValid === true && (
-            <div className="helper-text success">Key format looks valid.</div>
-          )}
-          {!validating && keyValid === false && keyError && (
-            <div className="helper-text error">{keyError}</div>
-          )}
-          {selected.consoleUrl && (
-            <div className="helper-text">
-              Get your key at:{' '}
-              <a href={selected.consoleUrl} target="_blank" rel="noopener noreferrer">
-                {selected.consoleUrl}
-              </a>
+      {/* Setup-token instructions for Claude subscription */}
+      {selected && selected.supportsSetupToken && authMethod === 'subscription' && (
+        <div style={{ marginTop: '16px' }}>
+          <div className="info-panel" style={{ borderColor: 'var(--color-primary, #6366f1)' }}>
+            <div style={{ marginBottom: '12px' }}>
+              <strong>🔑 Use your Claude Pro/Max subscription</strong>
             </div>
-          )}
+            <div style={{ marginBottom: '12px' }}>
+              <strong>Step 1:</strong> Install Claude Code CLI (if not installed):<br />
+              <code style={{ display: 'block', margin: '6px 0', padding: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '4px' }}>
+                npm install -g @anthropic-ai/claude-code
+              </code>
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <strong>Step 2:</strong> Login to Claude Code (if not logged in):<br />
+              <code style={{ display: 'block', margin: '6px 0', padding: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '4px' }}>
+                claude login
+              </code>
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <strong>Step 3:</strong> Generate a setup-token:<br />
+              <code style={{ display: 'block', margin: '6px 0', padding: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '4px' }}>
+                claude setup-token
+              </code>
+            </div>
+            <div>
+              <strong>Step 4:</strong> Paste the token below:
+            </div>
+          </div>
+
+          <div className="form-group" style={{ marginTop: '12px' }}>
+            <label>Setup Token</label>
+            <input
+              type="password"
+              value={data.apiKey}
+              onChange={(e) => handleKeyChange(e.target.value)}
+              placeholder="Paste your setup-token here..."
+              className="w-full"
+            />
+            {validating && (
+              <div className="helper-text"><span className="spinner sm" /> Validating...</div>
+            )}
+            {!validating && keyValid === true && (
+              <div className="helper-text success">✅ Token looks valid.</div>
+            )}
+            {!validating && keyValid === false && keyError && (
+              <div className="helper-text error">{keyError}</div>
+            )}
+            <div className="helper-text" style={{ marginTop: '4px' }}>
+              This token uses your Claude subscription — no extra charges. Token may expire, regenerate with <code>claude setup-token</code> if needed.
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* Standard API key input */}
+      {selected && selected.requiresApiKey && (
+        (!selected.supportsSetupToken || authMethod === 'api-key') && (
+          <div className="form-group" style={{ marginTop: '16px' }}>
+            <label>API Key</label>
+            <input
+              type="password"
+              value={data.apiKey}
+              onChange={(e) => handleKeyChange(e.target.value)}
+              placeholder={selected.keyPrefix ? `${selected.keyPrefix}...` : 'Enter API key'}
+              className="w-full"
+            />
+            {validating && (
+              <div className="helper-text"><span className="spinner sm" /> Validating...</div>
+            )}
+            {!validating && keyValid === true && (
+              <div className="helper-text success">Key format looks valid.</div>
+            )}
+            {!validating && keyValid === false && keyError && (
+              <div className="helper-text error">{keyError}</div>
+            )}
+            {selected.consoleUrl && (
+              <div className="helper-text">
+                Get your key at:{' '}
+                <a href={selected.consoleUrl} target="_blank" rel="noopener noreferrer">
+                  {selected.consoleUrl}
+                </a>
+              </div>
+            )}
+          </div>
+        )
       )}
 
       {selected && !selected.requiresApiKey && selected.id === 'cocoon' && (

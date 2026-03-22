@@ -27,6 +27,7 @@ export interface SetupProvider {
   consoleUrl: string | null;
   requiresApiKey: boolean;
   autoDetectsKey?: boolean;
+  supportsSetupToken?: boolean;
 }
 
 export interface ClaudeCodeKeyDetection {

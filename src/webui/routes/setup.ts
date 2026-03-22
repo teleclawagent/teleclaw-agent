@@ -88,18 +88,22 @@ export function createSetupRoutes(): Hono {
 
   // ── GET /providers ────────────────────────────────────────────────
   app.get("/providers", (c) => {
-    const providers = getSupportedProviders().map((p) => ({
-      id: p.id,
-      displayName: p.displayName,
-      defaultModel: p.defaultModel,
-      utilityModel: p.utilityModel,
-      toolLimit: p.toolLimit,
-      keyPrefix: p.keyPrefix,
-      consoleUrl: p.consoleUrl,
-      requiresApiKey: p.id !== "cocoon" && p.id !== "local" && p.id !== "claude-code",
-      autoDetectsKey: p.id === "claude-code",
-      requiresBaseUrl: p.id === "local",
-    }));
+    // Hide deprecated auto-detect providers from setup UI (kept for backward compat only)
+    const HIDDEN_PROVIDERS = new Set(["claude-code", "openai-codex"]);
+    const providers = getSupportedProviders()
+      .filter((p) => !HIDDEN_PROVIDERS.has(p.id))
+      .map((p) => ({
+        id: p.id,
+        displayName: p.displayName,
+        defaultModel: p.defaultModel,
+        utilityModel: p.utilityModel,
+        toolLimit: p.toolLimit,
+        keyPrefix: p.keyPrefix,
+        consoleUrl: p.consoleUrl,
+        requiresApiKey: p.id !== "cocoon" && p.id !== "local",
+        supportsSetupToken: p.id === "anthropic", // Claude subscription via setup-token
+        requiresBaseUrl: p.id === "local",
+      }));
     return c.json({ success: true, data: providers });
   });
 
