@@ -1139,7 +1139,12 @@ async function runInteractiveOnboarding(
   console.log(
     `  ${GREEN.bold("✔")} ${GREEN.bold("Setup complete!")} ${DIM(`Config saved to ${workspace.configPath}`)}`
   );
-  console.log(`  ${TON.bold("⚡")} Good luck!\n`);
+  console.log(`  ${TON.bold("⚡")} Starting agent...\n`);
+
+  // Auto-start the agent after setup
+  const { TeleclawApp } = await import("../../index.js");
+  const app = new TeleclawApp(workspace.configPath);
+  await app.start();
 }
 
 /**
