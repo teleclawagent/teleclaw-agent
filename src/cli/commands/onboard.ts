@@ -1094,7 +1094,7 @@ async function runInteractiveOnboarding(
     },
     agent: {
       provider: selectedProvider,
-      api_key: "", // Key stored in .env file, loaded at runtime
+      api_key: apiKey, // Stored directly in config for reliability
       ...(selectedProvider === "local" && localBaseUrl ? { base_url: localBaseUrl } : {}),
       model: selectedModel,
       max_tokens: 4096,
