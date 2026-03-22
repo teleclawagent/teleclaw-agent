@@ -167,7 +167,7 @@ program
   .command("config")
   .description("Manage configuration keys (set, get, list, unset)")
   .argument("<action>", "set | get | list | unset")
-  .argument("[key]", "Config key (e.g., tavily_api_key, telegram.bot_token)")
+  .argument("[key]", "Config key (e.g., brave_api_key, telegram.bot_token)")
   .argument("[value]", "Value to set (prompts interactively if omitted)")
   .option("-c, --config <path>", "Config file path")
   .action(async (action: string, key: string | undefined, value: string | undefined, options) => {

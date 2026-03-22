@@ -374,7 +374,12 @@ export function createSetupRoutes(): Hono {
         ...(input.cocoon ? { cocoon: input.cocoon } : {}),
         ...(input.tonapi_key ? { tonapi_key: input.tonapi_key } : {}),
         ...(input.toncenter_api_key ? { toncenter_api_key: input.toncenter_api_key } : {}),
-        ...(input.tavily_api_key ? { tavily_api_key: input.tavily_api_key } : {}),
+        search_provider: input.search_provider ?? "auto",
+        ...(input.brave_api_key ? { brave_api_key: input.brave_api_key } : {}),
+        ...(input.gemini_api_key ? { gemini_api_key: input.gemini_api_key } : {}),
+        ...(input.xai_api_key ? { xai_api_key: input.xai_api_key } : {}),
+        ...(input.kimi_api_key ? { kimi_api_key: input.kimi_api_key } : {}),
+        ...(input.perplexity_api_key ? { perplexity_api_key: input.perplexity_api_key } : {}),
       };
 
       // Validate with Zod

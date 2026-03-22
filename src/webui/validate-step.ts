@@ -21,7 +21,8 @@ export interface WizardData {
   botToken: string;
   botUsername: string;
   tonapiKey: string;
-  tavilyKey: string;
+  searchProvider: string;
+  searchApiKey: string;
   customizeThresholds: boolean;
   buyMaxFloor: number;
   sellMinFloor: number;
