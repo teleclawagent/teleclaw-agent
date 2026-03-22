@@ -539,85 +539,36 @@ async function runInteractiveOnboarding(
     });
 
     if (authMethod === "subscription") {
-      const { hasCredentials, getAccessToken } =
-        await import("../../providers/generate-setup-token.js");
+      // Same approach as OpenClaw: user runs `claude setup-token`, gets a token, pastes it
+      noteBox(
+        "Connect your Claude Pro/Max subscription\n\n" +
+          "Open a SECOND terminal/PowerShell and run these commands:\n\n" +
+          "   1. npm install -g @anthropic-ai/claude-code\n" +
+          "   2. claude login\n" +
+          "      (browser opens → sign in → wait for 'Successfully logged in')\n" +
+          "   3. claude setup-token\n" +
+          "      (prints a long token starting with sk-ant-oat01-...)\n\n" +
+          "Copy the ENTIRE token and paste it below.",
+        "Claude Subscription",
+        TON
+      );
 
-      // Step 1: Check if already logged in via Claude Code
-      if (hasCredentials()) {
-        prompter.log("Claude Code credentials found. Getting access token...");
-        try {
-          apiKey = await getAccessToken();
-          prompter.log(GREEN("✓ Claude subscription connected!"));
-        } catch (err) {
-          prompter.warn(
-            `Failed to read token: ${err instanceof Error ? err.message : String(err)}`
-          );
-        }
-      }
-
-      // Step 2: If no credentials, guide user to login
-      if (!apiKey) {
-        noteBox(
-          "Connect your Claude Pro/Max subscription\n\n" +
-            "You need to login with Claude Code CLI once.\n" +
-            "Open a SECOND terminal/PowerShell and run:\n\n" +
-            "   npx @anthropic-ai/claude-code login\n\n" +
-            "Browser opens → sign in → wait for 'Successfully logged in'\n" +
-            "Then come back HERE and press Enter.",
-          "Claude Subscription",
-          TON
-        );
-
-        let retries = 0;
-        while (!apiKey && retries < 5) {
-          await input({
-            message:
-              retries === 0
-                ? "Press Enter after you've logged in..."
-                : "Not found yet. Complete login in other terminal, then press Enter...",
-            theme,
-          });
-
-          if (hasCredentials()) {
-            try {
-              apiKey = await getAccessToken();
-              prompter.log(GREEN("✓ Claude subscription connected!"));
-              break;
-            } catch {
-              prompter.warn("Token read failed. Try again...");
-            }
-          } else {
-            prompter.warn(
-              "Credentials not found. Make sure you:\n" +
-                "  1. Ran: npx @anthropic-ai/claude-code login\n" +
-                "  2. Signed in via browser\n" +
-                "  3. Saw 'Successfully logged in' in the other terminal"
-            );
-          }
-          retries++;
-        }
-      }
-
-      // Step 3: Final fallback — paste token manually
-      if (!apiKey) {
-        prompter.warn("Could not auto-detect credentials.");
-        noteBox(
-          "You can still connect by pasting a token manually.\n\n" +
-            "In another terminal, run:\n" +
-            "   npx @anthropic-ai/claude-code setup-token\n\n" +
-            "Or get an API key from: https://console.anthropic.com/",
-          "Manual Entry",
-          TON
-        );
-        apiKey = await password({
-          message: "Paste token or API key",
+      apiKey = (
+        await password({
+          message: "Paste setup-token (sk-ant-oat01-...)",
           theme,
           validate: (value = "") => {
-            if (!value || value.trim().length === 0) return "Required";
+            const trimmed = value.trim();
+            if (!trimmed) return "Token is required — follow the steps above";
+            if (!trimmed.startsWith("sk-ant-oat01-"))
+              return "Token should start with sk-ant-oat01- (run 'claude setup-token' to get it)";
+            if (trimmed.length < 80)
+              return "Token looks too short — copy the ENTIRE output of 'claude setup-token'";
             return true;
           },
-        });
-      }
+        })
+      ).trim();
+      prompter.log(GREEN("✓ Claude subscription token accepted!"));
       STEPS[1].value = `${providerMeta.displayName}  ${DIM("subscription ✓")}`;
     } else {
       noteBox(`Anthropic API key required.\nGet it at: ${providerMeta.consoleUrl}`, "API Key", TON);
