@@ -501,16 +501,13 @@ export class DealBot {
       }
     }
 
-    // bot.init() fetches bot info without starting long polling
+    // bot.init() fetches bot info without starting long polling.
+    // NOTE: Do NOT call bot.start() here — BotBridge already runs polling
+    // on the same token. Starting a second polling session causes 409 Conflict.
     await this.bot.init();
-    // bot.start() launches long polling - do NOT await (it blocks forever)
-    this.bot
-      .start({
-        onStart: () => log.info(`🤖 [Bot] @${this.config.username} polling started`),
-      })
-      .catch((err) => {
-        log.error({ err }, "[Bot] Polling error");
-      });
+    log.info(
+      `🤖 [Bot] @${this.config.username} initialized (handlers registered, no polling — BotBridge handles polling)`
+    );
   }
 
   /**

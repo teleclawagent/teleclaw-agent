@@ -38,9 +38,7 @@ export class BotClient {
     if (this.initialized) return;
     await this.bot.init();
     this.initialized = true;
-    log.info(
-      `Bot initialized: @${this.bot.botInfo.username} (${this.bot.botInfo.id})`
-    );
+    log.info(`Bot initialized: @${this.bot.botInfo.username} (${this.bot.botInfo.id})`);
   }
 
   /**
@@ -58,13 +56,33 @@ export class BotClient {
       log.warn({ err }, "Failed to delete webhook (non-fatal)");
     }
 
-    void this.bot.start({
-      drop_pending_updates: true,
-      allowed_updates: ["message", "edited_message", "callback_query", "inline_query", "chosen_inline_result", "channel_post"],
-      onStart: () => {
-        log.info("Bot polling started");
-      },
-    });
+    void this.bot
+      .start({
+        drop_pending_updates: true,
+        allowed_updates: [
+          "message",
+          "edited_message",
+          "callback_query",
+          "inline_query",
+          "chosen_inline_result",
+          "channel_post",
+        ],
+        onStart: () => {
+          log.info("Bot polling started");
+        },
+      })
+      .catch((err: unknown) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        if (errMsg.includes("409") || errMsg.includes("Conflict")) {
+          log.error(
+            "❌ Another bot instance is already running with this token. " +
+              "Stop the other instance first, then try again."
+          );
+        } else {
+          log.error({ err }, "❌ Bot polling failed");
+        }
+        this.polling = false;
+      });
     this.polling = true;
   }
 

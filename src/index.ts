@@ -46,7 +46,10 @@ import { setBotPreMiddleware, getDealBot } from "./deals/module.js";
 import type { TaskDependencyResolver } from "./telegram/task-dependency-resolver.js";
 import type { WebUIServer } from "./webui/server.js";
 import { checkStaleListings, expireOldListings } from "./agent/tools/fragment/stale-checker.js";
-import { createMatchmakerClient, type MatchmakerAPIClient } from "./agent/tools/fragment/matchmaker-api.js";
+import {
+  createMatchmakerClient,
+  type MatchmakerAPIClient,
+} from "./agent/tools/fragment/matchmaker-api.js";
 
 const log = createLogger("App");
 
@@ -186,6 +189,21 @@ export class TeleclawApp {
     return this.lifecycle;
   }
 
+  /** Check if the terminal supports Unicode (for emoji fallback on Windows) */
+  private isUnicodeTerminal(): boolean {
+    if (process.platform !== "win32") return true;
+    if (process.env.WT_SESSION) return true; // Windows Terminal
+    if (process.env.TERM_PROGRAM === "vscode") return true;
+    const lang = (
+      process.env.LANG ||
+      process.env.LC_ALL ||
+      process.env.LC_CTYPE ||
+      ""
+    ).toLowerCase();
+    if (lang.includes("utf")) return true;
+    return false;
+  }
+
   /**
    * Start the agent
    */
@@ -194,12 +212,12 @@ export class TeleclawApp {
     log.info(`
   === TELECLAW AGENT v1.0.0-beta.1 ===
 
-   _____    _         _                 _                    _
-  |_   _|__| | ___  _| | __ ___      _| |   __ _  __ _  ___| |_ ___
-    | |/ _ \\ |/ _ \\/ __| |/ _\` \\ \\ /\\ / / |  / _\` |/ _\` |/ _ \\ __/ __|
-    | |  __/ |  __/ (__| | (_| |\\ V  V /| | | (_| | (_| |  __/ |_\\__ \\
-    |_|\\___|_|\\___|\\___|_|\\__,_| \\_/\\_/ |_|  \\__,_|\\__, |\\___|\\__|___/
-                                                   |___/
+   _____    _         _                  _                    _
+  |_   _|__| | ___  _| | __ ___      __| |   __ _  __ _  ___| |_ ___
+    | |/ _ \\ |/ _ \\/ __| |/ _\` \\ \\ /\\ / /  / _\` |/ _\` |/ _ \\ __/ __|
+    | |  __/ |  __/ (__| | (_| |\\ V  V /  | (_| | (_| |  __/ |_\\__ \\
+    |_|\\___|_|\\___|\\___|_|\\__,_| \\_/\\_/    \\__,_|\\__, |\\___|\\__|___/
+                                                 |___/
 `);
 
     // Register lifecycle callbacks so WebUI routes can call start()/stop() without args
@@ -591,20 +609,24 @@ export class TeleclawApp {
       this.pluginWatcher.start();
     }
 
-    // Display startup summary
-    log.info(`✅ SOUL.md loaded`);
-    log.info(`✅ Knowledge: ${indexResult.indexed} files, ${ftsResult.knowledge} chunks indexed`);
-    log.info(`✅ Telegram: @${username} connected`);
-    log.info(`✅ TON Blockchain: connected`);
-    if (this.config.tonapi_key) {
-      log.info(`🔑 TonAPI key configured`);
-    }
-    log.info(`✅ DEXs: STON.fi, DeDust connected`);
-    log.info(`✅ Wallet: ${walletAddress || "not configured"}`);
-    log.info(`✅ Model: ${provider}/${this.config.agent.model}`);
-    log.info(`✅ Admins: ${this.config.telegram.admin_ids.join(", ")}`);
+    // Display startup summary (ASCII-safe for Windows PowerShell)
+    const ok = this.isUnicodeTerminal() ? "✅" : "[OK]";
+    const key = this.isUnicodeTerminal() ? "🔑" : "[KEY]";
+    log.info(`${ok} SOUL.md loaded`);
     log.info(
-      `✅ Policy: DM ${this.config.telegram.dm_policy}, Groups ${this.config.telegram.group_policy}, Debounce ${this.config.telegram.debounce_ms}ms\n`
+      `${ok} Knowledge: ${indexResult.indexed} files, ${ftsResult.knowledge} chunks indexed`
+    );
+    log.info(`${ok} Telegram: @${username} connected`);
+    log.info(`${ok} TON Blockchain: connected`);
+    if (this.config.tonapi_key) {
+      log.info(`${key} TonAPI key configured`);
+    }
+    log.info(`${ok} DEXs: STON.fi, DeDust connected`);
+    log.info(`${ok} Wallet: ${walletAddress || "not configured"}`);
+    log.info(`${ok} Model: ${provider}/${this.config.agent.model}`);
+    log.info(`${ok} Admins: ${this.config.telegram.admin_ids.join(", ")}`);
+    log.info(
+      `${ok} Policy: DM ${this.config.telegram.dm_policy}, Groups ${this.config.telegram.group_policy}, Debounce ${this.config.telegram.debounce_ms}ms\n`
     );
 
     log.info("Teleclaw Agent is running! Press Ctrl+C to stop.");
@@ -847,20 +869,25 @@ export class TeleclawApp {
         if (userCmd.command === "help") {
           const isAdmin = this.adminHandler.isAdmin(message.senderId);
           const helpText = isAdmin
-            ? this.adminHandler.handleCommand(userCmd, message.chatId, message.senderId, message.isGroup)
+            ? this.adminHandler.handleCommand(
+                userCmd,
+                message.chatId,
+                message.senderId,
+                message.isGroup
+              )
             : Promise.resolve(
                 `🦞 **TeleClaw Commands**\n\n` +
-                `💬 **General**\n` +
-                `/help — Show this help message\n` +
-                `/ping — Check if agent is alive\n\n` +
-                `🔐 **Wallet & OTC**\n` +
-                `/verify — Verify your TON wallet (0.01 TON)\n` +
-                `/otc — OTC Matchmaker info\n\n` +
-                `⚙️ **Settings**\n` +
-                `/apikey — Set your own LLM API key\n` +
-                `/mymodel — Set your preferred model\n` +
-                `/mysettings — View your settings\n\n` +
-                `💡 You can also just chat naturally — ask about gifts, prices, usernames, or anything TON & Telegram related.`
+                  `💬 **General**\n` +
+                  `/help — Show this help message\n` +
+                  `/ping — Check if agent is alive\n\n` +
+                  `🔐 **Wallet & OTC**\n` +
+                  `/verify — Verify your TON wallet (0.01 TON)\n` +
+                  `/otc — OTC Matchmaker info\n\n` +
+                  `⚙️ **Settings**\n` +
+                  `/apikey — Set your own LLM API key\n` +
+                  `/mymodel — Set your preferred model\n` +
+                  `/mysettings — View your settings\n\n` +
+                  `💡 You can also just chat naturally — ask about gifts, prices, usernames, or anything TON & Telegram related.`
               );
           const response = await helpText;
           if (response) {
@@ -887,8 +914,10 @@ export class TeleclawApp {
         if (userCmd.command === "verify") {
           const action = userCmd.args[0] === "check" ? "check" : "start";
           try {
-            const { verifyWalletExecutor } = await import("./agent/tools/agentic-wallet/verify-wallet.js");
-            const { migrateVerifiedWallets } = await import("./agent/tools/agentic-wallet/verify-wallet.js");
+            const { verifyWalletExecutor } =
+              await import("./agent/tools/agentic-wallet/verify-wallet.js");
+            const { migrateVerifiedWallets } =
+              await import("./agent/tools/agentic-wallet/verify-wallet.js");
             const db = getDatabase().getDb();
             migrateVerifiedWallets(db);
             const result = await verifyWalletExecutor(
@@ -903,7 +932,7 @@ export class TeleclawApp {
               }
             );
             const text = result.success
-              ? (result.data as Record<string, unknown>)?.message as string || "✅ Done"
+              ? ((result.data as Record<string, unknown>)?.message as string) || "✅ Done"
               : result.error || "❌ Error";
             await this.bridge.sendMessage({
               chatId: message.chatId,
