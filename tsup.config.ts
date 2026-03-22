@@ -1,5 +1,5 @@
 import { defineConfig } from "tsup";
-import { rmSync, readdirSync } from "node:fs";
+import { rmSync, readdirSync, cpSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import pkg from "./package.json" with { type: "json" };
 
@@ -25,6 +25,23 @@ function cleanDistPreserveWeb() {
 
 cleanDistPreserveWeb();
 
+/** Copy JSON data files that are loaded at runtime via __dirname */
+function copyDataFiles() {
+  const pairs = [
+    ["src/agent/tools/fragment/gifts-complete-data.json", "dist/gifts-complete-data.json"],
+    ["src/agent/tools/fragment/gifts-database.json", "dist/gifts-database.json"],
+    ["src/agent/tools/fragment/gifts-cdn-data.json", "dist/gifts-cdn-data.json"],
+    ["src/templates/SOUL.md", "dist/templates/SOUL.md"],
+  ];
+  for (const [src, dest] of pairs) {
+    if (existsSync(src)) {
+      const destDir = join(dest, "..");
+      if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
+      cpSync(src, dest);
+    }
+  }
+}
+
 export default defineConfig({
   entry: {
     index: "src/index.ts",
@@ -39,4 +56,8 @@ export default defineConfig({
   sourcemap: false,
   outDir: "dist",
   external,
+  onSuccess: async () => {
+    copyDataFiles();
+    console.log("📦 Data files copied to dist/");
+  },
 });
