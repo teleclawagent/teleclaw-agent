@@ -193,7 +193,8 @@ export async function runClaudeOAuthFlow(
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = generateCodeChallenge(codeVerifier);
 
-  // Build authorize URL
+  // Build authorize URL (state parameter required by Claude OAuth)
+  const state = randomBytes(16).toString("base64url");
   const params = new URLSearchParams({
     code: "true",
     client_id: OAUTH_CLIENT_ID,
@@ -202,6 +203,7 @@ export async function runClaudeOAuthFlow(
     scope: OAUTH_SCOPES,
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
+    state,
   });
   const authorizeUrl = `${OAUTH_AUTHORIZE_URL}?${params}`;
 
