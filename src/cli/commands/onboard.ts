@@ -541,21 +541,38 @@ async function runInteractiveOnboarding(
     if (authMethod === "subscription") {
       noteBox(
         "Use your Claude Pro/Max subscription with Teleclaw\n\n" +
-          "1. Install Claude Code CLI (if not installed):\n" +
-          "   npm install -g @anthropic-ai/claude-code\n\n" +
-          "2. Login (if not logged in):\n" +
-          "   claude login\n\n" +
-          "3. Generate a setup-token:\n" +
-          "   claude setup-token\n\n" +
-          "4. Paste the token below",
+          "IMPORTANT: Open a SECOND terminal window and follow these steps.\n" +
+          "Keep this setup window open — you'll paste the token here.\n\n" +
+          "━━━ In your second terminal: ━━━\n\n" +
+          "Step 1 — Install Claude Code CLI:\n" +
+          "  npm install -g @anthropic-ai/claude-code\n" +
+          "  (Wait for 'added X packages' message)\n\n" +
+          "Step 2 — Login to your Claude account:\n" +
+          "  claude login --method browser\n" +
+          "  (Browser opens → sign in → return to terminal)\n" +
+          "  (You'll see 'Successfully logged in')\n\n" +
+          "Step 3 — Generate your setup token:\n" +
+          "  claude setup-token\n" +
+          "  (This prints a long token starting with 'sk-ant-...')\n" +
+          "  (Copy the ENTIRE token)\n\n" +
+          "Step 4 — Come back to THIS window and paste it below.\n\n" +
+          "━━━ Troubleshooting: ━━━\n" +
+          "- If 'claude login' opens Claude Code instead of logging in:\n" +
+          "  Press Ctrl+C to exit, then try: claude login --method browser\n" +
+          "- If 'claude setup-token' is not recognized:\n" +
+          "  Try: npx @anthropic-ai/claude-code setup-token\n" +
+          "- Token starts with 'sk-ant-' and is very long — copy ALL of it",
         "Claude Subscription",
         TON
       );
       apiKey = await password({
-        message: "Setup Token (from 'claude setup-token')",
+        message: "Setup Token (paste the sk-ant-... token here)",
         theme,
         validate: (value = "") => {
-          if (!value || value.trim().length === 0) return "Token is required";
+          if (!value || value.trim().length === 0)
+            return "Token is required — follow the steps above in a second terminal";
+          if (!value.trim().startsWith("sk-ant-"))
+            return "Token should start with 'sk-ant-...' — make sure you copied the full token from 'claude setup-token'";
           return true;
         },
       });
