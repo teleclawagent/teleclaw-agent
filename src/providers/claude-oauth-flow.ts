@@ -2,17 +2,18 @@
  * Claude Subscription OAuth Flow
  *
  * Handles browser-based OAuth login for Claude Pro/Max subscriptions.
- * No Claude Code CLI needed — Teleclaw does it directly.
+ * Uses PKCE flow with Claude's registered redirect URI.
  *
  * Flow:
  * 1. Generate PKCE code verifier + challenge
  * 2. Open browser to Claude OAuth authorize URL
- * 3. Start local HTTP server to receive callback
- * 4. Exchange authorization code for access + refresh tokens
- * 5. Save credentials to ~/.teleclaw/claude-oauth.json
+ * 3. User signs in, gets redirected to platform.claude.com/oauth/code/callback
+ * 4. Claude shows the authorization code on-screen
+ * 5. User pastes the code back into the terminal
+ * 6. Exchange code for access + refresh tokens
+ * 7. Save credentials to ~/.teleclaw/claude-oauth.json
  */
 
-import { createServer, type Server } from "http";
 import { randomBytes, createHash } from "crypto";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { homedir } from "os";
@@ -25,9 +26,8 @@ const log = createLogger("ClaudeOAuth");
 const OAUTH_AUTHORIZE_URL = "https://claude.ai/oauth/authorize";
 const OAUTH_TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
 const OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
-const OAUTH_REDIRECT_URI = "http://localhost:19485/oauth/callback";
+const OAUTH_REDIRECT_URI = "https://platform.claude.com/oauth/code/callback";
 const OAUTH_SCOPES = "user:inference";
-const LOCAL_PORT = 19485;
 
 // Credential storage
 function getCredentialsPath(): string {
@@ -173,28 +173,21 @@ export function hasClaudeOAuthCredentials(): boolean {
   return loadCredentials() !== null;
 }
 
-// ── Main OAuth Flow (used during setup) ───────────────────────────────
+// ── OAuth Flow Types ──────────────────────────────────────────────────
 
-/**
- * Run the Claude OAuth flow:
- * 1. Start local callback server
- * 2. Open browser for login
- * 3. Receive auth code via callback
- * 4. Exchange for tokens
- * 5. Save and return access token
- *
- * @param openUrl - function to open URL in browser (injected for testability)
- * @param onWaiting - callback when waiting for user to authorize
- */
-export async function runClaudeOAuthFlow(
-  openUrl: (url: string) => Promise<void>,
-  onWaiting?: (url: string) => void
-): Promise<{ accessToken: string; expiresIn: number }> {
+export interface OAuthFlowResult {
+  accessToken: string;
+  expiresIn: number;
+  codeVerifier: string;
+}
+
+// ── Step 1: Generate authorize URL ────────────────────────────────────
+
+export function generateAuthorizeUrl(): { url: string; codeVerifier: string } {
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = generateCodeChallenge(codeVerifier);
-
-  // Build authorize URL (state parameter required by Claude OAuth)
   const state = randomBytes(16).toString("base64url");
+
   const params = new URLSearchParams({
     code: "true",
     client_id: OAUTH_CLIENT_ID,
@@ -205,106 +198,23 @@ export async function runClaudeOAuthFlow(
     code_challenge_method: "S256",
     state,
   });
-  const authorizeUrl = `${OAUTH_AUTHORIZE_URL}?${params}`;
 
-  // Start local callback server
-  return new Promise<{ accessToken: string; expiresIn: number }>((resolve, reject) => {
-    let timeoutHandle: ReturnType<typeof setTimeout>;
+  return {
+    url: `${OAUTH_AUTHORIZE_URL}?${params}`,
+    codeVerifier,
+  };
+}
 
-    const server: Server = createServer((req, res) => {
-      void (async () => {
-        try {
-          const url = new URL(req.url ?? "/", `http://localhost:${LOCAL_PORT}`);
+// ── Step 2: Exchange code for tokens ──────────────────────────────────
 
-          if (url.pathname !== "/oauth/callback") {
-            res.writeHead(404);
-            res.end("Not found");
-            return;
-          }
-
-          const code = url.searchParams.get("code");
-          const error = url.searchParams.get("error");
-
-          if (error) {
-            res.writeHead(200, { "Content-Type": "text/html" });
-            res.end(`
-            <html><body style="font-family:system-ui;text-align:center;padding:40px">
-              <h2>❌ Authorization Failed</h2>
-              <p>${error}</p>
-              <p>You can close this window and try again.</p>
-            </body></html>
-          `);
-            clearTimeout(timeoutHandle);
-            server.close();
-            reject(new Error(`OAuth authorization failed: ${error}`));
-            return;
-          }
-
-          if (!code) {
-            res.writeHead(400, { "Content-Type": "text/html" });
-            res.end(`
-            <html><body style="font-family:system-ui;text-align:center;padding:40px">
-              <h2>⚠️ Missing Code</h2>
-              <p>No authorization code received. Please try again.</p>
-            </body></html>
-          `);
-            return;
-          }
-
-          // Exchange code for tokens
-          const creds = await exchangeCodeForTokens(code, codeVerifier);
-          saveCredentials(creds);
-
-          res.writeHead(200, { "Content-Type": "text/html" });
-          res.end(`
-          <html><body style="font-family:system-ui;text-align:center;padding:40px">
-            <h2>✅ Success!</h2>
-            <p>Your Claude subscription is now connected to Teleclaw.</p>
-            <p>You can close this window and return to the terminal.</p>
-          </body></html>
-        `);
-
-          clearTimeout(timeoutHandle);
-          server.close();
-          resolve({
-            accessToken: creds.accessToken,
-            expiresIn: Math.floor((creds.expiresAt - Date.now()) / 1000),
-          });
-        } catch (e) {
-          res.writeHead(500, { "Content-Type": "text/html" });
-          res.end(`
-          <html><body style="font-family:system-ui;text-align:center;padding:40px">
-            <h2>❌ Error</h2>
-            <p>${e instanceof Error ? e.message : String(e)}</p>
-          </body></html>
-        `);
-          clearTimeout(timeoutHandle);
-          server.close();
-          reject(e);
-        }
-      })();
-    });
-
-    server.listen(LOCAL_PORT, () => {
-      // Set timeout after server is listening
-      timeoutHandle = setTimeout(
-        () => {
-          server.close();
-          reject(new Error("OAuth flow timed out after 5 minutes. Please try again."));
-        },
-        5 * 60 * 1000
-      );
-
-      // Open browser
-      onWaiting?.(authorizeUrl);
-      openUrl(authorizeUrl).catch(() => {
-        // Browser didn't open — user will need to copy URL manually
-      });
-    });
-
-    server.on("error", (err) => {
-      clearTimeout(timeoutHandle);
-      reject(new Error(`Failed to start OAuth callback server: ${err.message}`));
-    });
-  });
+export async function exchangeCode(
+  code: string,
+  codeVerifier: string
+): Promise<{ accessToken: string; expiresIn: number }> {
+  const creds = await exchangeCodeForTokens(code.trim(), codeVerifier);
+  saveCredentials(creds);
+  return {
+    accessToken: creds.accessToken,
+    expiresIn: Math.floor((creds.expiresAt - Date.now()) / 1000),
+  };
 }

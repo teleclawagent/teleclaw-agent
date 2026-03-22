@@ -548,59 +548,47 @@ async function runInteractiveOnboarding(
         TON
       );
 
-      const proceed = await confirm({
-        message: "Open browser to sign in with Claude?",
-        default: true,
-        theme,
-      });
-      if (!proceed) throw new CancelledError();
-
       try {
-        const { runClaudeOAuthFlow } = await import("../../providers/claude-oauth-flow.js");
+        const { generateAuthorizeUrl, exchangeCode } =
+          await import("../../providers/claude-oauth-flow.js");
 
-        // Cross-platform browser open
-        const openBrowser = async (url: string) => {
-          const { exec: cpExec } = await import("child_process");
-          const cmd =
-            process.platform === "win32"
-              ? `start "" "${url}"`
-              : process.platform === "darwin"
-                ? `open "${url}"`
-                : `xdg-open "${url}"`;
-          cpExec(cmd);
-        };
+        const { url: authorizeUrl, codeVerifier } = generateAuthorizeUrl();
 
-        prompter.log("Opening browser... Sign in with your Claude account.");
-        prompter.log("Waiting for authorization...\n");
+        // Open browser
+        const { exec: cpExec } = await import("child_process");
+        const openCmd =
+          process.platform === "win32"
+            ? `start "" "${authorizeUrl}"`
+            : process.platform === "darwin"
+              ? `open "${authorizeUrl}"`
+              : `xdg-open "${authorizeUrl}"`;
+        cpExec(openCmd);
 
-        const result = await runClaudeOAuthFlow(openBrowser, (url) => {
-          prompter.log(`If browser didn't open, visit:\n${CYAN(url)}\n`);
+        prompter.log("Opening browser to sign in with your Claude account...\n");
+        prompter.log(`If browser didn't open, visit this URL:\n${CYAN(authorizeUrl)}\n`);
+        prompter.log(
+          "After signing in, Claude will show you an authorization code.\n" +
+            "Copy that code and paste it below.\n"
+        );
+
+        const authCode = await input({
+          message: "Paste the authorization code here",
+          theme,
+          validate: (value = "") => {
+            if (!value || value.trim().length === 0) return "Authorization code is required";
+            return true;
+          },
         });
 
+        prompter.log("Exchanging code for token...");
+        const result = await exchangeCode(authCode, codeVerifier);
         apiKey = result.accessToken;
         prompter.log(GREEN("✓ Claude subscription connected!"));
       } catch (err) {
         if (err instanceof CancelledError) throw err;
-        prompter.warn(`OAuth flow failed: ${err instanceof Error ? err.message : String(err)}`);
-        prompter.log("Falling back to manual token entry...\n");
-
-        noteBox(
-          "Manual fallback — get a token from Claude Code CLI:\n\n" +
-            "1. npm install -g @anthropic-ai/claude-code\n" +
-            "2. claude login --method browser\n" +
-            "3. claude setup-token\n" +
-            "4. Copy the sk-ant-... token and paste below",
-          "Manual Token",
-          TON
-        );
-        apiKey = await password({
-          message: "Setup Token (sk-ant-...)",
-          theme,
-          validate: (value = "") => {
-            if (!value || value.trim().length === 0) return "Token is required";
-            return true;
-          },
-        });
+        prompter.warn(`OAuth failed: ${err instanceof Error ? err.message : String(err)}`);
+        prompter.log("You can try again or use an API key instead.\n");
+        throw new CancelledError();
       }
       STEPS[1].value = `${providerMeta.displayName}  ${DIM("subscription ✓")}`;
     } else {
