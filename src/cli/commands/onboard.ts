@@ -87,7 +87,7 @@ const STEPS: StepDef[] = [
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-function generateClaimCode(): string {
+function _generateClaimCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I confusion
   let code = "TC-";
   for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
@@ -186,8 +186,7 @@ async function runInteractiveOnboarding(
 ): Promise<void> {
   // ── PowerShell detection ──
   const isPowerShell =
-    !!process.env.PSModulePath ||
-    (process.env.ComSpec || "").toLowerCase().includes("powershell");
+    !!process.env.PSModulePath || (process.env.ComSpec || "").toLowerCase().includes("powershell");
   if (isPowerShell) {
     console.log();
     console.log(
@@ -434,7 +433,8 @@ async function runInteractiveOnboarding(
     }
   } else if (selectedProvider === "openai-codex") {
     // OpenAI Codex — auto-detect from Codex CLI
-    const { isCodexOAuthConfigured, isCodexTokenValid, getCodexOAuthToken } = await import("../../providers/openai-codex-oauth.js");
+    const { isCodexOAuthConfigured, isCodexTokenValid } =
+      await import("../../providers/openai-codex-oauth.js");
     let detected = false;
     try {
       if (isCodexOAuthConfigured()) {
@@ -479,12 +479,12 @@ async function runInteractiveOnboarding(
       : `${providerMeta.displayName}  ${DIM(apiKey.slice(0, 6) + "...")}`;
   } else if (selectedProvider === "copilot") {
     // GitHub Copilot — device login flow
-    const { requestDeviceCode, pollForAccessToken, saveCopilotCredentials, isCopilotConfigured } = await import("../../providers/github-copilot-auth.js");
+    const { requestDeviceCode, pollForAccessToken, saveCopilotCredentials, isCopilotConfigured } =
+      await import("../../providers/github-copilot-auth.js");
 
     if (isCopilotConfigured()) {
       noteBox(
-        `GitHub Copilot already configured ✓\n` +
-          `Using existing credentials.`,
+        `GitHub Copilot already configured ✓\n` + `Using existing credentials.`,
         "GitHub Copilot",
         TON
       );
@@ -500,8 +500,7 @@ async function runInteractiveOnboarding(
 
       const device = await requestDeviceCode();
       noteBox(
-        `Visit: ${CYAN(device.verification_uri)}\n` +
-          `Enter code: ${WHITE(device.user_code)}`,
+        `Visit: ${CYAN(device.verification_uri)}\n` + `Enter code: ${WHITE(device.user_code)}`,
         "Authorize",
         TON
       );
@@ -509,11 +508,67 @@ async function runInteractiveOnboarding(
       prompter.log("Waiting for GitHub authorization...");
       const expiresAt = Date.now() + device.expires_in * 1000;
       const intervalMs = Math.max(1000, device.interval * 1000);
-      const token = await pollForAccessToken({ deviceCode: device.device_code, expiresAt, intervalMs });
+      const token = await pollForAccessToken({
+        deviceCode: device.device_code,
+        expiresAt,
+        intervalMs,
+      });
 
       saveCopilotCredentials(token);
       apiKey = "";
       STEPS[1].value = `${providerMeta.displayName}  ${DIM("authorized ✓")}`;
+    }
+  } else if (selectedProvider === "anthropic") {
+    // Anthropic — offer subscription (setup-token) or API key
+    const authMethod = await select({
+      message: "Authentication method",
+      default: "subscription",
+      theme,
+      choices: [
+        {
+          value: "subscription",
+          name: "⭐ Claude Subscription (Recommended)",
+          description: "Use your Claude Pro/Max plan — no extra charges",
+        },
+        {
+          value: "api-key",
+          name: "API Key (Pay-as-you-go)",
+          description: "Usage-based billing from console.anthropic.com",
+        },
+      ],
+    });
+
+    if (authMethod === "subscription") {
+      noteBox(
+        "Use your Claude Pro/Max subscription with Teleclaw\n\n" +
+          "1. Install Claude Code CLI (if not installed):\n" +
+          "   npm install -g @anthropic-ai/claude-code\n\n" +
+          "2. Login (if not logged in):\n" +
+          "   claude login\n\n" +
+          "3. Generate a setup-token:\n" +
+          "   claude setup-token\n\n" +
+          "4. Paste the token below",
+        "Claude Subscription",
+        TON
+      );
+      apiKey = await password({
+        message: "Setup Token (from 'claude setup-token')",
+        theme,
+        validate: (value = "") => {
+          if (!value || value.trim().length === 0) return "Token is required";
+          return true;
+        },
+      });
+      STEPS[1].value = `${providerMeta.displayName}  ${DIM("subscription ✓")}`;
+    } else {
+      noteBox(`Anthropic API key required.\nGet it at: ${providerMeta.consoleUrl}`, "API Key", TON);
+      apiKey = await password({
+        message: `Anthropic API Key (${providerMeta.keyHint})`,
+        theme,
+        validate: (value = "") => validateApiKeyFormat(selectedProvider, value) ?? true,
+      });
+      const maskedKey = apiKey.length > 10 ? apiKey.slice(0, 6) + "..." + apiKey.slice(-4) : "***";
+      STEPS[1].value = `${providerMeta.displayName}  ${DIM(maskedKey)}`;
     }
   } else {
     // Standard providers — API key required
@@ -744,8 +799,16 @@ async function runInteractiveOnboarding(
       brave: { url: "https://brave.com/search/api/", prefix: "BSA", hint: "Brave Search API key" },
       gemini: { url: "https://aistudio.google.com/apikey", prefix: "AIza", hint: "Gemini API key" },
       grok: { url: "https://console.x.ai/", prefix: "xai-", hint: "xAI API key" },
-      kimi: { url: "https://platform.moonshot.cn/console/api-keys", prefix: "", hint: "Moonshot API key" },
-      perplexity: { url: "https://www.perplexity.ai/settings/api", prefix: "pplx-", hint: "Perplexity API key" },
+      kimi: {
+        url: "https://platform.moonshot.cn/console/api-keys",
+        prefix: "",
+        hint: "Moonshot API key",
+      },
+      perplexity: {
+        url: "https://www.perplexity.ai/settings/api",
+        prefix: "pplx-",
+        hint: "Perplexity API key",
+      },
     };
 
     const info = providerInfo[providerChoice];
@@ -1056,7 +1119,9 @@ async function runInteractiveOnboarding(
     ...(searchProvider === "gemini" && searchApiKey ? { gemini_api_key: searchApiKey } : {}),
     ...(searchProvider === "grok" && searchApiKey ? { xai_api_key: searchApiKey } : {}),
     ...(searchProvider === "kimi" && searchApiKey ? { kimi_api_key: searchApiKey } : {}),
-    ...(searchProvider === "perplexity" && searchApiKey ? { perplexity_api_key: searchApiKey } : {}),
+    ...(searchProvider === "perplexity" && searchApiKey
+      ? { perplexity_api_key: searchApiKey }
+      : {}),
   };
 
   // Save config
@@ -1263,12 +1328,23 @@ async function runNonInteractiveOnboarding(
     ton_proxy: { enabled: false, port: 8080 },
     mcp: { servers: {} },
     plugins: {},
-    search_provider: (options.searchProvider as "brave" | "gemini" | "grok" | "kimi" | "perplexity") ?? "auto",
-    ...(options.searchApiKey && options.searchProvider === "brave" ? { brave_api_key: options.searchApiKey } : {}),
-    ...(options.searchApiKey && options.searchProvider === "gemini" ? { gemini_api_key: options.searchApiKey } : {}),
-    ...(options.searchApiKey && options.searchProvider === "grok" ? { xai_api_key: options.searchApiKey } : {}),
-    ...(options.searchApiKey && options.searchProvider === "kimi" ? { kimi_api_key: options.searchApiKey } : {}),
-    ...(options.searchApiKey && options.searchProvider === "perplexity" ? { perplexity_api_key: options.searchApiKey } : {}),
+    search_provider:
+      (options.searchProvider as "brave" | "gemini" | "grok" | "kimi" | "perplexity") ?? "auto",
+    ...(options.searchApiKey && options.searchProvider === "brave"
+      ? { brave_api_key: options.searchApiKey }
+      : {}),
+    ...(options.searchApiKey && options.searchProvider === "gemini"
+      ? { gemini_api_key: options.searchApiKey }
+      : {}),
+    ...(options.searchApiKey && options.searchProvider === "grok"
+      ? { xai_api_key: options.searchApiKey }
+      : {}),
+    ...(options.searchApiKey && options.searchProvider === "kimi"
+      ? { kimi_api_key: options.searchApiKey }
+      : {}),
+    ...(options.searchApiKey && options.searchProvider === "perplexity"
+      ? { perplexity_api_key: options.searchApiKey }
+      : {}),
   };
 
   const configYaml = YAML.stringify(config);

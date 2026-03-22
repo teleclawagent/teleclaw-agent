@@ -468,7 +468,16 @@ export function getProviderMetadata(provider: SupportedProvider): ProviderMetada
   return meta;
 }
 
+/** Hidden providers kept for backward compat only (existing configs still work) */
+const HIDDEN_PROVIDERS = new Set(["claude-code", "openai-codex"]);
+
+/** Get providers visible in setup UIs (excludes deprecated auto-detect providers) */
 export function getSupportedProviders(): ProviderMetadata[] {
+  return Object.values(PROVIDER_REGISTRY).filter((p) => !HIDDEN_PROVIDERS.has(p.id));
+}
+
+/** Get ALL providers including hidden ones (for config loading backward compat) */
+export function getAllProviders(): ProviderMetadata[] {
   return Object.values(PROVIDER_REGISTRY);
 }
 
