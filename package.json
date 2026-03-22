@@ -50,7 +50,7 @@
     "build:sdk": "npm run build -w @teleclaw-agent/sdk",
     "build:backend": "tsup --config tsup.config.ts",
     "build:web": "cd web && npm install --no-audit --no-fund && npm run build",
-    "postinstall": "node -e \"const{execSync:e}=require('child_process');try{e('npm install --no-audit --no-fund',{cwd:'web',stdio:'inherit'})}catch{}\"",
+    "postinstall": "node --input-type=module -e \"import{execSync as e}from'child_process';try{e('npm install --no-audit --no-fund',{cwd:'web',stdio:'inherit'})}catch(x){}\"",
     "prestart": "npm run build",
     "start": "node dist/cli/index.js start",
     "dev": "tsx watch src/index.ts",

@@ -9,6 +9,33 @@ import { input, select, checkbox, confirm, password } from "@inquirer/prompts";
 import chalk from "chalk";
 import ora from "ora";
 
+// ── Unicode support detection ─────────────────────────────────────────
+
+/** Detect whether the terminal can render Unicode characters */
+function detectUnicodeSupport(): boolean {
+  // CI environments usually support Unicode
+  if (process.env.CI) return true;
+  // Explicit UTF-8 locale
+  const lang = (process.env.LANG || process.env.LC_ALL || process.env.LC_CTYPE || "").toLowerCase();
+  if (lang.includes("utf")) return true;
+  // Windows Terminal, VS Code terminal, and modern terminals
+  if (process.env.WT_SESSION) return true; // Windows Terminal
+  if (process.env.TERM_PROGRAM === "vscode") return true;
+  // Most Unix terminals support Unicode
+  if (process.platform !== "win32") return true;
+  // Windows: check codepage — 65001 is UTF-8
+  if (process.env.CHCP === "65001") return true;
+  // Fallback: assume no Unicode on Windows unless proven otherwise
+  return false;
+}
+
+export const UNICODE_SUPPORTED = detectUnicodeSupport();
+
+/** Return Unicode or ASCII fallback based on terminal support */
+export function icon(unicode: string, ascii: string): string {
+  return UNICODE_SUPPORTED ? unicode : ascii;
+}
+
 // ── Branding & Theme ──────────────────────────────────────────────────
 
 export const TON = chalk.hex("#0098EA");
@@ -21,16 +48,16 @@ export const YELLOW = chalk.yellow;
 export const WHITE = chalk.white;
 
 export const inquirerTheme = {
-  prefix: { idle: TON("›"), done: GREEN("✔") },
+  prefix: { idle: TON(icon("›", ">")), done: GREEN(icon("✔", "[OK]")) },
   style: {
     answer: (t: string) => CYAN.bold(t),
     message: (t: string, status: string) => (status === "done" ? DIM(t) : BOLD(t)),
-    error: (t: string) => RED.bold(`  ✘ ${t}`),
+    error: (t: string) => RED.bold(`  ${icon("✘", "X")} ${t}`),
     help: (t: string) => DIM(t),
     highlight: (t: string) => TON.bold(t),
     description: (t: string) => DIM.italic(t),
   },
-  icon: { cursor: TON("❯") },
+  icon: { cursor: TON(icon("❯", ">")) },
 };
 
 // ── ANSI helpers ──────────────────────────────────────────────────────
@@ -105,7 +132,7 @@ export function wizardFrame(currentStep: number, steps: StepDef[]): string {
 
   const subtitle = "Autonomous AI agent on Telegram with native TON blockchain integration";
   out.push(frameRow(DIM(centerIn(subtitle, W))));
-  out.push(frameRow(DIM(centerIn("t.me/TeleclawAgents  |  v0.7.0", W))));
+  out.push(frameRow(DIM(centerIn("github.com/gioooton/teleclaw-agent", W))));
 
   out.push(`  ${TON("+" + "-".repeat(W) + "+")}`);
   out.push(emptyRow());
@@ -116,11 +143,11 @@ export function wizardFrame(currentStep: number, steps: StepDef[]): string {
     let line: string;
     if (i < currentStep) {
       const val = s.value ?? "";
-      line = `  ${GREEN("✔")} ${WHITE(padRight(s.label, labelWidth))}${CYAN(val)}`;
+      line = `  ${GREEN(icon("✔", "[OK]"))} ${WHITE(padRight(s.label, labelWidth))}${CYAN(val)}`;
     } else if (i === currentStep) {
-      line = `  ${TON.bold("▸")} ${TON.bold(padRight(s.label, labelWidth))}${DIM(s.desc)}`;
+      line = `  ${TON.bold(icon("▸", ">"))} ${TON.bold(padRight(s.label, labelWidth))}${DIM(s.desc)}`;
     } else {
-      line = `  ${DIM("○")} ${DIM(padRight(s.label, labelWidth))}${DIM(s.desc)}`;
+      line = `  ${DIM(icon("○", "o"))} ${DIM(padRight(s.label, labelWidth))}${DIM(s.desc)}`;
     }
     out.push(frameRow(padRightAnsi(line, W)));
   }
@@ -130,7 +157,8 @@ export function wizardFrame(currentStep: number, steps: StepDef[]): string {
   const barLen = Math.max(10, W - 36);
   const filled = Math.round((currentStep / steps.length) * barLen);
   const bar = TON("#".repeat(filled)) + DIM("-".repeat(barLen - filled));
-  const footer = `  ${bar}  ${DIM(`${pct}%  ·  Step ${currentStep + 1} of ${steps.length}`)}`;
+  const displayStep = Math.min(currentStep + 1, steps.length);
+  const footer = `  ${bar}  ${DIM(`${pct}%  ${icon("·", "-")}  Step ${displayStep} of ${steps.length}`)}`;
   out.push(frameRow(padRightAnsi(footer, W)));
 
   out.push(emptyRow());
@@ -178,7 +206,7 @@ export function finalSummaryBox(steps: StepDef[], connected: boolean): string {
 
   for (const s of steps) {
     const val = s.value ?? DIM("not set");
-    const entry = `  ${GREEN("✔")} ${WHITE(padRight(s.label, 14))}${CYAN(val)}`;
+    const entry = `  ${GREEN(icon("✔", "[OK]"))} ${WHITE(padRight(s.label, 14))}${CYAN(val)}`;
     out.push(gRow(entry));
   }
 
@@ -191,10 +219,10 @@ export function finalSummaryBox(steps: StepDef[], connected: boolean): string {
   const items = connected
     ? [
         `${TON("1.")} Start the agent`,
-        `   ${CYAN("$ teleclaw start")}`,
+        `   ${CYAN("$ node dist/cli/index.js start")}`,
         "",
-        `${TON("2.")} Send ${CYAN("/boot")} as your first message`,
-        `   to bootstrap the agent's personality`,
+        `${TON("2.")} Claim admin — send to your bot:`,
+        `   ${CYAN("/start <your-claim-code>")}`,
         "",
         `${TON("3.")} Customize ${DIM("~/.teleclaw/workspace/SOUL.md")}`,
         `   to shape your agent's behavior`,
@@ -388,19 +416,19 @@ export class InquirerPrompter {
   }
 
   log(message: string): void {
-    console.log(`  ${DIM("○")} ${message}`);
+    console.log(`  ${DIM(icon("○", "o"))} ${message}`);
   }
 
   warn(message: string): void {
-    console.log(`  ${YELLOW("⚠")} ${YELLOW(message)}`);
+    console.log(`  ${YELLOW(icon("⚠", "!"))} ${YELLOW(message)}`);
   }
 
   error(message: string): void {
-    console.log(`  ${RED("✗")} ${RED(message)}`);
+    console.log(`  ${RED(icon("✗", "X"))} ${RED(message)}`);
   }
 
   success(message: string): void {
-    console.log(`  ${GREEN("✓")} ${GREEN(message)}`);
+    console.log(`  ${GREEN(icon("✓", "[OK]"))} ${GREEN(message)}`);
   }
 }
 

@@ -191,21 +191,9 @@ async function runInteractiveOnboarding(
   if (isPowerShell) {
     console.log();
     console.log(
-      `  ${RED("⚠")}  PowerShell detected — interactive input may not work correctly.`
-    );
-    console.log(
-      `     Use ${CYAN("teleclaw setup --ui")} for browser-based setup or switch to Git Bash.`
+      `  ${DIM("Tip: If prompts look broken, try")} ${CYAN("teleclaw setup --ui")} ${DIM("for browser-based setup.")}`
     );
     console.log();
-    const continueAnyway = await confirm({
-      message: "Continue with interactive setup anyway?",
-      default: false,
-      theme,
-    });
-    if (!continueAnyway) {
-      console.log(`\n  ${DIM("Run")} ${CYAN("teleclaw setup --ui")} ${DIM("to use the web wizard.")}\n`);
-      process.exit(0);
-    }
   }
 
   // ── Shared state ──
@@ -674,73 +662,6 @@ async function runInteractiveOnboarding(
 
   const extras: string[] = [];
 
-  // Bot token (recommended — required for deals module)
-  const setupBot = await confirm({
-    message: `Add a Telegram bot token? ${DIM("(recommended — enables deals & inline buttons)")}`,
-    default: true,
-    theme,
-  });
-
-  if (setupBot) {
-    noteBox(
-      "Create a bot with @BotFather on Telegram:\n" +
-        "1. Send /newbot and follow the instructions\n" +
-        "2. Copy the bot token\n" +
-        "3. Enable inline mode: /setinline on the bot",
-      "Bot Token",
-      TON
-    );
-
-    const tokenInput = await input({
-      message: "Bot token (from @BotFather)",
-      theme,
-      validate: (value) => {
-        const clean = (value || "").replace(/[^\x20-\x7E]/g, "").trim();
-        if (!clean) return "Bot token is required";
-        if (!clean.match(/^\d{8,15}:[A-Za-z0-9_-]{30,50}$/)) {
-          return "Invalid format. Expected: 1234567890:ABCdefGHIjklMNO (numeric ID, colon, alphanumeric hash)";
-        }
-        return true;
-      },
-    });
-
-    // Validate bot token
-    spinner.start(DIM("Validating bot token..."));
-    try {
-      const res = await fetchWithTimeout(`https://api.telegram.org/bot${tokenInput}/getMe`);
-      const data = await res.json();
-      if (!data.ok) {
-        spinner.warn(DIM("Bot token is invalid — skipping bot setup"));
-      } else {
-        botToken = tokenInput.replace(/[^\x20-\x7E]/g, "").trim();
-        botUsername = data.result.username;
-        spinner.succeed(DIM(`Bot verified: @${botUsername}`));
-        extras.push("Bot");
-      }
-    } catch {
-      spinner.warn(DIM("Could not validate bot token (network error)"));
-      const saveAnyway = await confirm({
-        message: "Network error — save token anyway? (Re-validate later with 'teleclaw doctor')",
-        default: true,
-        theme,
-      });
-      if (saveAnyway) {
-        botToken = tokenInput.replace(/[^\x20-\x7E]/g, "").trim();
-        const usernameInput = await input({
-          message: "Bot username (without @)",
-          theme,
-          validate: (value) => {
-            if (!value || value.length < 3) return "Username too short";
-            if (!/^[a-zA-Z][a-zA-Z0-9_]{2,}$/.test(value)) return "Invalid username format";
-            return true;
-          },
-        });
-        botUsername = usernameInput;
-        extras.push("Bot (unverified)");
-      }
-    }
-  }
-
   // TonAPI key
   const setupTonapi = await confirm({
     message: `Add a TonAPI key? ${DIM("(strongly recommended for TON features)")}`,
@@ -1038,7 +959,7 @@ async function runInteractiveOnboarding(
 
   // Step: Save config
   // ════════════════════════════════════════════════════════════════════
-  redraw(6);
+  redraw(STEPS.length);
 
   // Build config
   const config: Config = {
