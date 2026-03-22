@@ -12,11 +12,11 @@ export type AssetKind = "username" | "number" | "gift";
 // ─── Marketplace IDs ─────────────────────────────────────────────────
 
 export type MarketplaceId =
-  | "fragment"     // fragment.com — usernames, numbers, gifts
+  | "fragment"     // fragment.com — usernames, numbers, gifts (on-chain & off-chain)
   | "marketapp"    // market.app — usernames, numbers, gifts (rebranded Whales Market)
-  | "getgems"      // getgems.io — usernames, numbers, gifts (NFT marketplace)
-  | "tonnel"       // tonnel.network — gifts only
-  | "portals"      // portals.to — gifts only (on-chain)
+  | "getgems"      // getgems.io — usernames, numbers, gifts (on-chain & off-chain)
+  | "tonnel"       // tonnel.network — off-chain gifts only
+  | "portals"      // portals.to — off-chain gifts only
   | "mrkt";        // mrkt.tg — gifts only
 
 // ─── Which marketplaces support which assets ─────────────────────────

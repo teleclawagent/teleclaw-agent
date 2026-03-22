@@ -1,9 +1,9 @@
 /**
  * Getgems.io Marketplace Adapter
  *
- * Supports: usernames, anonymous numbers, gifts
+ * Supports: usernames, anonymous numbers, gifts (both on-chain & off-chain)
  * Method: GraphQL API
- * On-chain NFT marketplace — all assets are TON NFTs
+ * Getgems supports both upgraded (on-chain NFT) and non-upgraded (off-chain) gifts.
  */
 
 import type {

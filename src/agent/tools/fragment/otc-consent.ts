@@ -45,14 +45,17 @@ export function requireOtcConsent(ctx: ToolContext): ToolResult | null {
     success: false,
     error:
       "🔒 You need to opt into the OTC Matchmaker first.\n\n" +
-      "The OTC system connects buyers and sellers across Teleclaw bots. " +
-      "Here's how it works:\n\n" +
+      "**Requirements:**\n" +
+      "1. Verified TON wallet — use /verify to connect\n" +
+      "2. Hold minimum 0.1% of $TELECLAW supply (100,000 tokens)\n\n" +
+      "**How it works:**\n" +
       "• You list items (usernames, gifts, numbers) for sale or register buying interest\n" +
       "• Active listings are shared anonymously with other Teleclaw bots\n" +
       "• Only item details and price are shared — your identity stays private\n" +
       "• When someone is interested, the seller decides whether to share contact info\n" +
       "• All trades happen directly between parties — Teleclaw never handles funds\n\n" +
-      "To opt in, use the otc_join command.",
+      "To opt in, use the otc_join command.\n" +
+      "Buy $TELECLAW: https://dedust.io/swap/TON/EQD01TwE1plYpYKvRwWOLwAzzAJaDKwpB2bR3nfg-wkJJwks",
   };
 }
 
@@ -62,6 +65,8 @@ export const otcJoinTool: Tool = {
   name: "otc_join",
   description:
     "Join the OTC Matchmaker — opt in to buy and sell usernames, gifts, and numbers.\n" +
+    "REQUIREMENTS: User must have (1) a verified TON wallet (/verify) and (2) hold at least 0.1% of $TELECLAW supply (100,000 tokens).\n" +
+    "IMPORTANT: Always tell the user about BOTH requirements BEFORE calling this tool.\n" +
     "Your listings will be shared anonymously with other Teleclaw bots for matching.\n" +
     "Only item details and prices are shared — your identity stays private until you choose to reveal it.",
   category: "action",

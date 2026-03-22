@@ -32,10 +32,20 @@ interface MarketSearchParams {
 const marketSearchTool: Tool = {
   name: "marketplace_search",
   description:
-    "🏪 Search across ALL marketplaces at once for usernames, numbers, or gifts.\n\n" +
+    "🏪 Search across ALL marketplaces at once for usernames, numbers, or gifts.\n" +
+    "USE THIS TOOL whenever a user asks about prices, floor prices, or where to buy/sell.\n" +
+    "NEVER quote prices from memory — always call this tool for live data.\n\n" +
     "MARKETPLACES CHECKED:\n" +
     "• Usernames & Numbers: Fragment, Market.app, Getgems (3 sources)\n" +
-    "• Gifts: Fragment, Market.app, Getgems, Tonnel, Portals, MRKT (6 sources)\n\n" +
+    "• On-chain gifts: Fragment, Getgems\n" +
+    "• Off-chain gifts: Fragment, Getgems, Tonnel, Portals, Market.app, MRKT\n\n" +
+    "MARKETPLACE INFO (use this when explaining to users):\n" +
+    "• Fragment — Telegram's official marketplace, on-chain & off-chain\n" +
+    "• Getgems — Major NFT marketplace, on-chain & off-chain\n" +
+    "• Tonnel — Off-chain gifts only\n" +
+    "• Portals — Off-chain gifts only\n" +
+    "• Market.app — Usernames, numbers, gifts\n" +
+    "• MRKT — Gifts only\n\n" +
     "Results are normalized and sorted by price. Shows which marketplace has the best deal.\n\n" +
     "EXAMPLES:\n" +
     "• Search usernames: asset_type='username', query='crypto'\n" +

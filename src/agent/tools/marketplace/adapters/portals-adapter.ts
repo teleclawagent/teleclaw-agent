@@ -1,7 +1,8 @@
 /**
  * Portals.to Marketplace Adapter
  *
- * Supports: gifts ONLY (on-chain NFT trading)
+ * Supports: OFF-CHAIN gifts ONLY
+ * Portals is for trading off-chain (non-upgraded) Telegram gifts.
  * Method: REST API
  */
 

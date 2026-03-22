@@ -1,7 +1,9 @@
 /**
  * Fragment.com Marketplace Adapter
  *
- * Supports: usernames, anonymous numbers, gifts
+ * Supports: usernames, anonymous numbers, gifts (both on-chain & off-chain)
+ * Fragment is Telegram's official marketplace — supports both upgraded (on-chain NFT)
+ * and non-upgraded (off-chain) gifts, plus username and number trading.
  * Method: HTML scraping via cheerio (no official API)
  * Rate limit: 2s between requests, 5min cache
  */

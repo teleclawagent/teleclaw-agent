@@ -138,15 +138,96 @@ export const verifyWalletExecutor: ToolExecutor<VerifyWalletParams> = async (
       const txUrl = `/blockchain/accounts/${encodeURIComponent(botWallet)}/transactions?limit=50`;
       console.log("=== VERIFY: fetching from URL:", txUrl);
 
-      // Attempt with retry on 502/429
+      // Attempt with retry on 401/502/429
       let response = await tonapiFetch(txUrl);
       console.log("=== VERIFY: TonAPI response status:", response.status);
 
-      if (response.status === 502 || response.status === 429) {
-        console.log("=== VERIFY: retrying after 2s...");
+      if (response.status === 502 || response.status === 429 || response.status === 401) {
+        console.log("=== VERIFY: retrying after 2s (status:", response.status, ")...");
         await new Promise((r) => setTimeout(r, 2000));
         response = await tonapiFetch(txUrl);
         console.log("=== VERIFY: retry response status:", response.status);
+      }
+
+      // If still 401, try Toncenter as fallback
+      if (response.status === 401) {
+        log.warn({ botWallet }, "TonAPI 401 — trying Toncenter fallback for tx verification");
+        try {
+          const toncenterUrl = `https://toncenter.com/api/v3/transactions?account=${encodeURIComponent(botWallet)}&limit=50`;
+          const tcResponse = await fetch(toncenterUrl, {
+            headers: { Accept: "application/json" },
+          });
+          if (tcResponse.ok) {
+            const tcData = await tcResponse.json();
+            const tcTransactions = tcData.transactions || [];
+            console.log("=== VERIFY: Toncenter fallback found", tcTransactions.length, "transactions");
+            // Re-format Toncenter data to match TonAPI structure for processing below
+            const reformatted = tcTransactions.map((tx: Record<string, unknown>) => ({
+              hash: tx.hash,
+              in_msg: tx.in_msg ? {
+                msg_type: (tx.in_msg as Record<string, unknown>).msg_type || "int_msg",
+                value: String((tx.in_msg as Record<string, unknown>).value || "0"),
+                source: (tx.in_msg as Record<string, unknown>).source ? { address: ((tx.in_msg as Record<string, unknown>).source as Record<string, unknown>)?.address } : undefined,
+                decoded_body: (tx.in_msg as Record<string, unknown>).decoded_body || { text: (tx.in_msg as Record<string, unknown>).message || "" },
+              } : undefined,
+            }));
+            // Process with Toncenter data — skip to transaction matching below
+            const userIdStr = String(userId);
+            for (const tx of reformatted) {
+              const inMsg = tx.in_msg;
+              if (!inMsg) continue;
+              const amount = BigInt(inMsg.value || "0");
+              if (amount < 10_000_000n) continue;
+              const comment = (inMsg.decoded_body?.text || "").trim();
+              if (!comment.includes(userIdStr)) continue;
+              const senderAddress = inMsg.source?.address;
+              if (!senderAddress) continue;
+              const txHash = tx.hash || "";
+
+              const existingOwner = db
+                .prepare("SELECT user_id FROM verified_wallets WHERE wallet_address = ? AND user_id != ?")
+                .get(senderAddress, userId) as { user_id: number } | undefined;
+              if (existingOwner) {
+                return { success: false, error: "Bu cüzdan başka bir hesaba bağlı." };
+              }
+
+              db.prepare(
+                `INSERT OR REPLACE INTO verified_wallets (user_id, wallet_address, verified_at, tx_hash) VALUES (?, ?, unixepoch(), ?)`
+              ).run(userId, senderAddress, txHash);
+
+              const existingAgenticWallet = db.prepare("SELECT id FROM agentic_wallets WHERE user_id = ?").get(userId);
+              if (!existingAgenticWallet) {
+                db.prepare(
+                  `INSERT OR IGNORE INTO agentic_wallets (id, user_id, chat_id, address, encrypted_secret, label) VALUES (?, ?, '', ?, '', 'Verified Wallet')`
+                ).run(`verified_${userId}`, userId, senderAddress);
+              }
+
+              log.info({ userId, wallet: senderAddress, txHash }, "Wallet verified via Toncenter fallback");
+              return {
+                success: true,
+                data: {
+                  status: "verified",
+                  wallet: senderAddress,
+                  txHash,
+                  message: `✅ Cüzdan doğrulandı!\n\nAdres: \`${senderAddress}\`\nTx: \`${txHash}\``,
+                },
+              };
+            }
+            return {
+              success: true,
+              data: {
+                status: "not_found",
+                message:
+                  `Eşleşen işlem bulunamadı.\n\n` +
+                  `• **${botWallet}** adresine 0.01 TON gönderildi mi?\n` +
+                  `• Memo: \`${userId}\`\n` +
+                  `• 1-2 dakika bekleyip \`/verify check\` deneyin.`,
+              },
+            };
+          }
+        } catch (tcErr) {
+          log.warn({ err: tcErr }, "Toncenter fallback also failed");
+        }
       }
 
       if (!response.ok) {
@@ -154,7 +235,7 @@ export const verifyWalletExecutor: ToolExecutor<VerifyWalletParams> = async (
         log.error({ status: response.status, body, botWallet }, "TonAPI error fetching transactions");
         return {
           success: false,
-          error: `İşlemler kontrol edilemedi (HTTP ${response.status}). Lütfen biraz bekleyip tekrar deneyin.`,
+          error: `İşlemler kontrol edilemedi (HTTP ${response.status}). Lütfen biraz bekleyip tekrar deneyin.\n\n💡 Bu hata devam ederse bot adminine TonAPI key ayarını kontrol ettirin.`,
         };
       }
 

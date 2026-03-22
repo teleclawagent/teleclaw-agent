@@ -840,28 +840,108 @@ export class TeleclawApp {
         }
       }
 
-      // Handle /apikey and /mymodel — available to ALL users (not admin-gated)
+      // Handle user-level commands — available to ALL users (not admin-gated)
       const userCmd = this.adminHandler.parseCommand(message.text);
-      if (
-        userCmd &&
-        (userCmd.command === "apikey" ||
-          userCmd.command === "mymodel" ||
-          userCmd.command === "mysettings")
-      ) {
-        const response = await this.handleUserSettingsCommand(
-          userCmd.command,
-          userCmd.args,
-          message.chatId,
-          message.senderId
-        );
-        if (response) {
+      if (userCmd) {
+        // /help — show user-facing help (different from admin help)
+        if (userCmd.command === "help") {
+          const isAdmin = this.adminHandler.isAdmin(message.senderId);
+          const helpText = isAdmin
+            ? this.adminHandler.handleCommand(userCmd, message.chatId, message.senderId, message.isGroup)
+            : Promise.resolve(
+                `🦞 **TeleClaw Commands**\n\n` +
+                `💬 **General**\n` +
+                `/help — Show this help message\n` +
+                `/ping — Check if agent is alive\n\n` +
+                `🔐 **Wallet & OTC**\n` +
+                `/verify — Verify your TON wallet (0.01 TON)\n` +
+                `/otc — OTC Matchmaker info\n\n` +
+                `⚙️ **Settings**\n` +
+                `/apikey — Set your own LLM API key\n` +
+                `/mymodel — Set your preferred model\n` +
+                `/mysettings — View your settings\n\n` +
+                `💡 You can also just chat naturally — ask about gifts, prices, usernames, or anything TON & Telegram related.`
+              );
+          const response = await helpText;
+          if (response) {
+            await this.bridge.sendMessage({
+              chatId: message.chatId,
+              text: response,
+              replyToId: message.id,
+            });
+          }
+          return;
+        }
+
+        // /ping — available to everyone
+        if (userCmd.command === "ping") {
           await this.bridge.sendMessage({
             chatId: message.chatId,
-            text: response,
+            text: "🏓 Pong!",
             replyToId: message.id,
           });
+          return;
         }
-        return;
+
+        // /verify — wallet verification (available to all users)
+        if (userCmd.command === "verify") {
+          const action = userCmd.args[0] === "check" ? "check" : "start";
+          try {
+            const { verifyWalletExecutor } = await import("./agent/tools/agentic-wallet/verify-wallet.js");
+            const { migrateVerifiedWallets } = await import("./agent/tools/agentic-wallet/verify-wallet.js");
+            const db = getDatabase().getDb();
+            migrateVerifiedWallets(db);
+            const result = await verifyWalletExecutor(
+              { action },
+              {
+                bridge: this.bridge,
+                db,
+                chatId: message.chatId,
+                senderId: message.senderId,
+                isGroup: message.isGroup,
+                config: this.config,
+              }
+            );
+            const text = result.success
+              ? (result.data as Record<string, unknown>)?.message as string || "✅ Done"
+              : result.error || "❌ Error";
+            await this.bridge.sendMessage({
+              chatId: message.chatId,
+              text,
+              replyToId: message.id,
+            });
+          } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            await this.bridge.sendMessage({
+              chatId: message.chatId,
+              text: `❌ Verification error: ${errMsg}`,
+              replyToId: message.id,
+            });
+          }
+          return;
+        }
+
+        // /apikey, /mymodel, /mysettings — user settings
+        if (
+          userCmd.command === "apikey" ||
+          userCmd.command === "mymodel" ||
+          userCmd.command === "mysettings"
+        ) {
+          const response = await this.handleUserSettingsCommand(
+            userCmd.command,
+            userCmd.args,
+            message.chatId,
+            message.senderId
+          );
+          if (response) {
+            await this.bridge.sendMessage({
+              chatId: message.chatId,
+              text: response,
+              replyToId: message.id,
+            });
+          }
+          return;
+        }
       }
 
       // Check if this is an admin command

@@ -1,7 +1,8 @@
 /**
  * Tonnel.network Marketplace Adapter
  *
- * Supports: gifts ONLY (both on-chain and off-chain)
+ * Supports: OFF-CHAIN gifts ONLY
+ * Tonnel is for trading off-chain (non-upgraded) Telegram gifts.
  * Method: REST API
  */
 

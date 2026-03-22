@@ -39,24 +39,34 @@ export class BotBridge implements TelegramTransport {
     // Register commands with BotFather
     try {
       await this.client.getBot().api.setMyCommands([
-        { command: "ping", description: "Check if agent is alive" },
-        { command: "status", description: "Agent status & info" },
         { command: "help", description: "List all commands" },
-        { command: "reset", description: "Reset session context" },
-        { command: "history", description: "Recent messages" },
-        { command: "settings", description: "View all settings" },
-        { command: "wallet", description: "TON wallet balance" },
-        { command: "portfolio", description: "Portfolio summary" },
-        { command: "model", description: "Switch LLM model" },
-        { command: "strategy", description: "Trading thresholds" },
-        { command: "sniper", description: "Sniper commands" },
-        { command: "alerts", description: "Alert management" },
-        { command: "version", description: "Check for updates" },
-        { command: "update", description: "Update to latest version" },
-        { command: "clear", description: "Clear chat history" },
-        { command: "pause", description: "Pause agent" },
-        { command: "resume", description: "Resume agent" },
+        { command: "ping", description: "Check if agent is alive" },
+        { command: "verify", description: "Verify your TON wallet" },
+        { command: "apikey", description: "Set your own LLM API key" },
+        { command: "mymodel", description: "Set your preferred model" },
+        { command: "mysettings", description: "View your settings" },
       ]);
+      // Register admin-only commands separately
+      await this.client.getBot().api.setMyCommands(
+        [
+          { command: "status", description: "Agent status & info" },
+          { command: "reset", description: "Reset session context" },
+          { command: "history", description: "Recent messages" },
+          { command: "settings", description: "View all settings" },
+          { command: "wallet", description: "TON wallet balance" },
+          { command: "portfolio", description: "Portfolio summary" },
+          { command: "model", description: "Switch LLM model" },
+          { command: "strategy", description: "Trading thresholds" },
+          { command: "sniper", description: "Sniper commands" },
+          { command: "alerts", description: "Alert management" },
+          { command: "version", description: "Check for updates" },
+          { command: "update", description: "Update to latest version" },
+          { command: "clear", description: "Clear chat history" },
+          { command: "pause", description: "Pause agent" },
+          { command: "resume", description: "Resume agent" },
+        ],
+        { scope: { type: "all_chat_administrators" } }
+      );
       log.info("Registered bot commands with BotFather");
     } catch (error) {
       log.warn({ err: error }, "Failed to register bot commands");
