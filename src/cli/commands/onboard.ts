@@ -542,13 +542,18 @@ async function runInteractiveOnboarding(
       // Same approach as OpenClaw: user runs `claude setup-token`, gets a token, pastes it
       noteBox(
         "Connect your Claude Pro/Max subscription\n\n" +
-          "Open a SECOND terminal/PowerShell and run these commands:\n\n" +
-          "   1. npm install -g @anthropic-ai/claude-code\n" +
-          "   2. claude login\n" +
-          "      (browser opens → sign in → wait for 'Successfully logged in')\n" +
-          "   3. claude setup-token\n" +
-          "      (prints a long token starting with sk-ant-oat01-...)\n\n" +
-          "Copy the ENTIRE token and paste it below.",
+          "Open a SECOND terminal/PowerShell and follow these steps:\n\n" +
+          "   Step 1: npm install -g @anthropic-ai/claude-code\n" +
+          "           (wait for 'added X packages' message)\n\n" +
+          "   Step 2: claude login\n" +
+          "           (Claude Code opens — type /login and press Enter)\n" +
+          "           (browser opens → sign in with your Claude account)\n" +
+          "           (wait for 'Successfully logged in' in the terminal)\n" +
+          "           (then type /exit to close Claude Code)\n\n" +
+          "   Step 3: claude setup-token\n" +
+          "           (prints a long token starting with sk-ant-oat01-...)\n" +
+          "           (select and copy the ENTIRE token)\n\n" +
+          "Come back HERE and paste the token below.",
         "Claude Subscription",
         TON
       );
