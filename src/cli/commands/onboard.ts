@@ -1228,14 +1228,41 @@ async function runInteractiveOnboarding(
     // Bu session için yükle
     process.env.TELECLAW_ENCRYPT_SECRET = secret;
   } else {
-    // Ensure signing key exists in existing env file
-    const existingEnv = readFileSync(envFilePath, "utf-8");
+    // .env exists — update API key + ensure signing key
+    let existingEnv = readFileSync(envFilePath, "utf-8");
+
+    // Update or add API key
+    if (apiKey) {
+      if (existingEnv.includes("TELECLAW_API_KEY")) {
+        existingEnv = existingEnv.replace(
+          /^.*TELECLAW_API_KEY=.*$/m,
+          `export TELECLAW_API_KEY=${apiKey}`
+        );
+      } else {
+        existingEnv += `export TELECLAW_API_KEY=${apiKey}\n`;
+      }
+    }
+
+    // Update or add bot token
+    if (botToken) {
+      if (existingEnv.includes("TELECLAW_BOT_TOKEN")) {
+        existingEnv = existingEnv.replace(
+          /^.*TELECLAW_BOT_TOKEN=.*$/m,
+          `export TELECLAW_BOT_TOKEN=${botToken}`
+        );
+      } else {
+        existingEnv += `export TELECLAW_BOT_TOKEN=${botToken}\n`;
+      }
+    }
+
+    // Ensure signing key
     if (!existingEnv.includes("TELECLAW_SIGNING_KEY")) {
       const signingKey = randomBytes(32).toString("hex");
-      const appendContent = `export TELECLAW_SIGNING_KEY=${signingKey}\n`;
-      writeFileSync(envFilePath, existingEnv + appendContent, { encoding: "utf-8", mode: 0o600 });
-      spinner.succeed(DIM(`Signing key added to: ${envFilePath}`));
+      existingEnv += `export TELECLAW_SIGNING_KEY=${signingKey}\n`;
     }
+
+    writeFileSync(envFilePath, existingEnv, { encoding: "utf-8", mode: 0o600 });
+    spinner.succeed(DIM(`Secrets updated: ${envFilePath}`));
   }
 
   // Bot mode — already validated token above, no further auth needed
