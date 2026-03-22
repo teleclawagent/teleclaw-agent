@@ -548,47 +548,78 @@ async function runInteractiveOnboarding(
         TON
       );
 
-      try {
-        const { generateAuthorizeUrl, exchangeCode } =
-          await import("../../providers/claude-oauth-flow.js");
+      const { hasClaudeCodeCredentials, getClaudeAccessToken } =
+        await import("../../providers/claude-oauth-flow.js");
 
-        const { url: authorizeUrl, codeVerifier } = generateAuthorizeUrl();
+      // Check if already logged in
+      if (hasClaudeCodeCredentials()) {
+        const token = getClaudeAccessToken();
+        if (token) {
+          apiKey = token;
+          prompter.log(GREEN("✓ Claude subscription detected automatically!"));
+        }
+      }
 
-        // Open browser
-        const { exec: cpExec } = await import("child_process");
-        const openCmd =
-          process.platform === "win32"
-            ? `start "" "${authorizeUrl}"`
-            : process.platform === "darwin"
-              ? `open "${authorizeUrl}"`
-              : `xdg-open "${authorizeUrl}"`;
-        cpExec(openCmd);
-
-        prompter.log("Opening browser to sign in with your Claude account...\n");
-        prompter.log(`If browser didn't open, visit this URL:\n${CYAN(authorizeUrl)}\n`);
-        prompter.log(
-          "After signing in, Claude will show you an authorization code.\n" +
-            "Copy that code and paste it below.\n"
+      if (!apiKey) {
+        noteBox(
+          "Connect your Claude Pro/Max subscription\n\n" +
+            "Step 1: Open a SECOND terminal/PowerShell window\n\n" +
+            "Step 2: Run this command:\n" +
+            "   npx @anthropic-ai/claude-code auth login\n\n" +
+            "   (If that doesn't work, try:)\n" +
+            "   npx @anthropic-ai/claude-code login\n\n" +
+            "Step 3: Browser opens → sign in with your Claude account\n" +
+            "        Wait for 'Successfully logged in' message\n\n" +
+            "Step 4: Come back HERE and press Enter",
+          "Claude Subscription",
+          TON
         );
 
-        const authCode = await input({
-          message: "Paste the authorization code here",
-          theme,
-          validate: (value = "") => {
-            if (!value || value.trim().length === 0) return "Authorization code is required";
-            return true;
-          },
-        });
+        let retries = 0;
+        while (!apiKey && retries < 3) {
+          await input({
+            message:
+              retries === 0
+                ? "Press Enter after you've logged in..."
+                : "Credentials not found yet. Login in other terminal, then press Enter...",
+            theme,
+          });
 
-        prompter.log("Exchanging code for token...");
-        const result = await exchangeCode(authCode, codeVerifier);
-        apiKey = result.accessToken;
-        prompter.log(GREEN("✓ Claude subscription connected!"));
-      } catch (err) {
-        if (err instanceof CancelledError) throw err;
-        prompter.warn(`OAuth failed: ${err instanceof Error ? err.message : String(err)}`);
-        prompter.log("You can try again or use an API key instead.\n");
-        throw new CancelledError();
+          if (hasClaudeCodeCredentials()) {
+            const token = getClaudeAccessToken();
+            if (token) {
+              apiKey = token;
+              prompter.log(GREEN("✓ Claude subscription connected!"));
+              break;
+            }
+          }
+
+          retries++;
+          if (retries < 3) {
+            prompter.warn(
+              "Claude credentials not found at ~/.claude/.credentials.json\n" +
+                "Make sure you ran the login command and saw 'Successfully logged in'"
+            );
+          }
+        }
+
+        if (!apiKey) {
+          prompter.warn("Could not detect Claude credentials after 3 attempts.");
+          const useFallback = await confirm({
+            message: "Use an API key instead?",
+            default: true,
+            theme,
+          });
+          if (useFallback) {
+            apiKey = await password({
+              message: "Anthropic API Key",
+              theme,
+              validate: (value = "") => validateApiKeyFormat("anthropic", value) ?? true,
+            });
+          } else {
+            throw new CancelledError();
+          }
+        }
       }
       STEPS[1].value = `${providerMeta.displayName}  ${DIM("subscription ✓")}`;
     } else {

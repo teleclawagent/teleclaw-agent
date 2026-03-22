@@ -149,40 +149,19 @@ export function ProviderStep({ data, onChange }: StepProps) {
               <strong>🔑 Use your Claude Pro/Max subscription — no extra charges</strong>
             </div>
             <div style={{ marginBottom: '8px', padding: '8px', background: 'rgba(255,200,0,0.1)', borderRadius: '4px', fontSize: '0.9em' }}>
-              ⚠️ Open a <strong>separate terminal/command prompt</strong> and run these commands. Keep this page open.
+              ⚠️ Open a <strong>separate terminal/command prompt</strong> and run this command:
             </div>
             <div style={{ marginBottom: '12px' }}>
-              <strong>Step 1:</strong> Install Claude Code CLI<br />
-              <code style={{ display: 'block', margin: '6px 0', padding: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '4px' }}>
-                npm install -g @anthropic-ai/claude-code
+              <code style={{ display: 'block', margin: '6px 0', padding: '12px', background: 'rgba(0,0,0,0.15)', borderRadius: '4px', fontSize: '1.05em' }}>
+                npx @anthropic-ai/claude-code auth login
               </code>
-              <div style={{ fontSize: '0.8em', opacity: 0.7 }}>Wait for "added X packages" message</div>
+              <div style={{ fontSize: '0.85em', opacity: 0.8, marginTop: '6px' }}>
+                Browser opens → sign in with your Claude account → see "Successfully logged in" → come back here
+              </div>
             </div>
-            <div style={{ marginBottom: '12px' }}>
-              <strong>Step 2:</strong> Login to your Claude account<br />
-              <code style={{ display: 'block', margin: '6px 0', padding: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '4px' }}>
-                claude login --method browser
-              </code>
-              <div style={{ fontSize: '0.8em', opacity: 0.7 }}>Browser opens → sign in → you'll see "Successfully logged in"</div>
+            <div style={{ fontSize: '0.85em', opacity: 0.7 }}>
+              Your credentials are saved locally and auto-refresh. No token to copy/paste.
             </div>
-            <div style={{ marginBottom: '12px' }}>
-              <strong>Step 3:</strong> Generate your setup token<br />
-              <code style={{ display: 'block', margin: '6px 0', padding: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '4px' }}>
-                claude setup-token
-              </code>
-              <div style={{ fontSize: '0.8em', opacity: 0.7 }}>Prints a long token starting with "sk-ant-..." — copy ALL of it</div>
-            </div>
-            <div style={{ marginBottom: '12px' }}>
-              <strong>Step 4:</strong> Paste the token below
-            </div>
-            <details style={{ fontSize: '0.85em', opacity: 0.8 }}>
-              <summary style={{ cursor: 'pointer' }}>🔧 Troubleshooting</summary>
-              <ul style={{ marginTop: '6px', paddingLeft: '20px' }}>
-                <li>If <code>claude login</code> opens Claude Code instead of logging in: Press Ctrl+C, then try <code>claude login --method browser</code></li>
-                <li>If <code>claude setup-token</code> is not recognized: Try <code>npx @anthropic-ai/claude-code setup-token</code></li>
-                <li>Token starts with "sk-ant-" and is very long — make sure you copy the entire thing</li>
-              </ul>
-            </details>
           </div>
 
           <div className="form-group" style={{ marginTop: '12px' }}>
