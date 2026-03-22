@@ -84,26 +84,43 @@ export class AdminHandler {
   }
 
   /**
-   * Handle /start <claim_code> — allows first user to become admin.
-   * Returns response string if handled, null if not a claim attempt.
+   * Handle /start — first user to send /start becomes admin automatically.
+   * Also supports legacy /start <claim_code> for backward compatibility.
+   * Returns response string if handled, null if not a start attempt.
    */
   async handleClaimAttempt(command: AdminCommand, senderId: number): Promise<string | null> {
-    if (command.command !== "start" || command.args.length === 0) return null;
+    if (command.command !== "start") return null;
 
-    const code = command.args[0].toUpperCase();
-    const expectedCode = this.config.admin_claim_code;
-
-    if (!expectedCode) return null; // No claim code configured
+    // Already has admin(s) — check for legacy claim code
     if (this.config.admin_ids.length > 0) {
-      // Admin already claimed — clear the code for safety
+      if (command.args.length > 0) {
+        const code = command.args[0].toUpperCase();
+        const expectedCode = this.config.admin_claim_code;
+        if (expectedCode && code === expectedCode.toUpperCase()) {
+          // Legacy claim code matches — add as admin
+          if (!this.config.admin_ids.includes(senderId)) {
+            this.config.admin_ids.push(senderId);
+          }
+          (this.config as Record<string, unknown>).admin_claim_code = undefined;
+          if (this.fullConfig && this.configPath) {
+            if (!this.fullConfig.telegram.admin_ids.includes(senderId)) {
+              this.fullConfig.telegram.admin_ids.push(senderId);
+            }
+            delete (this.fullConfig.telegram as Record<string, unknown>).admin_claim_code;
+            try {
+              saveConfig(this.fullConfig, this.configPath);
+              log.info({ senderId }, "Admin claimed via legacy code and persisted");
+            } catch (err) {
+              log.error({ err }, "Failed to persist admin claim");
+            }
+          }
+          return `✅ You are now an admin!\n\nWelcome to Teleclaw. Use /help to see available commands.`;
+        }
+      }
       return null;
     }
 
-    if (code !== expectedCode.toUpperCase()) {
-      return "❌ Invalid claim code.";
-    }
-
-    // Claim successful — add as admin and persist
+    // No admins yet — first /start sender becomes admin automatically
     this.config.admin_ids.push(senderId);
     (this.config as Record<string, unknown>).admin_claim_code = undefined;
 
@@ -113,13 +130,13 @@ export class AdminHandler {
       delete (this.fullConfig.telegram as Record<string, unknown>).admin_claim_code;
       try {
         saveConfig(this.fullConfig, this.configPath);
-        log.info({ senderId }, "Admin claimed and persisted to config");
+        log.info({ senderId }, "First user auto-claimed as admin");
       } catch (err) {
         log.error({ err }, "Failed to persist admin claim");
       }
     }
 
-    return `✅ You are now the admin!\n\nWelcome to Teleclaw. Use /help to see available commands.`;
+    return `✅ You are now the admin!\n\nWelcome to Teleclaw. Send me a message to get started.`;
   }
 
   async handleCommand(

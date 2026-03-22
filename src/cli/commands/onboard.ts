@@ -587,9 +587,8 @@ async function runInteractiveOnboarding(
   // ════════════════════════════════════════════════════════════════════
   redraw(2);
 
-  // Admin claim code — generated at setup, user sends /start <code> to become admin
-  const claimCode = generateClaimCode();
-  _userId = 0; // Will be set when user claims via bot
+  // Admin — first /start sender becomes admin automatically
+  _userId = 0;
 
   dmPolicy = await select({
     message: "DM policy (private messages)",
@@ -1001,7 +1000,7 @@ async function runInteractiveOnboarding(
       rate_limit_messages_per_second: 1.0,
       rate_limit_groups_per_minute: 20,
       admin_ids: [],
-      admin_claim_code: claimCode,
+      // First /start sender becomes admin automatically
       agent_channel: null,
       debounce_ms: 1500,
       bot_token: botToken,
@@ -1124,16 +1123,6 @@ async function runInteractiveOnboarding(
   console.log();
   console.log(finalSummaryBox(STEPS, telegramConnected));
   console.log();
-  noteBox(
-    `Your admin claim code: ${GREEN.bold(claimCode)}\n` +
-      "\n" +
-      "To become admin, send this to your bot:\n" +
-      `  /start ${claimCode}\n` +
-      "\n" +
-      "This code can only be used once. Save it!",
-    "🔐 Admin Claim",
-    TON
-  );
   noteBox(
     "API key'lerin şifreli saklanıyor.\n" +
       "\n" +
