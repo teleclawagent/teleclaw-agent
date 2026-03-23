@@ -1,6 +1,6 @@
 /**
  * OpenAI Codex OAuth Flow
- * 
+ *
  * Reads OAuth tokens from local Codex CLI installation.
  * If user has ChatGPT Plus/Pro, Codex CLI can authenticate via OAuth
  * and we read those tokens — similar to claude-code-credentials.
@@ -20,6 +20,7 @@ interface CodexCredentials {
 }
 
 const CODEX_CONFIG_PATHS = [
+  join(homedir(), ".codex", "auth.json"),
   join(homedir(), ".codex", "credentials.json"),
   join(homedir(), ".codex", ".credentials.json"),
 ];
@@ -35,6 +36,14 @@ function readCodexCredentials(): CodexCredentials | null {
       if (parsed.access_token) return parsed;
       // OpenAI stores it nested sometimes
       if (parsed.openai?.access_token) return parsed.openai;
+      // auth.json format: { token, refresh_token, expires_at } or { api_key }
+      if (parsed.token)
+        return {
+          access_token: parsed.token,
+          refresh_token: parsed.refresh_token,
+          expires_at: parsed.expires_at,
+        };
+      if (parsed.api_key) return { access_token: parsed.api_key };
     } catch {
       continue;
     }
@@ -62,7 +71,7 @@ export function isCodexTokenValid(): boolean {
  */
 export function getCodexOAuthToken(fallbackKey?: string): string {
   const creds = readCodexCredentials();
-  
+
   if (creds?.access_token) {
     log.debug("Using Codex OAuth token");
     return creds.access_token;
@@ -75,6 +84,6 @@ export function getCodexOAuthToken(fallbackKey?: string): string {
 
   throw new Error(
     "OpenAI Codex credentials not found. Install Codex CLI and run 'codex login', " +
-    "or provide an API key manually."
+      "or provide an API key manually."
   );
 }
