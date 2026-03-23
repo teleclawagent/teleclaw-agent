@@ -732,7 +732,9 @@ export class AgentRuntime {
               continue;
             }
             log.error(`🚫 Rate limited after ${RATE_LIMIT_MAX_RETRIES} retries: ${errorMsg}`);
-            throw new Error(`I'm getting a lot of requests right now — try again in a moment 🦞`);
+            throw new Error(
+              `Rate limited 🚫 Try switching to another model with /models or wait a moment and try again.`
+            );
           } else if (
             errorMsg.includes("500") ||
             errorMsg.includes("502") ||
@@ -753,7 +755,15 @@ export class AgentRuntime {
             throw new Error(`Something's off on my end right now — try again in a minute 🦞`);
           } else {
             log.error(`🚨 API error: ${errorMsg}`);
-            throw new Error(`API error: ${errorMsg || "Unknown error"}`);
+            // User-friendly error with model switch hint
+            const switchHint =
+              errorMsg.includes("scope") ||
+              errorMsg.includes("unauthorized") ||
+              errorMsg.includes("401") ||
+              errorMsg.includes("403")
+                ? `\n\nYour current provider may not support this. Use /models to switch or /addprovider to set up a different one.`
+                : "";
+            throw new Error(`API error: ${errorMsg || "Unknown error"}${switchHint}`);
           }
         }
 
