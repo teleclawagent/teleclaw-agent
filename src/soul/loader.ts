@@ -119,6 +119,7 @@ export function buildSystemPrompt(options: {
   includeStrategy?: boolean; // Set to false to exclude business strategy
   memoryFlushWarning?: boolean;
   modelInfo?: string; // e.g. "anthropic/claude-opus-4-6"
+  toolCapabilities?: string; // Auto-generated capabilities summary from registry
 }): string {
   const soul = options.soul ?? loadSoul();
   const parts = [soul];
@@ -163,6 +164,12 @@ You have a personal workspace at \`~/.teleclaw/workspace/\` where you can store 
 - Use \`memory_write\` for important facts (goes to MEMORY.md)
 - Rename downloaded files to meaningful names (e.g., "user_avatar.jpg" instead of "123_456_789.jpg")
 `);
+
+  if (options.toolCapabilities) {
+    parts.push(
+      `\n## Your Capabilities\n\nYou have access to the following tool modules. When a user asks what you can do, refer to this list — these are your REAL capabilities, not guesses.\n\n${options.toolCapabilities}\n\n**Important:** When asked about your skills/abilities, list capabilities from this section. Don't say you can't do something if you have the tools for it.`
+    );
+  }
 
   parts.push(`\n## Response Format
 - Be concise. Respond in 1-3 short sentences when possible. Avoid long paragraphs and walls of text.

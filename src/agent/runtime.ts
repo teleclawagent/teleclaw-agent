@@ -468,6 +468,47 @@ export class AgentRuntime {
         .join("\n\n");
       const finalContext = additionalContext + (allHookContext ? `\n\n${allHookContext}` : "");
 
+      // Build capabilities summary from tool registry
+      let toolCapabilities: string | undefined;
+      if (this.toolRegistry) {
+        const modules = this.toolRegistry.getAvailableModules();
+        const MODULE_LABELS: Record<string, string> = {
+          agentic:
+            "💰 Agentic Wallet — Create wallets, trade tokens, set rules, withdraw, portfolio management",
+          stonfi: "🔄 STON.fi — Token search, quotes, swaps, pools, trending tokens on STON.fi DEX",
+          dedust: "🔄 DeDust — Token swaps, pool info, and quotes on DeDust DEX",
+          ton: "⛓️ TON Blockchain — Wallet balance, transactions, jetton info, NFTs, staking, smart contracts",
+          telegram:
+            "📱 Telegram — Send messages, photos, documents, manage chats, groups, stickers, polls, reactions",
+          fragment:
+            "🏪 Fragment — Gift collections, rarity data, floor prices, marketplace search, OTC matchmaking",
+          gift: "🎁 Gift Market — Gift trading, floor prices, portfolio tracking",
+          dns: "🌐 TON DNS — Domain lookup, resolve, availability check, pricing",
+          journal: "📝 Journal — Log events, query history, track activities",
+          workspace: "📁 Workspace — Read, write, list, manage files in your workspace",
+          web: "🌍 Web — Search the internet, fetch web pages",
+          bot: "🤖 Bot Management — Bot settings and configuration",
+          marketplace: "🛒 Marketplace — Search and compare prices across Fragment, Getgems, etc.",
+          alpha: "📡 Alpha Radar — Monitor mentions, detect alpha signals",
+          whale: "🐋 Whale Watcher — Track large transactions and whale movements",
+          portfolio: "📊 Portfolio — Track token holdings and portfolio value",
+          soul: "🧠 Soul — Read and update personality and behavior",
+          skill: "🔧 Skills — Install, list, remove custom plugins",
+          memory: "🧠 Memory — Save and recall persistent information",
+        };
+
+        const lines: string[] = [];
+        let totalTools = 0;
+        for (const mod of modules) {
+          const count = this.toolRegistry.getModuleToolCount(mod);
+          totalTools += count;
+          const label = MODULE_LABELS[mod] || `${mod} (${count} tools)`;
+          lines.push(`- ${label} (${count} tools)`);
+        }
+        lines.unshift(`**${totalTools} tools across ${modules.length} modules:**\n`);
+        toolCapabilities = lines.join("\n");
+      }
+
       const systemPrompt = buildSystemPrompt({
         soul: this.soul,
         userName,
@@ -480,6 +521,7 @@ export class AgentRuntime {
         includeStrategy: !effectiveIsGroup,
         memoryFlushWarning: needsMemoryFlush,
         modelInfo: `${this.config.agent.provider || "anthropic"}/${this.config.agent.model}`,
+        toolCapabilities,
       });
 
       // Hook: prompt:after — observing, analytics on prompt size
