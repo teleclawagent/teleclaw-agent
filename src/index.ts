@@ -10,6 +10,7 @@ import type { TelegramTransport, CallbackQueryEvent } from "./telegram/transport
 import { MessageHandler } from "./telegram/handlers.js";
 import { AdminHandler } from "./telegram/admin.js";
 import { MessageDebouncer } from "./telegram/debounce.js";
+import { ProviderWizard } from "./telegram/provider-wizard.js";
 import { getDatabase, closeDatabase, initializeMemory, type MemorySystem } from "./memory/index.js";
 import { getWalletAddress } from "./ton/wallet-service.js";
 import { setTonapiKey } from "./constants/api-endpoints.js";
@@ -69,6 +70,7 @@ export class TeleclawApp {
   private webuiServer: WebUIServer | null = null;
   private pluginWatcher: PluginWatcher | null = null;
   private mcpConnections: McpConnection[] = [];
+  private providerWizard: ProviderWizard | null = null;
   private callbackHandlerRegistered = false;
   private messageHandlersRegistered = false;
   private lifecycle = new AgentLifecycle();
@@ -180,6 +182,9 @@ export class TeleclawApp {
       this.config,
       this.configPath
     );
+
+    // Provider wizard for multi-model management
+    this.providerWizard = new ProviderWizard(this.bridge, getDatabase().getDb());
   }
 
   /**
@@ -888,6 +893,10 @@ export class TeleclawApp {
                   `🔐 **Wallet & OTC**\n` +
                   `/verify — Verify your TON wallet (0.01 TON)\n` +
                   `/otc — OTC Matchmaker info\n\n` +
+                  `🔌 **AI Provider**\n` +
+                  `/addprovider — Add a new AI provider\n` +
+                  `/models — Switch AI model\n` +
+                  `/removeprovider — Remove custom settings\n\n` +
                   `⚙️ **Settings**\n` +
                   `/apikey — Set your own LLM API key\n` +
                   `/mymodel — Set your preferred model\n` +
@@ -953,6 +962,40 @@ export class TeleclawApp {
             });
           }
           return;
+        }
+
+        // /addprovider, /models, /removeprovider — multi-provider wizard
+        if (this.providerWizard) {
+          if (userCmd.command === "addprovider") {
+            await this.providerWizard.handleAddProvider(
+              message.chatId,
+              message.senderId,
+              message.id
+            );
+            return;
+          }
+          if (userCmd.command === "models") {
+            await this.providerWizard.handleModels(message.chatId, message.senderId, message.id);
+            return;
+          }
+          if (userCmd.command === "removeprovider") {
+            await this.providerWizard.handleRemoveProvider(
+              message.chatId,
+              message.senderId,
+              message.id
+            );
+            return;
+          }
+          if (userCmd.command === "cancel") {
+            if (this.providerWizard.cancelWizard(message.senderId)) {
+              await this.bridge.sendMessage({
+                chatId: message.chatId,
+                text: "❌ Wizard cancelled.",
+                replyToId: message.id,
+              });
+              return;
+            }
+          }
         }
 
         // /apikey, /mymodel, /mysettings — user settings
@@ -1033,6 +1076,16 @@ export class TeleclawApp {
 
           return;
         }
+      }
+
+      // Intercept text messages during provider wizard (API key input)
+      if (this.providerWizard && this.providerWizard.isInWizard(message.senderId)) {
+        const handled = await this.providerWizard.handleTextMessage(
+          message.chatId,
+          message.senderId,
+          message.text
+        );
+        if (handled) return;
       }
 
       // Skip if paused (admin commands still work above)
@@ -1309,6 +1362,12 @@ export class TeleclawApp {
     // Callback query handler: register ONCE, dispatch dynamically
     if (!this.callbackHandlerRegistered) {
       this.bridge.addCallbackQueryHandler(async (cbEvent: CallbackQueryEvent) => {
+        // Provider wizard callbacks (pw:, ms:, rp:)
+        if (this.providerWizard) {
+          const handled = await this.providerWizard.handleCallback(cbEvent);
+          if (handled) return;
+        }
+
         const { queryId, data, chatId, messageId, userId } = cbEvent;
         const parts = data.split(":");
         const action = parts[0];

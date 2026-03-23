@@ -881,6 +881,11 @@ export class AdminHandler {
 /settings — View all current settings
 /history — Last 10 messages in chat
 
+🔌 **Multi-Provider**
+/addprovider — Add a new AI provider
+/models — Switch AI model (inline buttons)
+/removeprovider — Remove custom AI settings
+
 🧠 **Agent**
 /model <name> — Switch LLM model
 /loop <1-50> — Set max agentic iterations
