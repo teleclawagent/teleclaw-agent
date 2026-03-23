@@ -459,9 +459,14 @@ export class MessageHandler {
             // Agent returned text but didn't use the send tool - send it manually
             let responseText = response.content;
 
-            // Truncate if needed
+            // Truncate at sentence/word boundary if needed
             if (responseText.length > this.config.max_message_length) {
-              responseText = responseText.slice(0, this.config.max_message_length - 3) + "...";
+              const limit = this.config.max_message_length - 20;
+              let cutAt = responseText.lastIndexOf("\n", limit);
+              if (cutAt < limit * 0.5) cutAt = responseText.lastIndexOf(". ", limit);
+              if (cutAt < limit * 0.5) cutAt = responseText.lastIndexOf(" ", limit);
+              if (cutAt < limit * 0.5) cutAt = limit;
+              responseText = responseText.slice(0, cutAt).trimEnd() + "\n\n_(truncated)_";
             }
 
             const sentMessage = await this.bridge.sendMessage({

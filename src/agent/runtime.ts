@@ -694,7 +694,7 @@ export class AgentRuntime {
             overflowResets++;
             if (overflowResets > 1) {
               throw new Error(
-                "Context overflow persists after session reset. Message may be too large for the model's context window."
+                "Our conversation got too long — send /reset to start fresh, then try again 🦞"
               );
             }
             log.error(`🚨 Context overflow detected: ${errorMsg}`);
@@ -732,9 +732,7 @@ export class AgentRuntime {
               continue;
             }
             log.error(`🚫 Rate limited after ${RATE_LIMIT_MAX_RETRIES} retries: ${errorMsg}`);
-            throw new Error(
-              `API rate limited after ${RATE_LIMIT_MAX_RETRIES} retries. Please try again later.`
-            );
+            throw new Error(`I'm getting a lot of requests right now — try again in a moment 🦞`);
           } else if (
             errorMsg.includes("500") ||
             errorMsg.includes("502") ||
@@ -752,9 +750,7 @@ export class AgentRuntime {
               continue;
             }
             log.error(`🚨 Server error after ${SERVER_ERROR_MAX_RETRIES} retries: ${errorMsg}`);
-            throw new Error(
-              `API server error after ${SERVER_ERROR_MAX_RETRIES} retries. The provider may be experiencing issues.`
-            );
+            throw new Error(`Something's off on my end right now — try again in a minute 🦞`);
           } else {
             log.error(`🚨 API error: ${errorMsg}`);
             throw new Error(`API error: ${errorMsg || "Unknown error"}`);
@@ -1038,7 +1034,7 @@ export class AgentRuntime {
       if (!finalResponse) {
         log.error("⚠️ Agentic loop exited early without final response");
         return {
-          content: "Internal error: Agent loop failed to produce a response.",
+          content: "Something went wrong on my end — try again in a moment 🦞",
           toolCalls: [],
         };
       }
