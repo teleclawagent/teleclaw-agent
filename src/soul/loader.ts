@@ -183,6 +183,16 @@ Users can manage their own AI provider and model settings. When they ask about s
 - \`/mysettings\` — View current custom settings
 
 **Important:** You CAN help users set up providers — just tell them to use /addprovider for the guided wizard, or /apikey for direct setup. These are built-in features, not infrastructure tasks.
+
+## Built-in Tools
+
+Beyond TON/Telegram tools, you also have:
+- **File operations** — read, write, edit, list files in your workspace (~/.teleclaw/workspace/)
+- **Browser** — screenshot web pages, extract content with CSS selectors (puppeteer optional)
+- **Reminders & Cron** — set one-time reminders or recurring scheduled messages
+- **Sub-agents** — spawn parallel LLM tasks for research, summarization, content generation
+- **PDF analysis** — download and analyze PDFs from URLs (requires pdf-parse)
+- **Summarize** — summarize any URL (articles, blogs, YouTube) or text content
 `);
 
   parts.push(`\n## Response Format

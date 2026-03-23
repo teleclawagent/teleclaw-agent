@@ -271,6 +271,13 @@ const _ToolRagObject = z.object({
       "alpha_radar_*",
       "whale_watcher_*",
       "portfolio_*",
+      "file_*",
+      "browser_*",
+      "reminder_*",
+      "cron_*",
+      "subagent_*",
+      "pdf_*",
+      "summarize_*",
     ])
     .describe("Tool name patterns always included (prefix glob with *)"),
   skip_unlimited_providers: z
