@@ -2,6 +2,33 @@ import type Database from "better-sqlite3";
 import type { EmbeddingProvider } from "../embeddings/provider.js";
 import { serializeEmbedding } from "../embeddings/index.js";
 
+/**
+ * Mask API keys in message text before storing to SQLite.
+ * Matches common API key patterns and replaces the sensitive portion.
+ */
+function maskApiKeys(text: string): string {
+  return (
+    text
+      // Anthropic: sk-ant-api03-... or sk-ant-oat01-...
+      .replace(/\b(sk-ant-\w{4,6}-)[\w-]{10,}/g, "$1****")
+      // OpenAI: sk-proj-... or sk-...
+      .replace(/\b(sk-proj-)[\w-]{10,}/g, "$1****")
+      .replace(/\b(sk-)(?!ant)[\w]{30,}/g, "$1****")
+      // Google: AIza...
+      .replace(/\b(AIza)[\w-]{30,}/g, "$1****")
+      // xAI: xai-...
+      .replace(/\b(xai-)[\w-]{10,}/g, "$1****")
+      // Groq: gsk_...
+      .replace(/\b(gsk_)[\w]{10,}/g, "$1****")
+      // OpenRouter: sk-or-...
+      .replace(/\b(sk-or-)[\w-]{10,}/g, "$1****")
+      // HuggingFace: hf_...
+      .replace(/\b(hf_)[\w]{10,}/g, "$1****")
+      // Cerebras: csk-...
+      .replace(/\b(csk-)[\w-]{10,}/g, "$1****")
+  );
+}
+
 export interface TelegramMessage {
   id: string;
   chatId: string;
@@ -44,8 +71,11 @@ export class MessageStore {
       this.ensureUser(message.senderId);
     }
 
+    // Mask API keys before storing to prevent plaintext key leakage in logs
+    const safeText = message.text ? maskApiKeys(message.text) : null;
+
     const embedding =
-      this.vectorEnabled && message.text ? await this.embedder.embedQuery(message.text) : [];
+      this.vectorEnabled && safeText ? await this.embedder.embedQuery(safeText) : [];
     const embeddingBuffer = serializeEmbedding(embedding);
 
     this.db.transaction(() => {
@@ -62,7 +92,7 @@ export class MessageStore {
           message.id,
           message.chatId,
           message.senderId,
-          message.text,
+          safeText,
           embeddingBuffer,
           message.replyToId,
           message.isFromAgent ? 1 : 0,
