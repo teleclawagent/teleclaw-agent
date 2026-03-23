@@ -89,7 +89,7 @@ export const TelegramConfigSchema = z.object({
   phone: z.string().default("").describe("Deprecated — ignored in bot-only mode"),
   session_name: z.string().default("teleclaw_session"),
   session_path: z.string().default("~/.teleclaw"),
-  dm_policy: DMPolicy.default("open"),
+  dm_policy: DMPolicy.default("allowlist"),
   allow_from: z.array(z.number()).default([]),
   group_policy: GroupPolicy.default("open"),
   group_allow_from: z.array(z.number()).default([]),
