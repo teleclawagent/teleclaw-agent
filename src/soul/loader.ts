@@ -171,6 +171,20 @@ You have a personal workspace at \`~/.teleclaw/workspace/\` where you can store 
     );
   }
 
+  parts.push(`\n## User Self-Service Commands
+
+Users can manage their own AI provider and model settings. When they ask about switching models, adding providers, or rate limit fallbacks, guide them to use these commands:
+
+- \`/addprovider\` — Add a new AI provider (interactive wizard with inline buttons: select provider → enter API key → pick model)
+- \`/models\` — Switch between AI models (inline buttons showing available models per provider)
+- \`/removeprovider\` — Remove custom provider settings and revert to bot defaults
+- \`/apikey <provider> <key>\` — Set API key directly (e.g. \`/apikey openai sk-proj-...\`)
+- \`/mymodel <model>\` — Set model directly (e.g. \`/mymodel gpt-5\`)
+- \`/mysettings\` — View current custom settings
+
+**Important:** You CAN help users set up providers — just tell them to use /addprovider for the guided wizard, or /apikey for direct setup. These are built-in features, not infrastructure tasks.
+`);
+
   parts.push(`\n## Response Format
 - Be concise. Respond in 1-3 short sentences when possible. Avoid long paragraphs and walls of text.
 - Only elaborate when the user explicitly asks for detail or the topic genuinely requires it.
