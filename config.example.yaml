@@ -70,7 +70,7 @@ webui:
 # Set enabled: false to disable and send all tools to the LLM.
 # tool_rag:
 #   enabled: true                      # Enabled by default — disable with false
-#   top_k: 25                          # Max tools to retrieve per LLM call
+#   top_k: 64                          # Max tools to retrieve per LLM call
 #   skip_unlimited_providers: true     # Skip RAG for providers with no tool limit (Anthropic, etc.)
 #   always_include:                    # Tools always included regardless of query
 #     - telegram_send_message
