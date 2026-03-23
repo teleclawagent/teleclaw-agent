@@ -609,6 +609,9 @@ export class AgentRuntime {
             chatId,
             isAdmin
           );
+          log.info(
+            `📦 Tools bypass RAG: ${tools?.length ?? 0}/${this.toolRegistry?.count ?? 0} tools sent to LLM (toolLimit=${providerMeta.toolLimit}, isGroup=${effectiveIsGroup}, isAdmin=${isAdmin})`
+          );
         }
       }
 
