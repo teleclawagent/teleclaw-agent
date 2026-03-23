@@ -82,7 +82,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://platform.openai.com/api-keys",
     defaultModel: "gpt-5.4",
     utilityModel: "gpt-4o-mini",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "openai",
   },
   // openai-codex kept for backward compat — maps to openai
@@ -95,7 +95,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://platform.openai.com/",
     defaultModel: "gpt-5.4",
     utilityModel: "gpt-4o-mini",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "openai",
   },
   google: {
@@ -107,7 +107,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://aistudio.google.com/apikey",
     defaultModel: "gemini-2.5-flash",
     utilityModel: "gemini-2.0-flash-lite",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "google",
   },
   xai: {
@@ -119,7 +119,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://console.x.ai/",
     defaultModel: "grok-3",
     utilityModel: "grok-3-mini-fast",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "xai",
   },
   groq: {
@@ -131,7 +131,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://console.groq.com/keys",
     defaultModel: "llama-3.3-70b-versatile",
     utilityModel: "llama-3.1-8b-instant",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "groq",
   },
   openrouter: {
@@ -143,7 +143,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://openrouter.ai/keys",
     defaultModel: "anthropic/claude-opus-4.5",
     utilityModel: "google/gemini-2.5-flash-lite",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "openrouter",
   },
   moonshot: {
@@ -155,7 +155,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://platform.moonshot.ai/",
     defaultModel: "k2p5",
     utilityModel: "k2p5",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "kimi-coding",
   },
   mistral: {
@@ -167,7 +167,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://console.mistral.ai/api-keys",
     defaultModel: "devstral-small-2507",
     utilityModel: "ministral-8b-latest",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "mistral",
   },
   cerebras: {
@@ -179,7 +179,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://cloud.cerebras.ai/",
     defaultModel: "qwen-3-235b-a22b-instruct-2507",
     utilityModel: "llama3.1-8b",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "cerebras",
   },
   zai: {
@@ -191,7 +191,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://z.ai/manage-apikey/apikey-list",
     defaultModel: "glm-4.7",
     utilityModel: "glm-4.7-flash",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "zai",
   },
   minimax: {
@@ -203,7 +203,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://platform.minimax.io/",
     defaultModel: "MiniMax-M2.5",
     utilityModel: "MiniMax-M2",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "minimax",
   },
   huggingface: {
@@ -215,7 +215,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://huggingface.co/settings/tokens",
     defaultModel: "deepseek-ai/DeepSeek-V3.2",
     utilityModel: "Qwen/Qwen3-Next-80B-A3B-Instruct",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "huggingface",
   },
   cocoon: {
@@ -227,7 +227,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://cocoon.network",
     defaultModel: "Qwen/Qwen3-32B",
     utilityModel: "Qwen/Qwen3-32B",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "cocoon",
   },
   local: {
@@ -239,7 +239,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "",
     defaultModel: "auto",
     utilityModel: "auto",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "local",
   },
   deepseek: {
@@ -251,7 +251,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://platform.deepseek.com/api_keys",
     defaultModel: "deepseek-chat",
     utilityModel: "deepseek-chat",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "deepseek",
   },
   together: {
@@ -263,7 +263,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://api.together.xyz/settings/api-keys",
     defaultModel: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
     utilityModel: "meta-llama/Llama-3.1-8B-Instruct-Turbo",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "together",
   },
   venice: {
@@ -275,7 +275,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://venice.ai/settings/api",
     defaultModel: "deepseek-r1-671b",
     utilityModel: "llama-3.3-70b",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "venice",
   },
   litellm: {
@@ -287,7 +287,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://docs.litellm.ai/",
     defaultModel: "gpt-4o",
     utilityModel: "gpt-4o-mini",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "litellm",
   },
   qwen: {
@@ -299,7 +299,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://bailian.console.alibabacloud.com/",
     defaultModel: "qwen3-235b-a22b",
     utilityModel: "qwen3-30b-a3b",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "qwen",
   },
   volcengine: {
@@ -311,7 +311,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://console.volcengine.com/",
     defaultModel: "deepseek-r1-250528",
     utilityModel: "deepseek-v3-250324",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "volcengine",
   },
   byteplus: {
@@ -323,7 +323,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://console.byteplus.com/",
     defaultModel: "deepseek-r1-250528",
     utilityModel: "deepseek-v3-250324",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "byteplus",
   },
   "cloudflare-ai": {
@@ -335,7 +335,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://dash.cloudflare.com/",
     defaultModel: "workers-ai",
     utilityModel: "workers-ai",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "cloudflare-ai",
   },
   copilot: {
@@ -347,7 +347,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://github.com/settings/copilot",
     defaultModel: "claude-sonnet-4-6",
     utilityModel: "gpt-4o-mini",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "copilot",
   },
   chutes: {
@@ -359,7 +359,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://chutes.ai",
     defaultModel: "chutes-default",
     utilityModel: "chutes-default",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "chutes",
   },
   kilo: {
@@ -371,7 +371,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://kilo.health",
     defaultModel: "anthropic/claude-opus-4.5",
     utilityModel: "google/gemini-2.5-flash-lite",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "openrouter",
   },
   qianfan: {
@@ -383,7 +383,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://console.bce.baidu.com/qianfan/",
     defaultModel: "ernie-4.5-8k",
     utilityModel: "ernie-4.5-8k",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "qianfan",
   },
   modelstudio: {
@@ -395,7 +395,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://bailian.console.alibabacloud.com/",
     defaultModel: "qwen3-235b-a22b",
     utilityModel: "qwen3-30b-a3b",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "modelstudio",
   },
   "vercel-ai": {
@@ -407,7 +407,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://sdk.vercel.ai/",
     defaultModel: "anthropic/claude-sonnet-4-6",
     utilityModel: "anthropic/claude-haiku-4-5",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "vercel-ai",
   },
   opencode: {
@@ -419,7 +419,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://opencode.ai",
     defaultModel: "claude-sonnet-4-6",
     utilityModel: "gpt-4o-mini",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "opencode",
   },
   xiaomi: {
@@ -431,7 +431,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://xiaoai.mi.com/",
     defaultModel: "xiaomi-default",
     utilityModel: "xiaomi-default",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "xiaomi",
   },
   synthetic: {
@@ -443,7 +443,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "https://synthetic.computer",
     defaultModel: "claude-sonnet-4-6",
     utilityModel: "claude-haiku-4-5",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "anthropic",
   },
   custom: {
@@ -455,7 +455,7 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     consoleUrl: "",
     defaultModel: "custom",
     utilityModel: "custom",
-    toolLimit: 128,
+    toolLimit: null,
     piAiProvider: "openai",
   },
 };

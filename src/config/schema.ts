@@ -246,7 +246,7 @@ export const McpConfigSchema = _McpObject.default(_McpObject.parse({}));
 
 const _ToolRagObject = z.object({
   enabled: z.boolean().default(true).describe("Enable semantic tool retrieval (Tool RAG)"),
-  top_k: z.number().default(25).describe("Max tools to retrieve per LLM call"),
+  top_k: z.number().default(64).describe("Max tools to retrieve per LLM call"),
   always_include: z
     .array(z.string())
     .default([
