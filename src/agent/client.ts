@@ -20,7 +20,7 @@ import {
   refreshClaudeCodeApiKey,
 } from "../providers/claude-code-credentials.js";
 import { getCodexOAuthToken } from "../providers/openai-codex-oauth.js";
-import { getCopilotApiKey } from "../providers/github-copilot-auth.js";
+import { getCopilotApiKey as _getCopilotApiKey } from "../providers/github-copilot-auth.js";
 
 const log = createLogger("LLM");
 
@@ -261,10 +261,13 @@ export async function chatWithContext(
 
   const temperature = options.temperature ?? config.temperature;
 
+  // openai-codex (ChatGPT subscription) doesn't support temperature parameter
+  const isCodexProvider = provider === "openai-codex";
+
   const completeOptions: Record<string, unknown> = {
     apiKey: getEffectiveApiKey(provider, config.api_key),
     maxTokens: options.maxTokens ?? config.max_tokens,
-    temperature,
+    ...(isCodexProvider ? {} : { temperature }),
     sessionId: options.sessionId,
     cacheRetention: "long",
   };
