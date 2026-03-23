@@ -71,7 +71,7 @@ webui:
 # tool_rag:
 #   enabled: true                      # Enabled by default — disable with false
 #   top_k: 25                          # Max tools to retrieve per LLM call
-#   skip_unlimited_providers: false    # RAG applies to ALL providers (including Anthropic)
+#   skip_unlimited_providers: true     # Skip RAG for providers with no tool limit (Anthropic, etc.)
 #   always_include:                    # Tools always included regardless of query
 #     - telegram_send_message
 #     - telegram_reply_message
@@ -79,6 +79,11 @@ webui:
 #     - telegram_send_document
 #     - "journal_*"                    # Prefix glob: all journal_ tools
 #     - "workspace_*"
+#     - "agentic_wallet_*"
+#     - "stonfi_*"
+#     - "dedust_*"
+#     - "ton_*"
+#     - "fragment_*"
 #     - "web_*"
 
 # Deals / OTC trading module

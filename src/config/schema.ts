@@ -257,11 +257,25 @@ const _ToolRagObject = z.object({
       "journal_*",
       "workspace_*",
       "web_*",
+      "agentic_wallet_*",
+      "stonfi_*",
+      "dedust_*",
+      "ton_*",
+      "fragment_*",
+      "gift_market_*",
+      "dns_*",
+      "soul_*",
+      "skill_*",
+      "bot_*",
+      "marketplace_*",
+      "alpha_radar_*",
+      "whale_watcher_*",
+      "portfolio_*",
     ])
     .describe("Tool name patterns always included (prefix glob with *)"),
   skip_unlimited_providers: z
     .boolean()
-    .default(false)
+    .default(true)
     .describe("Skip Tool RAG for providers with no tool limit (e.g. Anthropic)"),
 });
 export const ToolRagConfigSchema = _ToolRagObject.default(_ToolRagObject.parse({}));
@@ -348,22 +362,10 @@ export const ConfigSchema = z.object({
     .string()
     .optional()
     .describe("Brave Search API key (from https://brave.com/search/api/)"),
-  gemini_api_key: z
-    .string()
-    .optional()
-    .describe("Google Gemini API key for search grounding"),
-  xai_api_key: z
-    .string()
-    .optional()
-    .describe("xAI (Grok) API key for web search"),
-  kimi_api_key: z
-    .string()
-    .optional()
-    .describe("Moonshot/Kimi API key for web search"),
-  perplexity_api_key: z
-    .string()
-    .optional()
-    .describe("Perplexity API key for web search"),
+  gemini_api_key: z.string().optional().describe("Google Gemini API key for search grounding"),
+  xai_api_key: z.string().optional().describe("xAI (Grok) API key for web search"),
+  kimi_api_key: z.string().optional().describe("Moonshot/Kimi API key for web search"),
+  perplexity_api_key: z.string().optional().describe("Perplexity API key for web search"),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

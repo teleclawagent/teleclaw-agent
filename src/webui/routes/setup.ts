@@ -358,7 +358,7 @@ export function createSetupRoutes(): Hono {
             "workspace_*",
             "web_*",
           ],
-          skip_unlimited_providers: false,
+          skip_unlimited_providers: true,
         },
         capabilities: {
           exec: {

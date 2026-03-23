@@ -1110,7 +1110,7 @@ async function runInteractiveOnboarding(
         "workspace_*",
         "web_*",
       ],
-      skip_unlimited_providers: false,
+      skip_unlimited_providers: true,
     },
     logging: { level: "info", pretty: true },
     mcp: { servers: {} },
@@ -1354,7 +1354,7 @@ async function runNonInteractiveOnboarding(
         "workspace_*",
         "web_*",
       ],
-      skip_unlimited_providers: false,
+      skip_unlimited_providers: true,
     },
     logging: { level: "info", pretty: true },
     capabilities: {
