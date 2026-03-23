@@ -25,8 +25,9 @@ import { getModelsForProvider } from "../config/model-catalog.js";
 // ── Types ────────────────────────────────────────────────────────────────
 
 interface WizardState {
-  step: "select_provider" | "enter_key" | "select_model";
+  step: "select_provider" | "enter_key" | "enter_sub_token" | "select_model";
   provider?: string;
+  subType?: "chatgpt" | "claude";
   chatId: string;
   messageId?: number;
   createdAt: number;
@@ -71,12 +72,20 @@ export class ProviderWizard {
   // ── /addprovider ──────────────────────────────────────────────────────
 
   async handleAddProvider(chatId: string, senderId: number, replyToId?: number): Promise<void> {
-    // Show provider selection
-    const rows = this.buildProviderKeyboard("pw:");
+    // Show provider selection with subscription options at top
+    const subRow: InlineButton[] = [
+      { text: "⭐ ChatGPT Sub", callback_data: "pw:sub:chatgpt" },
+      { text: "⭐ Claude Sub", callback_data: "pw:sub:claude" },
+    ];
+    const providerRows = this.buildProviderKeyboard("pw:");
+    const rows = [subRow, ...providerRows];
 
     const msg = await this.bridge.sendMessage({
       chatId,
-      text: "🔌 **Add AI Provider**\n\nSelect a provider to configure:",
+      text:
+        "🔌 **Add AI Provider**\n\n" +
+        "⭐ **Got a subscription?** Use your ChatGPT Plus/Pro or Claude Pro/Max plan directly — no extra API charges!\n\n" +
+        "Or select an API key provider below:",
       inlineKeyboard: rows,
       replyToId,
     });
@@ -181,8 +190,16 @@ export class ProviderWizard {
 
   async handleTextMessage(chatId: string, senderId: number, text: string): Promise<boolean> {
     const state = this.wizardStates.get(senderId);
-    if (!state || state.step !== "enter_key" || state.chatId !== chatId) {
+    if (!state || state.chatId !== chatId) {
       return false;
+    }
+    if (state.step !== "enter_key" && state.step !== "enter_sub_token") {
+      return false;
+    }
+
+    // Handle subscription token input
+    if (state.step === "enter_sub_token") {
+      return this.handleSubscriptionToken(chatId, senderId, text.trim(), state);
     }
 
     // Check expiry
@@ -291,6 +308,57 @@ export class ProviderWizard {
           `You can switch models anytime with /models`,
       });
       await this.bridge.answerCallbackQuery(queryId, { message: "✅ Provider configured!" });
+      return;
+    }
+
+    // Subscription flows: pw:sub:chatgpt or pw:sub:claude
+    if (data.startsWith("sub:")) {
+      const subType = data.slice(4) as "chatgpt" | "claude";
+
+      this.wizardStates.set(userId, {
+        step: "enter_sub_token",
+        subType,
+        chatId,
+        messageId,
+        createdAt: Date.now(),
+      });
+
+      if (subType === "chatgpt") {
+        await this.bridge.editMessage({
+          chatId,
+          messageId,
+          text:
+            "⭐ **ChatGPT Subscription Setup**\n\n" +
+            "Uses your ChatGPT Plus/Pro plan — no extra API charges!\n\n" +
+            "**Steps:**\n" +
+            "1. Install Codex CLI:\n`npm install -g @openai/codex`\n\n" +
+            "2. Login:\n`codex login`\n" +
+            "(browser opens → sign in with your OpenAI account)\n\n" +
+            "3. After login, paste the token shown in terminal here.\n" +
+            "Or if you see no token, just send `auto` and I'll try to detect it.\n\n" +
+            "Send /cancel to abort.",
+        });
+      } else {
+        await this.bridge.editMessage({
+          chatId,
+          messageId,
+          text:
+            "⭐ **Claude Subscription Setup**\n\n" +
+            "Uses your Claude Pro/Max plan — no extra API charges!\n\n" +
+            "**Steps:**\n" +
+            "1. Install Claude Code:\n`npm install -g @anthropic-ai/claude-code`\n\n" +
+            "2. Login:\n`claude login`\n" +
+            "(type /login → browser opens → sign in)\n" +
+            "(wait for 'Successfully logged in')\n" +
+            "(type /exit to close)\n\n" +
+            "3. Get your token:\n`claude setup-token`\n\n" +
+            "4. Copy the token (starts with `sk-ant-oat01-...`) and paste it here.\n\n" +
+            "Send /cancel to abort.",
+        });
+      }
+      await this.bridge.answerCallbackQuery(queryId, {
+        message: `${subType === "chatgpt" ? "ChatGPT" : "Claude"} setup`,
+      });
       return;
     }
 
@@ -499,6 +567,101 @@ export class ProviderWizard {
     }
   }
 
+  // ── Private: Subscription Token Handler ────────────────────────────────
+
+  private async handleSubscriptionToken(
+    chatId: string,
+    senderId: number,
+    token: string,
+    state: WizardState
+  ): Promise<boolean> {
+    // Check expiry
+    if (Date.now() - state.createdAt > WIZARD_EXPIRY_MS) {
+      this.wizardStates.delete(senderId);
+      return false;
+    }
+
+    if (state.subType === "chatgpt") {
+      if (token.toLowerCase() === "auto") {
+        // Try auto-detect from Codex CLI
+        try {
+          const { isCodexOAuthConfigured } = await import("../providers/openai-codex-oauth.js");
+          if (isCodexOAuthConfigured()) {
+            setUserProvider(this.db, senderId, "openai-codex", "");
+            setUserModel(this.db, senderId, "gpt-5.4");
+            this.wizardStates.delete(senderId);
+
+            await this.bridge.sendMessage({
+              chatId,
+              text:
+                "✅ **ChatGPT Subscription** connected!\n\n" +
+                "Auto-detected from Codex CLI.\n" +
+                "Model: **gpt-5.4**\n\n" +
+                "Switch models with /models",
+            });
+            return true;
+          }
+        } catch {
+          // Not installed
+        }
+        await this.bridge.sendMessage({
+          chatId,
+          text: "❌ Codex CLI not found or not logged in.\n\nInstall it first: `npm install -g @openai/codex`\nThen: `codex login`\n\nOr paste your API key directly.",
+        });
+        return true;
+      }
+
+      // Accept token or API key
+      if (token.startsWith("sk-")) {
+        setUserProvider(this.db, senderId, "openai", token);
+        setUserModel(this.db, senderId, "gpt-5.4");
+        this.wizardStates.delete(senderId);
+
+        await this.bridge.sendMessage({
+          chatId,
+          text:
+            "✅ **OpenAI** configured!\n\n" +
+            "Model: **gpt-5.4**\n\n" +
+            "⚠️ Delete your message containing the key.\n" +
+            "Switch models with /models",
+        });
+        return true;
+      }
+
+      await this.bridge.sendMessage({
+        chatId,
+        text: "❌ Invalid token. Send `auto` to auto-detect, or paste an API key starting with `sk-`.\n\nSend /cancel to abort.",
+      });
+      return true;
+    }
+
+    if (state.subType === "claude") {
+      if (token.startsWith("sk-ant-")) {
+        setUserProvider(this.db, senderId, "claude-code", token);
+        setUserModel(this.db, senderId, "claude-opus-4-6");
+        this.wizardStates.delete(senderId);
+
+        await this.bridge.sendMessage({
+          chatId,
+          text:
+            "✅ **Claude Subscription** connected!\n\n" +
+            "Model: **claude-opus-4-6**\n\n" +
+            "⚠️ Delete your message containing the token.\n" +
+            "Switch models with /models",
+        });
+        return true;
+      }
+
+      await this.bridge.sendMessage({
+        chatId,
+        text: "❌ Invalid token. It should start with `sk-ant-oat01-...`\n\nRun `claude setup-token` and paste the full token.\n\nSend /cancel to abort.",
+      });
+      return true;
+    }
+
+    return false;
+  }
+
   // ── Private: Helpers ──────────────────────────────────────────────────
 
   private buildProviderKeyboard(prefix: string): InlineButton[][] {
@@ -544,7 +707,7 @@ export class ProviderWizard {
       this.wizardStates.delete(userId);
       return false;
     }
-    return state.step === "enter_key";
+    return state.step === "enter_key" || state.step === "enter_sub_token";
   }
 
   /** Handle /cancel during wizard */
