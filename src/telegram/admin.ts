@@ -256,26 +256,16 @@ export class AdminHandler {
     const cfg = this.agent.getConfig();
     const provider = cfg.agent.provider || "anthropic";
 
-    // Import model catalog
-    const allModels: Array<{ value: string; name: string; description: string }> = [];
-    try {
-      const catalog = require("../../config/model-catalog.js") as {
-        MODEL_OPTIONS: Record<string, Array<{ value: string; name: string; description: string }>>;
-      };
-      // Show ALL providers' models
-      for (const [prov, models] of Object.entries(catalog.MODEL_OPTIONS)) {
-        for (const m of models) {
-          allModels.push({ ...m, description: `${prov} — ${m.description}` });
-        }
-      }
-    } catch {
-      // catalog unavailable
+    if (command.args.length === 0) {
+      return (
+        `Current: ${provider}/${cfg.agent.model}\n` +
+        `\n/model <model_name> to switch\n` +
+        `/model status for details`
+      );
     }
 
-    if (command.args.length === 0) {
-      let response = `🧠 **Current model:** \`${cfg.agent.model}\`\n📡 **Provider:** ${provider}\n`;
-
-      // Group by provider
+    if (command.args[0] === "status") {
+      let response = `🧠 **Model:** \`${cfg.agent.model}\`\n📡 **Provider:** ${provider}\n`;
       try {
         const catalog = require("../../config/model-catalog.js") as {
           MODEL_OPTIONS: Record<
@@ -283,29 +273,23 @@ export class AdminHandler {
             Array<{ value: string; name: string; description: string }>
           >;
         };
-        for (const [prov, models] of Object.entries(catalog.MODEL_OPTIONS)) {
-          response += `\n**${prov.charAt(0).toUpperCase() + prov.slice(1)}:**\n`;
-          for (const m of models) {
+        const key = provider === "claude-code" ? "anthropic" : provider;
+        const provModels = catalog.MODEL_OPTIONS[key];
+        if (provModels) {
+          response += `\n**Available:**\n`;
+          for (const m of provModels) {
             const marker = m.value === cfg.agent.model ? " ✅" : "";
-            response += `• \`${m.value}\`${marker}\n  ${m.name} — ${m.description}\n`;
+            response += `• \`${m.value}\`${marker} — ${m.description}\n`;
           }
         }
       } catch {
         // catalog unavailable
       }
-
-      response += `\n**Usage:** \`/model <model_name>\``;
       return response;
     }
 
     const newModel = command.args[0];
     const oldModel = cfg.agent.model;
-
-    // Validate model exists in any provider
-    if (allModels.length > 0 && !allModels.find((m) => m.value === newModel)) {
-      return `❌ Unknown model: \`${newModel}\`\n\n` + `Use /model to see available models.`;
-    }
-
     cfg.agent.model = newModel;
 
     // Persist to config file
