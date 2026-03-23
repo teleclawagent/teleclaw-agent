@@ -36,7 +36,13 @@ function readCodexCredentials(): CodexCredentials | null {
       if (parsed.access_token) return parsed;
       // OpenAI stores it nested sometimes
       if (parsed.openai?.access_token) return parsed.openai;
-      // auth.json format: { token, refresh_token, expires_at } or { api_key }
+      // Codex CLI auth.json: { auth_mode, tokens: { access_token, refresh_token } }
+      if (parsed.tokens?.access_token)
+        return {
+          access_token: parsed.tokens.access_token,
+          refresh_token: parsed.tokens.refresh_token,
+        };
+      // Alternative formats
       if (parsed.token)
         return {
           access_token: parsed.token,
@@ -44,6 +50,7 @@ function readCodexCredentials(): CodexCredentials | null {
           expires_at: parsed.expires_at,
         };
       if (parsed.api_key) return { access_token: parsed.api_key };
+      if (parsed.OPENAI_API_KEY) return { access_token: parsed.OPENAI_API_KEY };
     } catch {
       continue;
     }
