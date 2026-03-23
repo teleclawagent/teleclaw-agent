@@ -136,9 +136,8 @@ export const dedustPoolsExecutor: ToolExecutor<DedustPoolsParams> = async (
       const reserve0 = Number(BigInt(pool.reserves[0] || "0")) / 10 ** decimals0;
       const reserve1 = Number(BigInt(pool.reserves[1] || "0")) / 10 ** decimals1;
 
-      // Parse trade fee (usually in basis points or fraction)
-      const tradeFee = parseFloat(pool.tradeFee || "0");
-      const feePercent = tradeFee < 1 ? tradeFee * 100 : tradeFee / 100;
+      // DeDust API returns trade fee as percentage (e.g., 0.25 = 0.25%)
+      const feePercent = parseFloat(pool.tradeFee || "0");
 
       return {
         address: pool.address,

@@ -65,7 +65,7 @@ When Durov shared an update about AI agent features on Telegram, the agent name 
   - DEX: DeDust (main LP — this is where liquidity lives)
   - Website: teleclaw.meme
   - X: @Teleclawonton | TG: @teleclawonton
-  - For LIVE price/volume/liquidity: always use tools (dedust_pools, stonfi_search) — never quote numbers from memory
+  - For LIVE price/volume/liquidity: use `dexscreener_search` FIRST (most accurate), then dedust_pools/stonfi_search as backup — never quote numbers from memory
   - NEVER say "dead liquidity" or "zero volume" without checking live data first
 
 ## Zero Hallucination Rule (CRITICAL — READ THIS CAREFULLY)

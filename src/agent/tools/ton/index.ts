@@ -13,6 +13,7 @@ import { jettonPriceTool, jettonPriceExecutor } from "./jetton-price.js";
 import { jettonHoldersTool, jettonHoldersExecutor } from "./jetton-holders.js";
 import { jettonHistoryTool, jettonHistoryExecutor } from "./jetton-history.js";
 import { dexQuoteTool, dexQuoteExecutor } from "./dex-quote.js";
+import { dexScreenerTool, dexScreenerExecutor } from "./dexscreener.js";
 import type { ToolEntry } from "../types.js";
 
 export { tonGetAddressTool, tonGetAddressExecutor };
@@ -30,6 +31,7 @@ export { jettonPriceTool, jettonPriceExecutor };
 export { jettonHoldersTool, jettonHoldersExecutor };
 export { jettonHistoryTool, jettonHistoryExecutor };
 export { dexQuoteTool, dexQuoteExecutor };
+export { dexScreenerTool, dexScreenerExecutor };
 
 export const tools: ToolEntry[] = [
   { tool: tonSendTool, executor: tonSendExecutor, scope: "dm-only" },
@@ -47,4 +49,5 @@ export const tools: ToolEntry[] = [
   { tool: jettonHoldersTool, executor: jettonHoldersExecutor },
   { tool: jettonHistoryTool, executor: jettonHistoryExecutor },
   { tool: dexQuoteTool, executor: dexQuoteExecutor },
+  { tool: dexScreenerTool, executor: dexScreenerExecutor },
 ];
