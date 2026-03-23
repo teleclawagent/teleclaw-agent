@@ -352,7 +352,11 @@ export const MODEL_OPTIONS: Record<string, ModelOption[]> = {
       description: "200K ctx, $3/M",
     },
     { value: "openai/gpt-5", name: "GPT-5", description: "400K ctx, $1.25/M" },
-    { value: "google/gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite", description: "1M ctx, ultra cheap" },
+    {
+      value: "google/gemini-2.5-flash-lite",
+      name: "Gemini 2.5 Flash Lite",
+      description: "1M ctx, ultra cheap",
+    },
     {
       value: "deepseek/deepseek-r1",
       name: "DeepSeek R1",
@@ -442,6 +446,13 @@ export const MODEL_OPTIONS: Record<string, ModelOption[]> = {
       name: "Custom Model",
       description: "Your model",
     },
+  ],
+  "openai-codex": [
+    { value: "gpt-5.4", name: "GPT-5.4", description: "Latest frontier, ChatGPT Sub" },
+    { value: "gpt-5.3-codex", name: "GPT-5.3 Codex", description: "Previous gen" },
+    { value: "gpt-5.2", name: "GPT-5.2", description: "Stable, ChatGPT Sub" },
+    { value: "gpt-5.1", name: "GPT-5.1", description: "Reliable, ChatGPT Sub" },
+    { value: "gpt-5.1-codex-mini", name: "GPT-5.1 Mini", description: "Fast & cheap" },
   ],
 };
 

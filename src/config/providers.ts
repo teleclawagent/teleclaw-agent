@@ -85,18 +85,19 @@ const PROVIDER_REGISTRY: Record<SupportedProvider, ProviderMetadata> = {
     toolLimit: null,
     piAiProvider: "openai",
   },
-  // openai-codex kept for backward compat — maps to openai
+  // openai-codex: ChatGPT subscription via Codex CLI OAuth
+  // Uses chatgpt.com/backend-api (openai-codex-responses API in pi-ai)
   "openai-codex": {
     id: "openai-codex",
-    displayName: "OpenAI (GPT-5.4)", // hidden from setup UI
+    displayName: "ChatGPT Subscription",
     envVar: "OPENAI_API_KEY",
-    keyPrefix: "sk-",
-    keyHint: "sk-proj-...",
+    keyPrefix: null,
+    keyHint: "Auto-detected from Codex CLI",
     consoleUrl: "https://platform.openai.com/",
     defaultModel: "gpt-5.4",
-    utilityModel: "gpt-4o-mini",
+    utilityModel: "gpt-5.1-codex-mini",
     toolLimit: null,
-    piAiProvider: "openai",
+    piAiProvider: "openai-codex",
   },
   google: {
     id: "google",
