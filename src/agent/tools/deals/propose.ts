@@ -1,4 +1,3 @@
-import { randomLong } from "../../../utils/gramjs-bigint.js";
 import { Type } from "@sinclair/typebox";
 import type { Tool, ToolExecutor, ToolResult } from "../types.js";
 import { generateDealId, calculateExpiry, formatDealProposal } from "../../../deals/utils.js";
@@ -144,51 +143,39 @@ export const dealProposeExecutor: ToolExecutor<DealProposeParams> = async (
 
     log.info(`[Deal] Created deal #${dealId} - profit: ${strategyCheck.profit.toFixed(2)} TON`);
 
-    // Send inline bot message with Accept/Decline buttons
-    const botUsername = context.config?.telegram?.bot_username;
-    let inlineSent = false;
+    // Send deal proposal message with Accept/Decline inline buttons (Bot API)
+    const proposalText = formatDealProposal(
+      dealId,
+      {
+        type: params.userGivesType,
+        tonAmount: params.userGivesTonAmount,
+        giftSlug: params.userGivesGiftSlug,
+        valueTon: params.userGivesValueTon,
+      },
+      {
+        type: params.agentGivesType,
+        tonAmount: params.agentGivesTonAmount,
+        giftSlug: params.agentGivesGiftSlug,
+        valueTon: params.agentGivesValueTon,
+      },
+      strategyCheck.profit,
+      true
+    );
 
-    if (botUsername) {
-      try {
-        inlineSent = await sendInlineBotResult(context.bridge, params.chatId, botUsername, dealId);
-      } catch (inlineError) {
-        log.warn({ err: inlineError }, "[Deal] Failed to send inline bot result");
-      }
-    }
+    const sentMessage = await context.bridge.sendMessage({
+      chatId: params.chatId,
+      text: proposalText,
+      inlineKeyboard: [
+        [
+          { text: "✅ Accept", callback_data: `accept:${dealId}` },
+          { text: "❌ Decline", callback_data: `decline:${dealId}` },
+        ],
+      ],
+    });
 
-    // Fallback: send plain text if inline bot failed
-    if (!inlineSent) {
-      const proposalText = formatDealProposal(
-        dealId,
-        {
-          type: params.userGivesType,
-          tonAmount: params.userGivesTonAmount,
-          giftSlug: params.userGivesGiftSlug,
-          valueTon: params.userGivesValueTon,
-        },
-        {
-          type: params.agentGivesType,
-          tonAmount: params.agentGivesTonAmount,
-          giftSlug: params.agentGivesGiftSlug,
-          valueTon: params.agentGivesValueTon,
-        },
-        strategyCheck.profit,
-        true
-      );
-
-      const fallbackText = botUsername
-        ? `${proposalText}\n\nTo confirm, type: @${botUsername} ${dealId}`
-        : proposalText;
-
-      const sentMessage = await context.bridge.sendMessage({
-        chatId: params.chatId,
-        text: fallbackText,
-      });
-
-      context.db
-        .prepare(`UPDATE deals SET proposal_message_id = ? WHERE id = ?`)
-        .run(sentMessage.id, dealId);
-    }
+    context.db
+      .prepare(`UPDATE deals SET proposal_message_id = ? WHERE id = ?`)
+      .run(sentMessage.id, dealId);
 
     return {
       success: true,
@@ -197,7 +184,6 @@ export const dealProposeExecutor: ToolExecutor<DealProposeParams> = async (
         profit: strategyCheck.profit,
         expiresAt: new Date(expiresAt * 1000).toISOString(),
         strategyRule: strategyCheck.rule,
-        inlineSent,
         note: "Deal card sent with buttons. STOP HERE — do NOT send any follow-up message. The user will click Accept/Decline on the card.",
       },
     };
@@ -209,55 +195,3 @@ export const dealProposeExecutor: ToolExecutor<DealProposeParams> = async (
     };
   }
 };
-
-/**
- * Send inline bot result via GramJS (userbot queries the bot, then sends the result)
- * This makes the deal card with buttons appear directly in the chat.
- */
-async function sendInlineBotResult(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deal data is dynamically structured
-  bridge: any,
-  chatId: string,
-  botUsername: string,
-  dealId: string
-): Promise<boolean> {
-  const gramJsClient = bridge.getClient().getClient();
-  const Api = (await import("telegram")).Api;
-
-  // Resolve bot and chat entities
-  const bot = await gramJsClient.getInputEntity(botUsername);
-  const peer = await gramJsClient.getInputEntity(chatId.startsWith("-") ? Number(chatId) : chatId);
-
-  // Query the inline bot with the deal ID
-  const results = await gramJsClient.invoke(
-    new Api.messages.GetInlineBotResults({
-      bot: bot,
-      peer: peer,
-      query: dealId,
-      offset: "",
-    })
-  );
-
-  if (!results.results || results.results.length === 0) {
-    log.warn(`[Deal] No inline results returned for deal ${dealId}`);
-    return false;
-  }
-
-  // Find the deal result (skip help/not_found/wrong_user results)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deal data is dynamically structured
-  const dealResult = results.results.find((r: any) => r.id === dealId);
-  const resultToSend = dealResult || results.results[0];
-
-  // Send the inline result as a message in the chat
-  await gramJsClient.invoke(
-    new Api.messages.SendInlineBotResult({
-      peer: peer,
-      queryId: results.queryId,
-      id: resultToSend.id,
-      randomId: randomLong(),
-    })
-  );
-
-  log.info(`[Deal] Inline bot message sent for deal #${dealId}`);
-  return true;
-}

@@ -30,7 +30,7 @@ const DECIMALS = 9;
 /** Required: 0.1% of total supply = 100,000 tokens */
 const REQUIRED_PERCENTAGE = 0.001;
 const REQUIRED_AMOUNT = BigInt(Math.floor(Number(TOTAL_SUPPLY) * REQUIRED_PERCENTAGE));
-const REQUIRED_AMOUNT_RAW = REQUIRED_AMOUNT * (10n ** BigInt(DECIMALS)); // In nano units
+const REQUIRED_AMOUNT_RAW = REQUIRED_AMOUNT * 10n ** BigInt(DECIMALS); // In nano units
 
 /** Cache TTL: 5 minutes — short enough for security, long enough to not spam TonAPI */
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -41,17 +41,17 @@ const MAX_CACHE_ENTRIES = 1000;
 // ─── Types ───────────────────────────────────────────────────────────
 
 interface CacheEntry {
-  balance: bigint;       // Raw balance (with decimals)
+  balance: bigint; // Raw balance (with decimals)
   hasAccess: boolean;
-  checkedAt: number;     // Unix timestamp ms
+  checkedAt: number; // Unix timestamp ms
   walletAddress: string; // Which wallet was checked
 }
 
 interface TokenGateResult {
   allowed: boolean;
   reason: string;
-  balance?: string;       // Human-readable balance
-  required?: string;      // Human-readable required amount
+  balance?: string; // Human-readable balance
+  required?: string; // Human-readable required amount
   walletAddress?: string;
   checkedAt?: number;
   fromCache?: boolean;
@@ -88,8 +88,9 @@ function setCacheEntry(userId: number, entry: CacheEntry): void {
 /** Evict oldest entries if cache exceeds max size */
 function evictIfNeeded(): void {
   if (balanceCache.size < MAX_CACHE_ENTRIES) return;
-  const entries = Array.from(balanceCache.entries())
-    .sort((a, b) => a[1].checkedAt - b[1].checkedAt);
+  const entries = Array.from(balanceCache.entries()).sort(
+    (a, b) => a[1].checkedAt - b[1].checkedAt
+  );
   const toRemove = entries.slice(0, Math.floor(MAX_CACHE_ENTRIES / 4));
   for (const [key] of toRemove) {
     balanceCache.delete(key);
@@ -125,17 +126,13 @@ async function fetchTeleclawBalance(walletAddress: string): Promise<bigint | nul
     }
 
     const jettonUrl = `/accounts/${encodeURIComponent(walletAddress)}/jettons/${encodeURIComponent(TELECLAW_JETTON_ADDRESS)}`;
-    console.log("=== TOKEN GATE: checking jetton balance for wallet:", walletAddress);
-    
+
     let response = await tonapiFetch(jettonUrl);
-    console.log("=== TOKEN GATE: TonAPI response:", response.status);
 
     // Retry on 502/429
     if (response.status === 502 || response.status === 429) {
-      console.log("=== TOKEN GATE: retrying after 2s...");
       await new Promise((r) => setTimeout(r, 2000));
       response = await tonapiFetch(jettonUrl);
-      console.log("=== TOKEN GATE: retry response:", response.status);
     }
 
     if (response.status === 404) {
@@ -184,14 +181,13 @@ function getUserWalletAddress(db: Database.Database, userId: number): string | n
     const verified = db
       .prepare("SELECT wallet_address FROM verified_wallets WHERE user_id = ?")
       .get(userId) as { wallet_address: string } | undefined;
-    console.log("=== TOKEN GATE: verified_wallets query for userId:", userId, "result:", verified?.wallet_address || "null");
+
     if (verified?.wallet_address) return verified.wallet_address;
 
     // Fallback to agentic_wallets (TON Connect or setup)
-    const row = db
-      .prepare("SELECT address FROM agentic_wallets WHERE user_id = ?")
-      .get(userId) as { address: string } | undefined;
-    console.log("=== TOKEN GATE: agentic_wallets fallback for userId:", userId, "result:", row?.address || "null");
+    const row = db.prepare("SELECT address FROM agentic_wallets WHERE user_id = ?").get(userId) as
+      | { address: string }
+      | undefined;
 
     return row?.address || null;
   } catch (error) {
@@ -241,16 +237,15 @@ export async function checkTokenGate(
   userId: number,
   skipCache = false
 ): Promise<TokenGateResult> {
-  console.log("=== TOKEN GATE START === userId:", userId);
   // Step 1: Get user's wallet address
   const walletAddress = getUserWalletAddress(db, userId);
-  console.log("=== TOKEN GATE: walletAddress resolved:", walletAddress || "null");
 
   if (!walletAddress) {
     logGateCheck(db, userId, "token_gate_no_wallet", { result: "denied" });
     return {
       allowed: false,
-      reason: "No wallet connected. Please connect your TON wallet first using the wallet setup command. Your wallet must hold at least 100,000 $TELECLAW tokens.",
+      reason:
+        "No wallet connected. Please connect your TON wallet first using the wallet setup command. Your wallet must hold at least 100,000 $TELECLAW tokens.",
     };
   }
 
@@ -348,7 +343,6 @@ export async function checkTokenGate(
     walletAddress,
   });
 
-  console.log("=== TOKEN GATE: balance =", humanBalance, "required =", formatBalance(REQUIRED_AMOUNT_RAW), "allowed =", hasAccess);
   log.info(
     { userId, walletAddress, balance: humanBalance, hasAccess },
     `Token gate ${hasAccess ? "PASSED" : "DENIED"}`
@@ -371,10 +365,7 @@ export async function checkTokenGate(
  * Quick check — does user pass the gate? Returns boolean only.
  * Use checkTokenGate() for detailed results.
  */
-export async function hasTokenAccess(
-  db: Database.Database,
-  userId: number
-): Promise<boolean> {
+export async function hasTokenAccess(db: Database.Database, userId: number): Promise<boolean> {
   const result = await checkTokenGate(db, userId);
   return result.allowed;
 }
@@ -382,8 +373,8 @@ export async function hasTokenAccess(
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 function formatBalance(rawBalance: bigint): string {
-  const whole = rawBalance / (10n ** BigInt(DECIMALS));
-  const frac = rawBalance % (10n ** BigInt(DECIMALS));
+  const whole = rawBalance / 10n ** BigInt(DECIMALS);
+  const frac = rawBalance % 10n ** BigInt(DECIMALS);
   if (frac === 0n) return whole.toLocaleString();
   const fracStr = frac.toString().padStart(DECIMALS, "0").replace(/0+$/, "");
   return `${whole.toLocaleString()}.${fracStr}`;
