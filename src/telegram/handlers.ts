@@ -517,7 +517,7 @@ export class MessageHandler {
           const errMsg = error instanceof Error ? error.message : String(error);
           const errLower = errMsg.toLowerCase();
           let userMessage: string;
-          if (errLower.includes("rate limit") || errLower.includes("429") || errLower.includes("too many requests") || errLower.includes("rate_limit")) {
+          if (errLower.includes("rate limit") || errLower.includes("429") || errLower.includes("too many requests") || errLower.includes("rate_limit") || errLower.includes("an unknown error occurred")) {
             userMessage = "⚠️ Hit an API rate limit — your AI provider is throttling requests. Wait a minute and try again, or switch to a different model with /models.";
           } else if (errLower.includes("overloaded") || errLower.includes("capacity") || errLower.includes("503")) {
             userMessage = "⚠️ AI provider is overloaded right now. Try again in a moment, or switch models with /models.";
