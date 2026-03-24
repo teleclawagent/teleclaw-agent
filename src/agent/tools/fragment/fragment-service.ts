@@ -87,10 +87,7 @@ function setCache<T>(key: string, data: T): void {
 
 let lastRequestTime = 0;
 
-async function rateLimitedFetch(
-  url: string,
-  init?: RequestInit
-): Promise<Response> {
+async function rateLimitedFetch(url: string, init?: RequestInit): Promise<Response> {
   const now = Date.now();
   const elapsed = now - lastRequestTime;
   if (elapsed < REQUEST_DELAY_MS) {
@@ -102,8 +99,7 @@ async function rateLimitedFetch(
     ...init,
     timeoutMs: 15000,
     headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       "Accept-Language": "en-US,en;q=0.9",
       Referer: "https://fragment.com/",
@@ -196,9 +192,10 @@ export async function fetchUsernames(
       const price = parsePrice(priceText);
 
       // TD[1] or TD[2]: time info
-      const timeText = tds.length >= 3
-        ? tds.eq(2).find(".table-cell-value").first().text().trim()
-        : tds.eq(1).find(".table-cell-desc.thin-only").text().trim();
+      const timeText =
+        tds.length >= 3
+          ? tds.eq(2).find(".table-cell-value").first().text().trim()
+          : tds.eq(1).find(".table-cell-desc.thin-only").text().trim();
       const endTime = parseEndTime(timeText);
 
       const entry: FragmentUsername = {
@@ -230,9 +227,7 @@ export async function fetchUsernames(
 /**
  * Get details for a specific username from Fragment.
  */
-export async function checkUsername(
-  username: string
-): Promise<FragmentUsername | null> {
+export async function checkUsername(username: string): Promise<FragmentUsername | null> {
   const clean = username.replace(/^@/, "").toLowerCase();
   const cacheKey = `username:${clean}`;
   const cached = getCached<FragmentUsername>(cacheKey);
@@ -378,9 +373,11 @@ async function checkSecondaryMarkets(
     }
 
     const data = await response.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TonAPI response is untyped
     const items: any[] = data.nft_items || [];
 
     // Find the specific username NFT
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TonAPI response is untyped
     const nftItem = items.find((item: any) => {
       const name = (item.metadata?.name || "").replace(/^@/, "").toLowerCase();
       return name === clean;
@@ -456,9 +453,7 @@ async function checkSecondaryMarkets(
 /**
  * Fetch sold username history for price analysis.
  */
-export async function fetchSoldHistory(
-  limit: number = 100
-): Promise<FragmentSaleHistory[]> {
+export async function fetchSoldHistory(limit: number = 100): Promise<FragmentSaleHistory[]> {
   const cacheKey = `sold_history:${limit}`;
   const cached = getCached<FragmentSaleHistory[]>(cacheKey);
   if (cached) return cached;
@@ -468,7 +463,7 @@ export async function fetchSoldHistory(
     .filter((l) => l.priceRaw !== undefined)
     .map((l) => ({
       username: l.username,
-      soldPrice: l.priceRaw!,
+      soldPrice: l.priceRaw ?? 0,
       soldDate: new Date().toISOString(), // Fragment doesn't always show exact date in list view
       buyer: l.owner,
     }));
@@ -495,10 +490,7 @@ export async function getMarketStats(): Promise<MarketStats> {
 
   const stats: MarketStats = {
     totalListings: auctionData.length + saleData.length,
-    avgPrice:
-      prices.length > 0
-        ? prices.reduce((a, b) => a + b, 0) / prices.length
-        : 0,
+    avgPrice: prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0,
     medianPrice: prices.length > 0 ? prices[Math.floor(prices.length / 2)] : 0,
     minPrice: prices.length > 0 ? prices[0] : 0,
     maxPrice: prices.length > 0 ? prices[prices.length - 1] : 0,
@@ -517,9 +509,7 @@ export async function getMarketStats(): Promise<MarketStats> {
 /**
  * Estimate username value based on characteristics and market data.
  */
-export async function estimateValue(
-  username: string
-): Promise<{
+export async function estimateValue(username: string): Promise<{
   estimated: { low: number; mid: number; high: number };
   factors: string[];
   confidence: "low" | "medium" | "high";
@@ -542,18 +532,19 @@ export async function estimateValue(
 
   // Length factor (shorter = more valuable)
   if (len <= 3) {
-    multiplier *= 20;
+    multiplier += 8;
     factors.push("Ultra-short (≤3 chars) — very rare");
   } else if (len === 4) {
-    multiplier *= 10;
+    multiplier += 4;
     factors.push("4-letter — premium category");
   } else if (len === 5) {
-    multiplier *= 5;
+    multiplier += 2;
     factors.push("5-letter — high demand");
   } else if (len <= 7) {
-    multiplier *= 2;
+    multiplier += 0.5;
     factors.push("6-7 letter — moderate demand");
   } else {
+    multiplier += 0;
     factors.push("8+ chars — standard");
   }
 
@@ -602,23 +593,21 @@ export async function estimateValue(
     "news",
     "tech",
   ];
-  const isWord = commonWords.some(
-    (w) => clean === w || clean.startsWith(w) || clean.endsWith(w)
-  );
+  const isWord = commonWords.some((w) => clean === w || clean.startsWith(w) || clean.endsWith(w));
   if (isWord) {
-    multiplier *= 3;
+    multiplier += 1.5;
     factors.push("Contains high-value keyword");
   }
 
   // All numeric
   if (/^\d+$/.test(clean)) {
-    multiplier *= len <= 5 ? 8 : 2;
+    multiplier += len <= 5 ? 3 : 0.5;
     factors.push("All-numeric — collector value");
   }
 
   // Repeating pattern
   if (/^(.)\1+$/.test(clean)) {
-    multiplier *= 5;
+    multiplier += 2;
     factors.push("Repeating character — rare");
   }
 
@@ -627,13 +616,15 @@ export async function estimateValue(
     const { analyzeChineseNumbers } = await import("./categorizer.js");
     const chineseAnalysis = analyzeChineseNumbers(clean);
     if (chineseAnalysis.tier === "ultra_lucky") {
-      multiplier *= 5;
-      factors.push(`Chinese ultra-lucky number 🔥 — ${chineseAnalysis.meaning.slice(0, 2).join("; ")}`);
+      multiplier += 3;
+      factors.push(
+        `Chinese ultra-lucky number 🔥 — ${chineseAnalysis.meaning.slice(0, 2).join("; ")}`
+      );
     } else if (chineseAnalysis.tier === "very_lucky") {
-      multiplier *= 3;
+      multiplier += 1.5;
       factors.push(`Chinese very lucky number — ${chineseAnalysis.meaning.slice(0, 2).join("; ")}`);
     } else if (chineseAnalysis.tier === "lucky") {
-      multiplier *= 1.5;
+      multiplier += 0.5;
       factors.push(`Chinese lucky number — ${chineseAnalysis.meaning[0] || "auspicious digits"}`);
     } else if (chineseAnalysis.tier === "unlucky") {
       multiplier *= 0.5;
@@ -641,30 +632,33 @@ export async function estimateValue(
     }
   }
 
-  // Base price from comparables or default
-  const basePrice =
-    comparables.length > 0
-      ? comparables.reduce((sum, c) => sum + c.soldPrice, 0) /
-        comparables.length
-      : len <= 4
-        ? 100
-        : len <= 6
-          ? 20
-          : 5;
+  // Base price from comparables (use MEDIAN, not average — avoids outlier skew)
+  let basePrice: number;
+  if (comparables.length > 0) {
+    const sorted = comparables.map((c) => c.soldPrice).sort((a, b) => a - b);
+    const midIdx = Math.floor(sorted.length / 2);
+    basePrice =
+      sorted.length % 2 === 0 ? (sorted[midIdx - 1] + sorted[midIdx]) / 2 : sorted[midIdx];
+  } else {
+    // Conservative defaults when no comparables
+    basePrice = len <= 3 ? 50 : len === 4 ? 20 : len === 5 ? 8 : len <= 7 ? 3 : 1;
+  }
 
   const mid = Math.round(basePrice * multiplier);
-  const low = Math.round(mid * 0.6);
-  const high = Math.round(mid * 1.8);
+  // Hard cap: no username is worth more than 50K TON without strong comparables
+  const cappedMid = comparables.length >= 5 ? mid : Math.min(mid, 50000);
+  const low = Math.round(cappedMid * 0.5);
+  const high = Math.round(cappedMid * 2.0);
+
+  if (cappedMid < mid) {
+    factors.push("⚠️ Capped — low comparable data, estimate may be unreliable");
+  }
 
   const confidence: "low" | "medium" | "high" =
-    comparables.length >= 10
-      ? "high"
-      : comparables.length >= 3
-        ? "medium"
-        : "low";
+    comparables.length >= 10 ? "high" : comparables.length >= 3 ? "medium" : "low";
 
   return {
-    estimated: { low, mid, high },
+    estimated: { low, mid: cappedMid, high },
     factors,
     confidence,
     comparables: comparables.slice(0, 5),
@@ -692,22 +686,17 @@ export async function findUndervalued(
     fetchUsernames("auction", "price_asc", 50),
   ]);
 
-  const allListings = [...sales, ...auctions].filter(
-    (l) => l.priceRaw !== undefined
-  );
+  const allListings = [...sales, ...auctions].filter((l) => l.priceRaw !== undefined);
 
   // Filter by budget
-  const affordable = budget
-    ? allListings.filter((l) => l.priceRaw! <= budget)
-    : allListings;
+  const affordable = budget ? allListings.filter((l) => l.priceRaw ?? 0 <= budget) : allListings;
 
   // Estimate values and find deals
   const results = [];
   for (const listing of affordable.slice(0, 20)) {
     // Limit API calls
     const valuation = await estimateValue(listing.username);
-    const discount =
-      (valuation.estimated.mid - listing.priceRaw!) / valuation.estimated.mid;
+    const discount = (valuation.estimated.mid - (listing.priceRaw ?? 0)) / valuation.estimated.mid;
 
     if (discount >= minDiscount) {
       results.push({
@@ -727,8 +716,8 @@ export async function findUndervalued(
 // ═══════════════════════════════════════════════════════════════════════
 
 export interface FragmentNumber {
-  number: string;          // formatted: "+888 0768 4929"
-  rawDigits: string;       // full digits: "88807684929"
+  number: string; // formatted: "+888 0768 4929"
+  rawDigits: string; // full digits: "88807684929"
   status: "auction" | "sale" | "sold" | "unavailable";
   price?: string;
   priceRaw?: number;
@@ -814,9 +803,10 @@ export async function fetchNumbers(
       const price = parsePrice(priceText);
 
       // Time
-      const timeText = tds.length >= 3
-        ? tds.eq(2).find(".table-cell-value").first().text().trim()
-        : tds.eq(1).find(".table-cell-desc.thin-only").text().trim();
+      const timeText =
+        tds.length >= 3
+          ? tds.eq(2).find(".table-cell-value").first().text().trim()
+          : tds.eq(1).find(".table-cell-desc.thin-only").text().trim();
       const endTime = parseEndTime(timeText);
 
       const entry: FragmentNumber = {
@@ -927,9 +917,7 @@ export async function checkNumber(input: string): Promise<FragmentNumber | null>
 /**
  * Fetch sold number history.
  */
-export async function fetchNumberSoldHistory(
-  limit: number = 100
-): Promise<NumberSaleHistory[]> {
+export async function fetchNumberSoldHistory(limit: number = 100): Promise<NumberSaleHistory[]> {
   const cacheKey = `number_sold_history:${limit}`;
   const cached = getCached<NumberSaleHistory[]>(cacheKey);
   if (cached) return cached;
@@ -939,7 +927,7 @@ export async function fetchNumberSoldHistory(
     .filter((l) => l.priceRaw !== undefined)
     .map((l) => ({
       number: l.number,
-      soldPrice: l.priceRaw!,
+      soldPrice: l.priceRaw ?? 0,
       soldDate: new Date().toISOString(),
       buyer: l.owner,
     }));
@@ -972,7 +960,10 @@ export async function getNumberMarketStats(): Promise<NumberMarketStats> {
     maxPrice: prices.length > 0 ? prices[prices.length - 1] : 0,
     floorPrice: saleData.length > 0 && saleData[0].priceRaw ? saleData[0].priceRaw : 1774,
     recentSales: salesData.slice(0, 10),
-    trending: auctionData.filter((a) => (a.bids ?? 0) > 1).sort((a, b) => (b.bids ?? 0) - (a.bids ?? 0)).slice(0, 10),
+    trending: auctionData
+      .filter((a) => (a.bids ?? 0) > 1)
+      .sort((a, b) => (b.bids ?? 0) - (a.bids ?? 0))
+      .slice(0, 10),
     fetchedAt: new Date().toISOString(),
   };
 
@@ -986,7 +977,18 @@ export async function getNumberMarketStats(): Promise<NumberMarketStats> {
 export async function findUndervaluedNumbers(
   budget?: number,
   minDiscount: number = 0.3
-): Promise<Array<FragmentNumber & { rarityScore: number; rarityTier: string; estimatedMin: number; estimatedMax: number; discount: number; flipPotential: string }>> {
+): Promise<
+  Array<
+    FragmentNumber & {
+      rarityScore: number;
+      rarityTier: string;
+      estimatedMin: number;
+      estimatedMax: number;
+      discount: number;
+      flipPotential: string;
+    }
+  >
+> {
   // Lazy import to avoid circular deps
   const { calculateRarity } = await import("./number-rarity.js");
 
@@ -996,7 +998,7 @@ export async function findUndervaluedNumbers(
   ]);
 
   const allListings = [...sales, ...auctions].filter((l) => l.priceRaw !== undefined);
-  const affordable = budget ? allListings.filter((l) => l.priceRaw! <= budget) : allListings;
+  const affordable = budget ? allListings.filter((l) => l.priceRaw ?? 0 <= budget) : allListings;
 
   const results = [];
   for (const listing of affordable.slice(0, 30)) {
@@ -1005,7 +1007,7 @@ export async function findUndervaluedNumbers(
 
     const estMid = (rarity.estimatedFloor.min + rarity.estimatedFloor.max) / 2;
     if (estMid <= 0) continue; // avoid division by zero
-    const discount = (estMid - listing.priceRaw!) / estMid;
+    const discount = (estMid - (listing.priceRaw ?? 0)) / estMid;
 
     if (discount >= minDiscount) {
       results.push({

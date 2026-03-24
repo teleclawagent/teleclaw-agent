@@ -54,26 +54,27 @@ const marketSearchTool: Tool = {
     "• Find cheapest: asset_type='gift', collection='Plush Pepe', sort_by='price'",
   category: "data-bearing",
   parameters: Type.Object({
-    asset_type: Type.Union([
-      Type.Literal("username"),
-      Type.Literal("number"),
-      Type.Literal("gift"),
-    ], { description: "What to search for" }),
+    asset_type: Type.Union(
+      [Type.Literal("username"), Type.Literal("number"), Type.Literal("gift")],
+      { description: "What to search for" }
+    ),
     query: Type.Optional(Type.String({ description: "Search keyword (for usernames/numbers)" })),
     collection: Type.Optional(Type.String({ description: "Gift collection name" })),
     model: Type.Optional(Type.String({ description: "Gift model filter" })),
     backdrop: Type.Optional(Type.String({ description: "Gift backdrop filter" })),
     symbol: Type.Optional(Type.String({ description: "Gift symbol filter" })),
-    min_tier: Type.Optional(Type.String({ description: "Min rarity tier (Legendary/Epic/Rare/Uncommon)" })),
+    min_tier: Type.Optional(
+      Type.String({ description: "Min rarity tier (Legendary/Epic/Rare/Uncommon)" })
+    ),
     max_price: Type.Optional(Type.Number({ description: "Max price in TON", minimum: 0 })),
     sort_by: Type.Optional(
-      Type.Union([
-        Type.Literal("price"),
-        Type.Literal("rarity"),
-        Type.Literal("newest"),
-      ], { description: "Sort order (default: price)" })
+      Type.Union([Type.Literal("price"), Type.Literal("rarity"), Type.Literal("newest")], {
+        description: "Sort order (default: price)",
+      })
     ),
-    limit: Type.Optional(Type.Number({ description: "Max results (default 20)", minimum: 1, maximum: 50 })),
+    limit: Type.Optional(
+      Type.Number({ description: "Max results (default 20)", minimum: 1, maximum: 50 })
+    ),
   }),
 };
 
@@ -100,7 +101,12 @@ const marketSearchExecutor: ToolExecutor<MarketSearchParams> = async (
         assetType: params.asset_type,
         totalFound: result.totalFound,
         marketplacesChecked: result.marketplacesChecked,
-        marketplacesFailed: result.marketplacesFailed.length > 0 ? result.marketplacesFailed : undefined,
+        marketplacesFailed:
+          result.marketplacesFailed.length > 0 ? result.marketplacesFailed : undefined,
+        note:
+          result.marketplacesFailed.length > 0
+            ? `⚠️ ${result.marketplacesFailed.length}/${result.marketplacesChecked.length} marketplaces unavailable (${result.marketplacesFailed.join(", ")}). Results may be incomplete — prices shown are from available sources only.`
+            : undefined,
         bestDeal: result.bestDeal
           ? {
               marketplace: result.bestDeal.marketplace,
@@ -109,12 +115,13 @@ const marketSearchExecutor: ToolExecutor<MarketSearchParams> = async (
               url: result.bestDeal.url,
             }
           : null,
-        priceRange: result.priceRange.lowest !== null
-          ? {
-              lowest: `${result.priceRange.lowest} TON (${result.priceRange.marketplace_lowest})`,
-              highest: `${result.priceRange.highest} TON`,
-            }
-          : null,
+        priceRange:
+          result.priceRange.lowest !== null
+            ? {
+                lowest: `${result.priceRange.lowest} TON (${result.priceRange.marketplace_lowest})`,
+                highest: `${result.priceRange.highest} TON`,
+              }
+            : null,
         listings: result.listings.map((l) => ({
           marketplace: l.marketplace,
           identifier: l.identifier,
@@ -123,7 +130,11 @@ const marketSearchExecutor: ToolExecutor<MarketSearchParams> = async (
           backdrop: l.backdrop,
           symbol: l.symbol,
           rarityTier: l.rarityTier,
-          price: l.priceTon ? `${l.priceTon} TON` : l.originalPrice ? `${l.originalPrice} ${l.originalCurrency}` : "N/A",
+          price: l.priceTon
+            ? `${l.priceTon} TON`
+            : l.originalPrice
+              ? `${l.originalPrice} ${l.originalCurrency}`
+              : "N/A",
           type: l.listingType,
           onChain: l.onChain,
           url: l.url,
@@ -131,7 +142,10 @@ const marketSearchExecutor: ToolExecutor<MarketSearchParams> = async (
       },
     };
   } catch (err: unknown) {
-    return { success: false, error: `Search failed: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      success: false,
+      error: `Search failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 };
 
@@ -193,7 +207,11 @@ const marketCompareExecutor: ToolExecutor<MarketCompareParams> = async (
           : null,
         allListings: result.listings.map((l) => ({
           marketplace: l.marketplace,
-          price: l.priceTon ? `${l.priceTon} TON` : l.originalPrice ? `${l.originalPrice} ${l.originalCurrency}` : "N/A",
+          price: l.priceTon
+            ? `${l.priceTon} TON`
+            : l.originalPrice
+              ? `${l.originalPrice} ${l.originalCurrency}`
+              : "N/A",
           type: l.listingType,
           onChain: l.onChain,
           url: l.url,
@@ -205,7 +223,10 @@ const marketCompareExecutor: ToolExecutor<MarketCompareParams> = async (
       },
     };
   } catch (err: unknown) {
-    return { success: false, error: `Compare failed: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      success: false,
+      error: `Compare failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 };
 
@@ -246,7 +267,10 @@ const marketHealthExecutor: ToolExecutor = async (): Promise<ToolResult> => {
       },
     };
   } catch (err: unknown) {
-    return { success: false, error: `Health check failed: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      success: false,
+      error: `Health check failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 };
 

@@ -11,7 +11,8 @@ import { createLogger } from "../../../utils/logger.js";
 const log = createLogger("FragmentScraper");
 
 const FRAGMENT_BASE = "https://fragment.com";
-const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+const USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
 
 // ─── Cache ───────────────────────────────────────────────────────────
@@ -40,12 +41,27 @@ function setCache<T>(key: string, data: T): void {
 
 async function fetchFragment(path: string): Promise<string> {
   const url = `${FRAGMENT_BASE}${path}`;
-  const res = await fetch(url, {
+  let res = await fetch(url, {
     headers: {
       "User-Agent": USER_AGENT,
-      Accept: "text/html,application/xhtml+xml",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
     },
   });
+
+  // Retry once on transient failures
+  if (!res.ok && (res.status === 429 || res.status === 502 || res.status === 503)) {
+    await new Promise((r) => setTimeout(r, 2000));
+    res = await fetch(url, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+  }
+
   if (!res.ok) throw new Error(`Fragment ${res.status}: ${url}`);
   return res.text();
 }
@@ -80,15 +96,8 @@ export interface FragmentSale {
 
 let _slugMap: Map<string, string> | null = null;
 
-function loadSlugMap(): Map<string, string> {
+function _loadSlugMap(): Map<string, string> {
   if (_slugMap) return _slugMap;
-  try {
-    // Dynamic import of collection map
-    const mapPath = new URL("./collection-map.json", import.meta.url);
-    // We'll build this lazily from Fragment's own page instead
-  } catch {
-    // ignore
-  }
   _slugMap = new Map();
   return _slugMap;
 }
@@ -103,7 +112,10 @@ export async function resolveSlug(collectionName: string): Promise<string | null
   if (cached) return cached;
 
   // Try direct lowercase no-space conversion first (covers most cases)
-  const guess = collectionName.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/\s+/g, "");
+  const guess = collectionName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/\s+/g, "");
 
   // Verify by fetching the page
   try {
@@ -119,7 +131,10 @@ export async function resolveSlug(collectionName: string): Promise<string | null
   // Try other patterns
   const variations = [
     collectionName.toLowerCase().replace(/[^a-z0-9]/g, ""),
-    collectionName.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9]/g, ""),
+    collectionName
+      .toLowerCase()
+      .replace(/\s+/g, "")
+      .replace(/[^a-z0-9]/g, ""),
     collectionName.toLowerCase().replace(/[']/g, "").replace(/\s+/g, ""),
   ];
 
@@ -168,7 +183,7 @@ export async function getAllCollectionSlugs(): Promise<string[]> {
 
 export async function fetchFloorPrice(slugOrName: string): Promise<FragmentFloorData | null> {
   // Determine if input is a slug or name
-  let slug = slugOrName.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const slug = slugOrName.toLowerCase().replace(/[^a-z0-9]/g, "");
 
   const cacheKey = `floor:${slug}`;
   const cached = getCached<FragmentFloorData>(cacheKey);
@@ -213,11 +228,8 @@ export async function fetchFloorPrice(slugOrName: string): Promise<FragmentFloor
 
 // ─── Listings ────────────────────────────────────────────────────────
 
-export async function fetchListings(
-  slugOrName: string,
-  limit = 20
-): Promise<FragmentListing[]> {
-  let slug = slugOrName.toLowerCase().replace(/[^a-z0-9]/g, "");
+export async function fetchListings(slugOrName: string, limit = 20): Promise<FragmentListing[]> {
+  const slug = slugOrName.toLowerCase().replace(/[^a-z0-9]/g, "");
 
   const cacheKey = `listings:${slug}:${limit}`;
   const cached = getCached<FragmentListing[]>(cacheKey);
@@ -255,11 +267,8 @@ export async function fetchListings(
 
 // ─── Recent Sales ────────────────────────────────────────────────────
 
-export async function fetchRecentSales(
-  slugOrName: string,
-  limit = 20
-): Promise<FragmentSale[]> {
-  let slug = slugOrName.toLowerCase().replace(/[^a-z0-9]/g, "");
+export async function fetchRecentSales(slugOrName: string, limit = 20): Promise<FragmentSale[]> {
+  const slug = slugOrName.toLowerCase().replace(/[^a-z0-9]/g, "");
 
   const cacheKey = `sales:${slug}:${limit}`;
   const cached = getCached<FragmentSale[]>(cacheKey);
@@ -307,9 +316,7 @@ export async function fetchAllFloorPrices(): Promise<FragmentFloorData[]> {
   // Process in batches of 5 to avoid rate limiting
   for (let i = 0; i < slugs.length; i += 5) {
     const batch = slugs.slice(i, i + 5);
-    const batchResults = await Promise.allSettled(
-      batch.map((slug) => fetchFloorPrice(slug))
-    );
+    const batchResults = await Promise.allSettled(batch.map((slug) => fetchFloorPrice(slug)));
 
     for (const result of batchResults) {
       if (result.status === "fulfilled" && result.value) {

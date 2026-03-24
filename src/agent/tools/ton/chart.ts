@@ -60,7 +60,69 @@ export const tonChartExecutor: ToolExecutor<ChartParams> = async (
     const startDate = endDate - config.seconds;
 
     const url = `/rates/chart?token=${encodeURIComponent(token)}&currency=usd&start_date=${startDate}&end_date=${endDate}&points_count=${config.points}`;
-    const res = await tonapiFetch(url);
+    let res = await tonapiFetch(url);
+
+    // Retry on transient errors
+    if (res.status === 502 || res.status === 429) {
+      await new Promise((r) => setTimeout(r, 2000));
+      res = await tonapiFetch(url);
+    }
+
+    // TonAPI 401 — try GeckoTerminal fallback (TON only)
+    if (res.status === 401) {
+      log.warn("TonAPI 401 — trying GeckoTerminal fallback for chart");
+      if (token === "ton") {
+        try {
+          const geckoUrl = `https://api.coingecko.com/api/v3/coins/the-open-network/market_chart?vs_currency=usd&days=${Math.ceil(config.seconds / 86400)}`;
+          const geckoRes = await fetch(geckoUrl, { headers: { Accept: "application/json" } });
+          if (geckoRes.ok) {
+            const geckoData = await geckoRes.json();
+            const prices = (geckoData.prices || []) as [number, number][];
+            if (prices.length > 0) {
+              // Downsample to target points
+              const step = Math.max(1, Math.floor(prices.length / config.points));
+              const sampled = prices.filter((_, i) => i % step === 0);
+              const points = sampled.map(([tsMs, price]) => ({
+                timestamp: Math.floor(tsMs / 1000),
+                date: new Date(tsMs).toISOString(),
+                price,
+              }));
+              const priceVals = points.map((p) => p.price);
+              const startPrice = priceVals[0];
+              const currentPrice = priceVals[priceVals.length - 1];
+              const minPrice = Math.min(...priceVals);
+              const maxPrice = Math.max(...priceVals);
+              const changePercent =
+                startPrice !== 0 ? ((currentPrice - startPrice) / startPrice) * 100 : 0;
+              const direction = changePercent >= 0 ? "+" : "";
+              return {
+                success: true,
+                data: {
+                  token: "TON",
+                  period,
+                  points,
+                  stats: {
+                    currentPrice,
+                    startPrice,
+                    minPrice,
+                    maxPrice,
+                    changePercent: Math.round(changePercent * 100) / 100,
+                  },
+                  message: `TON price over ${period}: $${currentPrice.toFixed(4)} (${direction}${Math.round(changePercent * 100) / 100}%). Low: $${minPrice.toFixed(4)}, High: $${maxPrice.toFixed(4)}. ${points.length} data points. (CoinGecko fallback)`,
+                  source: "coingecko",
+                },
+              };
+            }
+          }
+        } catch (geckoErr) {
+          log.error({ err: geckoErr }, "CoinGecko fallback failed");
+        }
+      }
+      return {
+        success: false,
+        error: "TonAPI authentication error (401). Chart data unavailable for this token.",
+      };
+    }
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");

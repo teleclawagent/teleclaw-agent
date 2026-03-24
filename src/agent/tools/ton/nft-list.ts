@@ -74,7 +74,61 @@ export const nftListExecutor: ToolExecutor<NftListParams> = async (
     }
 
     const url = `/accounts/${encodeURIComponent(address)}/nfts?${queryParts.join("&")}`;
-    const res = await tonapiFetch(url);
+    let res = await tonapiFetch(url);
+
+    // Retry on transient errors
+    if (res.status === 502 || res.status === 429) {
+      await new Promise((r) => setTimeout(r, 2000));
+      res = await tonapiFetch(url);
+    }
+
+    // TonAPI 401 — try Toncenter fallback
+    if (res.status === 401) {
+      log.warn("TonAPI 401 — trying Toncenter fallback for NFT list");
+      try {
+        const tcUrl = `https://toncenter.com/api/v3/nft/items?owner_address=${encodeURIComponent(address)}&limit=${limit}&offset=0`;
+        const tcRes = await fetch(tcUrl, { headers: { Accept: "application/json" } });
+        if (tcRes.ok) {
+          const tcData = await tcRes.json();
+          const tcItems = (tcData.nft_items || []) as Record<string, unknown>[];
+          const nfts: NftItem[] = tcItems
+            .filter((item) => (item.trust as string) !== "blacklist")
+            .map((item) => {
+              const meta = (item.metadata || {}) as Record<string, unknown>;
+              const coll = (item.collection || {}) as Record<string, unknown>;
+              return {
+                address: (item.address as string) || "",
+                name: (meta.name as string) || "Unnamed NFT",
+                description: ((meta.description as string) || "").slice(0, 100),
+                collection: (coll.name as string) || null,
+                collectionAddress: (coll.address as string) || null,
+                preview: (meta.image as string) || null,
+                onSale: false,
+                salePrice: null,
+                marketplace: null,
+                dns: (item.dns as string) || null,
+                trust: (item.trust as string) || "none",
+                explorer: `https://tonviewer.com/${item.address}`,
+              };
+            });
+
+          const summary = `Found ${nfts.length} NFT(s) for ${address} (via Toncenter fallback).`;
+          return {
+            success: true,
+            data: {
+              address,
+              totalNfts: nfts.length,
+              hasMore: tcItems.length >= limit,
+              nfts,
+              message: summary,
+              summary,
+            },
+          };
+        }
+      } catch (tcErr) {
+        log.error({ err: tcErr }, "Toncenter NFT fallback failed");
+      }
+    }
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");

@@ -42,8 +42,73 @@ export const dedustPricesExecutor: ToolExecutor<DedustPricesParams> = async (
   try {
     const { symbols } = params;
 
-    const response = await fetchWithTimeout(`${DEDUST_API_URL}/prices`);
+    let response = await fetchWithTimeout(`${DEDUST_API_URL}/prices`, { timeoutMs: 8000 });
+
+    // Retry once on failure
     if (!response.ok) {
+      await new Promise((r) => setTimeout(r, 2000));
+      response = await fetchWithTimeout(`${DEDUST_API_URL}/prices`, { timeoutMs: 8000 });
+    }
+
+    if (!response.ok) {
+      // Fallback: try GeckoTerminal for TON ecosystem tokens
+      log.warn("DeDust API unavailable, trying GeckoTerminal fallback");
+      try {
+        const geckoRes = await fetchWithTimeout(
+          "https://api.geckoterminal.com/api/v2/networks/ton/dexes/dedust/pools?page=1",
+          { timeoutMs: 8000 }
+        );
+        if (geckoRes.ok) {
+          const geckoData = await geckoRes.json();
+          const pools = (geckoData?.data || []) as Record<string, unknown>[];
+          const geckoEntries: PriceEntry[] = [];
+          for (const pool of pools) {
+            const attrs = pool.attributes as Record<string, unknown>;
+            if (attrs?.base_token_price_usd && attrs?.name) {
+              const name = (attrs.name as string).split(" / ")[0];
+              geckoEntries.push({
+                symbol: name,
+                price: parseFloat(attrs.base_token_price_usd as string),
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          }
+          if (geckoEntries.length > 0) {
+            // Deduplicate by symbol (keep first/highest)
+            const seen = new Set<string>();
+            const deduped = geckoEntries.filter((e) => {
+              if (seen.has(e.symbol)) return false;
+              seen.add(e.symbol);
+              return true;
+            });
+
+            if (symbols && symbols.length > 0) {
+              const upper = symbols.map((s) => s.toUpperCase());
+              const filtered = deduped.filter((p) => upper.includes(p.symbol.toUpperCase()));
+              return {
+                success: true,
+                data: {
+                  prices: filtered,
+                  count: filtered.length,
+                  message: `DeDust Prices via GeckoTerminal (${filtered.length} tokens)`,
+                  source: "geckoterminal",
+                },
+              };
+            }
+            return {
+              success: true,
+              data: {
+                prices: deduped,
+                count: deduped.length,
+                message: `DeDust Prices via GeckoTerminal (${deduped.length} tokens)`,
+                source: "geckoterminal",
+              },
+            };
+          }
+        }
+      } catch (geckoErr) {
+        log.error({ err: geckoErr }, "GeckoTerminal fallback also failed");
+      }
       throw new Error(`DeDust API error: ${response.status} ${response.statusText}`);
     }
 
