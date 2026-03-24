@@ -100,26 +100,61 @@ export class ProviderWizard {
 
   // ── /models ───────────────────────────────────────────────────────────
 
-  async handleModels(chatId: string, senderId: number, replyToId?: number): Promise<void> {
+  async handleModels(
+    chatId: string,
+    senderId: number,
+    replyToId?: number,
+    globalProvider?: string,
+    globalModel?: string
+  ): Promise<void> {
     const settings = getUserSettings(this.db, senderId);
-    const currentProvider = settings?.provider || "default";
-    const currentModel = settings?.model || "default";
+    const currentProvider = settings?.provider || globalProvider || "anthropic";
+    const currentModel = settings?.model || globalModel || "default";
 
-    let header = "🧠 **Model Switcher**\n\n";
-    header += `Current: **${currentProvider}** / **${currentModel}**\n\n`;
+    // Get models for current provider directly (no provider selection screen)
+    const providerForCatalog = currentProvider === "claude-code" ? "anthropic" : currentProvider;
+    const models = getModelsForProvider(providerForCatalog);
+    const meta = getProviderMetadata(currentProvider as SupportedProvider);
 
-    if (!settings?.provider && !settings?.apiKey) {
-      header += "⚠️ No custom provider set. Using bot defaults.\n";
-      header += "Use /addprovider first to add your own API key.\n\n";
+    if (models.length === 0) {
+      await this.bridge.sendMessage({
+        chatId,
+        text:
+          `🧠 **Model Switcher**\n\n` +
+          `Current: **${meta.displayName}** / **${currentModel}**\n\n` +
+          `No model catalog available for this provider.\n` +
+          `Use \`/mymodel <model-name>\` to set manually.`,
+        replyToId,
+      });
+      return;
     }
 
-    header += "Select a provider to see available models:";
+    const rows: InlineButton[][] = [];
+    let currentRow: InlineButton[] = [];
 
-    const rows = this.buildProviderKeyboard("ms:");
+    for (const model of models) {
+      if (currentRow.length >= 2) {
+        rows.push(currentRow);
+        currentRow = [];
+      }
+      const marker = model.value === currentModel ? "✅ " : "";
+      const cbData = `ms:d:${model.value.slice(0, 50)}`;
+      currentRow.push({
+        text: `${marker}${model.name}`,
+        callback_data: cbData,
+      });
+    }
+    if (currentRow.length > 0) rows.push(currentRow);
+
+    // Add "Other providers" button at bottom
+    rows.push([{ text: "🔄 Other Providers", callback_data: "ms:all" }]);
 
     await this.bridge.sendMessage({
       chatId,
-      text: header,
+      text:
+        `🧠 **${meta.displayName}** Models\n\n` +
+        `Current: **${currentModel}**\n\n` +
+        `Tap to switch:`,
       inlineKeyboard: rows,
       replyToId,
     });
@@ -417,6 +452,45 @@ export class ProviderWizard {
     messageId: number,
     queryId: string
   ): Promise<void> {
+    // ms:d:<model> — direct model switch (current provider, no provider check)
+    if (data.startsWith("d:")) {
+      const modelId = data.slice(2);
+      setUserModel(this.db, userId, modelId);
+
+      const settings = getUserSettings(this.db, userId);
+      const provider = settings?.provider || "anthropic";
+      const meta = getProviderMetadata(provider as SupportedProvider);
+
+      await this.bridge.editMessage({
+        chatId,
+        messageId,
+        text: `✅ Switched to **${meta.displayName}** / **${modelId}**`,
+      });
+      await this.bridge.answerCallbackQuery(queryId, { message: `✅ ${modelId}` });
+      return;
+    }
+
+    // ms:all — show all providers
+    if (data === "all") {
+      const settings = getUserSettings(this.db, userId);
+      const currentProvider = settings?.provider || "default";
+      const currentModel = settings?.model || "default";
+
+      const rows = this.buildProviderKeyboard("ms:");
+
+      await this.bridge.editMessage({
+        chatId,
+        messageId,
+        text:
+          `🧠 **Model Switcher**\n\n` +
+          `Current: **${currentProvider}** / **${currentModel}**\n\n` +
+          `Select a provider:`,
+        inlineKeyboard: rows,
+      });
+      await this.bridge.answerCallbackQuery(queryId, {});
+      return;
+    }
+
     // ms:p:<provider> — show models for provider
     if (data.startsWith("p:")) {
       const provider = data.slice(2) as SupportedProvider;

@@ -975,7 +975,13 @@ export class TeleclawApp {
             return;
           }
           if (userCmd.command === "models") {
-            await this.providerWizard.handleModels(message.chatId, message.senderId, message.id);
+            await this.providerWizard.handleModels(
+              message.chatId,
+              message.senderId,
+              message.id,
+              this.config.agent.provider,
+              this.config.agent.model
+            );
             return;
           }
           if (userCmd.command === "removeprovider") {
