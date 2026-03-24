@@ -6,7 +6,7 @@ import { refreshMonitoredChannels } from "./monitor.js";
 import { getErrorMessage } from "../../../utils/errors.js";
 import { createLogger } from "../../../utils/logger.js";
 
-const log = createLogger("AlphaRadar");
+const _log = createLogger("AlphaRadar");
 
 const MAX_CHANNELS_PER_USER = 20;
 const MAX_TOKENS_PER_USER = 50;
@@ -21,9 +21,7 @@ const addChannelTool: Tool = {
     chat_id: Type.String({
       description: "Channel/group chat ID (numeric) or @username",
     }),
-    title: Type.Optional(
-      Type.String({ description: "Friendly name for this channel" })
-    ),
+    title: Type.Optional(Type.String({ description: "Friendly name for this channel" })),
   }),
 };
 
@@ -246,9 +244,7 @@ const untrackTokenExecutor: ToolExecutor<{ symbol: string }> = async (
 ): Promise<ToolResult> => {
   const symbol = params.symbol.toUpperCase().replace(/^\$/, "");
   const result = context.db
-    .prepare(
-      "UPDATE radar_tokens SET active = 0 WHERE user_id = ? AND UPPER(symbol) = ?"
-    )
+    .prepare("UPDATE radar_tokens SET active = 0 WHERE user_id = ? AND UPPER(symbol) = ?")
     .run(context.senderId, symbol);
 
   if (result.changes === 0) {
@@ -327,12 +323,7 @@ const getMentionsExecutor: ToolExecutor<{ symbol: string; hours?: number }> = as
   const windowSeconds = hours * 3600;
 
   const mentions = getRecentMentions(context.db, context.senderId, symbol, windowSeconds);
-  const channelCount = getUniqueChannelCount(
-    context.db,
-    context.senderId,
-    symbol,
-    windowSeconds
-  );
+  const channelCount = getUniqueChannelCount(context.db, context.senderId, symbol, windowSeconds);
 
   if (mentions.length === 0) {
     return {
@@ -441,9 +432,7 @@ const setPreferencesExecutor: ToolExecutor<{
       if (updates.length > 0) {
         updates.push("updated_at = unixepoch()");
         context.db
-          .prepare(
-            `UPDATE radar_preferences SET ${updates.join(", ")} WHERE user_id = ?`
-          )
+          .prepare(`UPDATE radar_preferences SET ${updates.join(", ")} WHERE user_id = ?`)
           .run(...values, context.senderId);
       }
     } else {
@@ -485,38 +474,32 @@ const radarStatusExecutor: ToolExecutor<Record<string, never>> = async (
   context
 ): Promise<ToolResult> => {
   const channels = context.db
-    .prepare(
-      "SELECT COUNT(*) as count FROM radar_channels WHERE user_id = ? AND active = 1"
-    )
+    .prepare("SELECT COUNT(*) as count FROM radar_channels WHERE user_id = ? AND active = 1")
     .get(context.senderId) as { count: number };
 
   const tokens = context.db
-    .prepare(
-      "SELECT COUNT(*) as count FROM radar_tokens WHERE user_id = ? AND active = 1"
-    )
+    .prepare("SELECT COUNT(*) as count FROM radar_tokens WHERE user_id = ? AND active = 1")
     .get(context.senderId) as { count: number };
 
   const last24h = Math.floor(Date.now() / 1000) - 86400;
   const mentionsToday = context.db
-    .prepare(
-      "SELECT COUNT(*) as count FROM radar_mentions WHERE user_id = ? AND detected_at >= ?"
-    )
+    .prepare("SELECT COUNT(*) as count FROM radar_mentions WHERE user_id = ? AND detected_at >= ?")
     .get(context.senderId, last24h) as { count: number };
 
   const alertsToday = context.db
-    .prepare(
-      "SELECT COUNT(*) as count FROM radar_alerts WHERE user_id = ? AND sent_at >= ?"
-    )
+    .prepare("SELECT COUNT(*) as count FROM radar_alerts WHERE user_id = ? AND sent_at >= ?")
     .get(context.senderId, last24h) as { count: number };
 
   const prefs = context.db
     .prepare("SELECT * FROM radar_preferences WHERE user_id = ?")
-    .get(context.senderId) as {
-    alert_mode: string;
-    min_mentions: number;
-    quiet_start: number;
-    quiet_end: number;
-  } | undefined;
+    .get(context.senderId) as
+    | {
+        alert_mode: string;
+        min_mentions: number;
+        quiet_start: number;
+        quiet_end: number;
+      }
+    | undefined;
 
   return {
     success: true,

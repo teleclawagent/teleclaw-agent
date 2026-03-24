@@ -18,29 +18,29 @@
 
 import { createLogger } from "../../../utils/logger.js";
 
-const log = createLogger("NumberRarity");
+const _log = createLogger("NumberRarity");
 
 // ─── Types ───────────────────────────────────────────────────────────
 
 export type RarityTier = "S" | "A" | "B" | "C" | "D";
 
 export interface RarityResult {
-  number: string;          // formatted: +888 8 XXX or +888 0XXX XXXX
-  rawDigits: string;       // digits after 888: "8888" or "07684929"
-  totalDigits: number;     // 7 or 11
+  number: string; // formatted: +888 8 XXX or +888 0XXX XXXX
+  rawDigits: string; // digits after 888: "8888" or "07684929"
+  totalDigits: number; // 7 or 11
   tier: RarityTier;
-  score: number;           // 0-100
-  label: string;           // "Legendary", "Epic", etc.
-  tags: string[];          // ["short", "all-eights", "repeating", ...]
+  score: number; // 0-100
+  label: string; // "Legendary", "Epic", etc.
+  tags: string[]; // ["short", "all-eights", "repeating", ...]
   breakdown: {
-    lengthScore: number;   // 0-100
-    patternScore: number;  // 0-100
-    luckyScore: number;    // 0-100
+    lengthScore: number; // 0-100
+    patternScore: number; // 0-100
+    luckyScore: number; // 0-100
     uniquenessScore: number; // 0-100
   };
   estimatedFloor: {
-    min: number;           // TON
-    max: number;           // TON
+    min: number; // TON
+    max: number; // TON
   };
 }
 
@@ -48,16 +48,16 @@ export interface RarityResult {
 
 /** Lucky digits in Chinese numerology (critical for TON/crypto market) */
 const LUCKY_DIGITS: Record<string, number> = {
-  "8": 10,  // 发 (fā) = prosperity. THE premium digit.
-  "6": 7,   // 六 (liù) = smooth/flowing
-  "9": 6,   // 九 (jiǔ) = longevity
-  "0": 4,   // neutral, but round numbers = clean
-  "7": 3,   // 七 (qī) = togetherness (neutral-positive)
-  "1": 3,   // 一 (yī) = first/unity
-  "2": 2,   // 二 (èr) = pairs (neutral)
-  "3": 2,   // 三 (sān) = life (neutral)
-  "5": 1,   // 五 (wǔ) = neutral
-  "4": -5,  // 四 (sì) = sounds like death. Major penalty.
+  "8": 10, // 发 (fā) = prosperity. THE premium digit.
+  "6": 7, // 六 (liù) = smooth/flowing
+  "9": 6, // 九 (jiǔ) = longevity
+  "0": 4, // neutral, but round numbers = clean
+  "7": 3, // 七 (qī) = togetherness (neutral-positive)
+  "1": 3, // 一 (yī) = first/unity
+  "2": 2, // 二 (èr) = pairs (neutral)
+  "3": 2, // 三 (sān) = life (neutral)
+  "5": 1, // 五 (wǔ) = neutral
+  "4": -5, // 四 (sì) = sounds like death. Major penalty.
 };
 
 const TIER_CONFIG: Record<RarityTier, { label: string; emoji: string }> = {
@@ -71,7 +71,9 @@ const TIER_CONFIG: Record<RarityTier, { label: string; emoji: string }> = {
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 /** Parse a number string into clean digits after 888 prefix */
-function parseNumber(input: string): { raw: string; afterPrefix: string; totalDigits: number } | null {
+function parseNumber(
+  input: string
+): { raw: string; afterPrefix: string; totalDigits: number } | null {
   // Accept: "+888 8 036", "8888036", "+888 0768 4929", "88807684929", etc.
   const cleaned = input.replace(/[+\s\-()]/g, "");
   if (!cleaned.startsWith("888")) return null;
@@ -169,7 +171,10 @@ function hasBlockPattern(digits: string): { type: string; score: number } | null
   if (len >= 4 && len % 2 === 0) {
     let isAABB = true;
     for (let i = 0; i < len; i += 2) {
-      if (digits[i] !== digits[i + 1]) { isAABB = false; break; }
+      if (digits[i] !== digits[i + 1]) {
+        isAABB = false;
+        break;
+      }
     }
     if (isAABB) return { type: "AABB", score: 60 };
   }
@@ -310,7 +315,7 @@ function scoreLuckyComponent(afterPrefix: string): number {
 
 function scoreUniquenessComponent(afterPrefix: string): number {
   const uniqueDigits = new Set(afterPrefix).size;
-  const len = afterPrefix.length;
+  const _len = afterPrefix.length;
 
   // Fewer unique digits = more memorable = rarer
   // 1 unique digit (all same) = 100
@@ -346,14 +351,14 @@ export function calculateRarity(input: string): RarityResult | null {
   // For short numbers: pattern matters most (length already gives huge base)
   // For standard numbers: pattern is the primary differentiator
   const weights = isShort
-    ? { length: 0.30, pattern: 0.35, lucky: 0.20, uniqueness: 0.15 }
-    : { length: 0.15, pattern: 0.40, lucky: 0.25, uniqueness: 0.20 };
+    ? { length: 0.3, pattern: 0.35, lucky: 0.2, uniqueness: 0.15 }
+    : { length: 0.15, pattern: 0.4, lucky: 0.25, uniqueness: 0.2 };
 
   let totalScore = Math.round(
     lengthScore * weights.length +
-    patternScore * weights.pattern +
-    luckyScore * weights.lucky +
-    uniquenessScore * weights.uniqueness
+      patternScore * weights.pattern +
+      luckyScore * weights.lucky +
+      uniquenessScore * weights.uniqueness
   );
 
   // Special case: +888 8 888 is THE rarest number
@@ -447,7 +452,8 @@ function estimatePrice(
       if (isAllSame(afterPrefix)) return { min: 35_000, max: 80_000 };
       return { min: 15_000, max: 55_000 };
     case "A": // 0000 series, double blocks, partial strong patterns
-      if (isAllSame(afterPrefix.slice(0, 4)) || isAllSame(afterPrefix.slice(4))) return { min: 20_000, max: 55_000 };
+      if (isAllSame(afterPrefix.slice(0, 4)) || isAllSame(afterPrefix.slice(4)))
+        return { min: 20_000, max: 55_000 };
       return { min: 5_000, max: 30_000 };
     case "B": // notable patterns, 4+ repeats, some structure
       return { min: 2_000, max: 6_000 };

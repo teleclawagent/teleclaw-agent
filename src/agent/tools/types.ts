@@ -22,6 +22,7 @@ export interface ToolContext {
   /** Full config for accessing API key, model, etc. (optional) */
   config?: Config;
   /** Shared OTC matchmaker API client (optional) */
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   matchmakerApi?: import("../tools/fragment/matchmaker-api.js").MatchmakerAPIClient;
 }
 

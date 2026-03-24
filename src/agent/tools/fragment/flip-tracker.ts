@@ -10,8 +10,8 @@
 
 import { Type } from "@sinclair/typebox";
 import type { Tool, ToolExecutor, ToolResult, ToolContext } from "../types.js";
-import { estimateValue } from "./fragment-service.js";
-import { categorizeUsername, type CategoryKey } from "./categorizer.js";
+import { estimateValue as _estimateValue } from "./fragment-service.js";
+import { categorizeUsername } from "./categorizer.js";
 import { createLogger } from "../../../utils/logger.js";
 
 const log = createLogger("FlipTracker");
@@ -60,13 +60,16 @@ export const flipSellTool: Tool = {
   description:
     "Record a username or anonymous number (+888) sale/flip. If in portfolio, auto-pulls buy price & calculates P&L. " +
     "If not in portfolio, provide buy_price to record the complete flip in one step. " +
-    'Works for both usernames and +888 numbers.',
+    "Works for both usernames and +888 numbers.",
   category: "action",
   parameters: Type.Object({
     username: Type.String({ description: "Username (with @) or +888 number you sold" }),
     sell_price: Type.Number({ description: "Price you sold for in TON", minimum: 0 }),
     buy_price: Type.Optional(
-      Type.Number({ description: "Original buy price in TON (if not already in portfolio)", minimum: 0 })
+      Type.Number({
+        description: "Original buy price in TON (if not already in portfolio)",
+        minimum: 0,
+      })
     ),
     buy_date: Type.Optional(
       Type.String({ description: "Original buy date (YYYY-MM-DD, for quick flip recording)" })
@@ -85,7 +88,9 @@ export const flipSellExecutor: ToolExecutor<SellParams> = async (
   try {
     ensureFlipTables(ctx);
     const input = params.username.trim();
-    const isNumber = /^\+?888[\s\d\-()]+$/.test(input.replace(/[+\s\-()]/g, "").startsWith("888") ? input : "");
+    const isNumber = /^\+?888[\s\d\-()]+$/.test(
+      input.replace(/[+\s\-()]/g, "").startsWith("888") ? input : ""
+    );
     const clean = isNumber
       ? `+${input.replace(/[+\s\-()]/g, "")}`
       : `@${input.replace(/^@/, "").toLowerCase()}`;
@@ -94,9 +99,7 @@ export const flipSellExecutor: ToolExecutor<SellParams> = async (
 
     // Check if username exists in portfolio
     const portfolioEntry = ctx.db
-      .prepare(
-        `SELECT * FROM fragment_portfolio WHERE user_id = ? AND username = ?`
-      )
+      .prepare(`SELECT * FROM fragment_portfolio WHERE user_id = ? AND username = ?`)
       .get(userId, clean) as { buy_price: number; buy_date: string; notes?: string } | undefined;
 
     let buyPrice: number;
@@ -177,7 +180,11 @@ export const flipSellExecutor: ToolExecutor<SellParams> = async (
           `💸 Buy: ${buyPrice} TON → Sell: ${params.sell_price} TON\n` +
           `${emoji} P&L: ${profitStr} TON (${roiPct >= 0 ? "+" : ""}${roiPct}%)\n` +
           `📅 Held: ${holdDays} days (${buyDate} → ${sellDate})\n` +
-          (profit > 0 ? `\n🎉 Nice flip!` : profit === 0 ? `\n😐 Break even.` : `\n💎 Lesson learned.`),
+          (profit > 0
+            ? `\n🎉 Nice flip!`
+            : profit === 0
+              ? `\n😐 Break even.`
+              : `\n💎 Lesson learned.`),
       },
     };
   } catch (error) {
@@ -226,11 +233,20 @@ export const flipHistoryExecutor: ToolExecutor<HistoryParams> = async (
 
     let orderBy: string;
     switch (sort) {
-      case "profit": orderBy = "profit DESC"; break;
-      case "loss": orderBy = "profit ASC"; break;
-      case "roi": orderBy = "roi_pct DESC"; break;
-      case "duration": orderBy = "hold_days DESC"; break;
-      default: orderBy = "sell_date DESC, id DESC";
+      case "profit":
+        orderBy = "profit DESC";
+        break;
+      case "loss":
+        orderBy = "profit ASC";
+        break;
+      case "roi":
+        orderBy = "roi_pct DESC";
+        break;
+      case "duration":
+        orderBy = "hold_days DESC";
+        break;
+      default:
+        orderBy = "sell_date DESC, id DESC";
     }
 
     let query = `SELECT * FROM fragment_flips WHERE user_id = ?`;
@@ -261,7 +277,8 @@ export const flipHistoryExecutor: ToolExecutor<HistoryParams> = async (
       return {
         success: true,
         data: {
-          message: "📭 No flips recorded yet. Sell a username from your portfolio to start tracking!",
+          message:
+            "📭 No flips recorded yet. Sell a username from your portfolio to start tracking!",
         },
       };
     }
@@ -378,21 +395,20 @@ export const flipStatsExecutor: ToolExecutor<StatsParams> = async (
     const totalProfit = flips.reduce((s, f) => s + f.profit, 0);
     const totalInvested = flips.reduce((s, f) => s + f.buy_price, 0);
     const totalRevenue = flips.reduce((s, f) => s + f.sell_price, 0);
-    const avgRoi = totalInvested > 0 ? Math.round((totalProfit / totalInvested) * 100 * 10) / 10 : 0;
+    const avgRoi =
+      totalInvested > 0 ? Math.round((totalProfit / totalInvested) * 100 * 10) / 10 : 0;
     const avgHoldDays = Math.round(flips.reduce((s, f) => s + f.hold_days, 0) / totalFlips);
     const winRate = Math.round((wins.length / totalFlips) * 100);
 
     // Best & worst
-    const bestFlip = flips.reduce((best, f) => (f.profit > best.profit ? f : best), flips[0]);
-    const worstFlip = flips.reduce((worst, f) => (f.profit < worst.profit ? f : worst), flips[0]);
+    const _bestFlip = flips.reduce((best, f) => (f.profit > best.profit ? f : best), flips[0]);
+    const _worstFlip = flips.reduce((worst, f) => (f.profit < worst.profit ? f : worst), flips[0]);
 
     // Biggest single profit & loss
-    const biggestWin = wins.length > 0
-      ? wins.reduce((a, b) => (a.profit > b.profit ? a : b))
-      : null;
-    const biggestLoss = losses.length > 0
-      ? losses.reduce((a, b) => (a.profit < b.profit ? a : b))
-      : null;
+    const biggestWin =
+      wins.length > 0 ? wins.reduce((a, b) => (a.profit > b.profit ? a : b)) : null;
+    const biggestLoss =
+      losses.length > 0 ? losses.reduce((a, b) => (a.profit < b.profit ? a : b)) : null;
 
     // Profit by category
     const catProfit: Record<string, { profit: number; count: number }> = {};

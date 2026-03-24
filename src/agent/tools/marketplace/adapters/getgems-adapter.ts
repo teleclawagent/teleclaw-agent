@@ -6,12 +6,7 @@
  * Getgems supports both upgraded (on-chain NFT) and non-upgraded (off-chain) gifts.
  */
 
-import type {
-  MarketplaceAdapter,
-  MarketplaceListing,
-  SearchParams,
-  AssetKind,
-} from "../types.js";
+import type { MarketplaceAdapter, MarketplaceListing, SearchParams, AssetKind } from "../types.js";
 import { createLogger } from "../../../../utils/logger.js";
 
 const log = createLogger("Marketplace:Getgems");
@@ -65,7 +60,7 @@ function nftToListing(nft: GetgemsNFT, assetKind: AssetKind): MarketplaceListing
 }
 
 // Known Getgems collection addresses for Telegram assets
-const COLLECTIONS = {
+const _COLLECTIONS = {
   usernames: "EQAOQdwdw8kGftJCSFgOErM1mBjYPe4DBPq8-AhF6vr9si5N",
   numbers: "EQAOQdwdw8kGftJCSFgOErM1mBjYPe4DBPq8-AhF6vr9si5N", // Same collection, different NFTs
 };
@@ -95,10 +90,10 @@ export const getgemsAdapter: MarketplaceAdapter = {
       `;
 
       const searchQuery = params.query || params.collection || "";
-      const data = await queryGetgems(query, {
+      const data = (await queryGetgems(query, {
         query: searchQuery,
         first: params.limit ?? 20,
-      }) as { alphaNftSearch?: { edges: Array<{ node: GetgemsNFT }> } };
+      })) as { alphaNftSearch?: { edges: Array<{ node: GetgemsNFT }> } };
 
       if (!data?.alphaNftSearch?.edges) return [];
 
@@ -128,7 +123,7 @@ export const getgemsAdapter: MarketplaceAdapter = {
         }
       `;
 
-      const data = await queryGetgems(query, { address: identifier }) as {
+      const data = (await queryGetgems(query, { address: identifier })) as {
         nftItemByAddress?: GetgemsNFT;
       };
 

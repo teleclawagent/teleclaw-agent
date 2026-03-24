@@ -10,8 +10,12 @@ import { PendingHistory } from "../memory/pending-history.js";
 import type { ToolContext } from "../agent/tools/types.js";
 import { TELEGRAM_SEND_TOOLS } from "../constants/tools.js";
 // GramJS transcribe removed — stub for bot-only mode
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-const telegramTranscribeAudioExecutor = async (_params: any, _ctx: any) => ({ success: false as const, data: undefined, error: "Voice transcription unavailable in bot-only mode" });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const telegramTranscribeAudioExecutor = async (_params: any, _ctx: any) => ({
+  success: false as const,
+  data: undefined,
+  error: "Voice transcription unavailable in bot-only mode",
+});
 import { TYPING_REFRESH_MS } from "../constants/timeouts.js";
 import { createLogger } from "../utils/logger.js";
 import type { MatchmakerAPIClient } from "../agent/tools/fragment/matchmaker-api.js";
@@ -517,18 +521,47 @@ export class MessageHandler {
           const errMsg = error instanceof Error ? error.message : String(error);
           const errLower = errMsg.toLowerCase();
           let userMessage: string;
-          if (errLower.includes("rate limit") || errLower.includes("429") || errLower.includes("too many requests") || errLower.includes("rate_limit") || errLower.includes("an unknown error occurred")) {
-            userMessage = "⚠️ Hit an API rate limit — your AI provider is throttling requests. Wait a minute and try again, or switch to a different model with /models.";
-          } else if (errLower.includes("overloaded") || errLower.includes("capacity") || errLower.includes("503")) {
-            userMessage = "⚠️ AI provider is overloaded right now. Try again in a moment, or switch models with /models.";
-          } else if (errLower.includes("401") || errLower.includes("unauthorized") || errLower.includes("invalid api key") || errLower.includes("authentication")) {
-            userMessage = "⚠️ API key issue — your AI provider rejected the request. Check your API key with /mysettings or switch providers with /addprovider.";
-          } else if (errLower.includes("insufficient") || errLower.includes("quota") || errLower.includes("billing") || errLower.includes("402")) {
-            userMessage = "⚠️ API quota exceeded or billing issue. Check your provider account, or switch to a free model with /models.";
-          } else if (errLower.includes("timeout") || errLower.includes("timed out") || errLower.includes("econnreset")) {
+          if (
+            errLower.includes("rate limit") ||
+            errLower.includes("429") ||
+            errLower.includes("too many requests") ||
+            errLower.includes("rate_limit") ||
+            errLower.includes("an unknown error occurred")
+          ) {
+            userMessage =
+              "⚠️ Hit an API rate limit — your AI provider is throttling requests. Wait a minute and try again, or switch to a different model with /models.";
+          } else if (
+            errLower.includes("overloaded") ||
+            errLower.includes("capacity") ||
+            errLower.includes("503")
+          ) {
+            userMessage =
+              "⚠️ AI provider is overloaded right now. Try again in a moment, or switch models with /models.";
+          } else if (
+            errLower.includes("401") ||
+            errLower.includes("unauthorized") ||
+            errLower.includes("invalid api key") ||
+            errLower.includes("authentication")
+          ) {
+            userMessage =
+              "⚠️ API key issue — your AI provider rejected the request. Check your API key with /mysettings or switch providers with /addprovider.";
+          } else if (
+            errLower.includes("insufficient") ||
+            errLower.includes("quota") ||
+            errLower.includes("billing") ||
+            errLower.includes("402")
+          ) {
+            userMessage =
+              "⚠️ API quota exceeded or billing issue. Check your provider account, or switch to a free model with /models.";
+          } else if (
+            errLower.includes("timeout") ||
+            errLower.includes("timed out") ||
+            errLower.includes("econnreset")
+          ) {
             userMessage = "⚠️ Request timed out — the AI provider took too long. Try again.";
           } else {
-            userMessage = "⚠️ Something went wrong processing your message. Try again, or switch models with /models if the issue persists.";
+            userMessage =
+              "⚠️ Something went wrong processing your message. Try again, or switch models with /models if the issue persists.";
           }
           await this.bridge.sendMessage({
             chatId: message.chatId,

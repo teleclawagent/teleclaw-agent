@@ -2,7 +2,7 @@ import type Database from "better-sqlite3";
 import type { TelegramTransport } from "../../../telegram/transport.js";
 import type { Config } from "../../../config/schema.js";
 import { evaluateRules, markRuleTriggered, createPendingExecution } from "./rule-engine.js";
-import { getTonPrice } from "../../../ton/wallet-service.js";
+import { getTonPrice as _getTonPrice } from "../../../ton/wallet-service.js";
 import { expirePendingExecutions, getExecutionExpiry, auditLog } from "./security.js";
 import { createLogger } from "../../../utils/logger.js";
 import { getErrorMessage } from "../../../utils/errors.js";
@@ -130,9 +130,7 @@ async function fetchCurrentPrices(
 
   // Get unique assets from active rules
   const assets = db
-    .prepare(
-      `SELECT DISTINCT asset FROM trading_rules WHERE active = 1 AND LOWER(asset) != 'ton'`
-    )
+    .prepare(`SELECT DISTINCT asset FROM trading_rules WHERE active = 1 AND LOWER(asset) != 'ton'`)
     .all() as Array<{ asset: string }>;
 
   for (const { asset } of assets) {
@@ -182,10 +180,10 @@ async function processTriggeredRules(
 
       // Get price source info
       const assetPriceData = priceData.get(rule.asset.toLowerCase());
-      const priceSources = assetPriceData
-        ? assetPriceData.sources.join(", ")
-        : "unknown";
-      const priceVerified = assetPriceData?.verified ? "✅ Multi-source verified" : "⚠️ Single source";
+      const priceSources = assetPriceData ? assetPriceData.sources.join(", ") : "unknown";
+      const priceVerified = assetPriceData?.verified
+        ? "✅ Multi-source verified"
+        : "⚠️ Single source";
 
       const executionId = createPendingExecution(db, {
         ruleId: rule.id,

@@ -32,7 +32,6 @@ export function createTelegramSocialSDK(bridge: TelegramTransport, log: PluginLo
     requireBridgeUtil(bridge);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GramJS client is untyped in SDK context
   function getClient(): any {
     return getClientUtil(bridge);
   }

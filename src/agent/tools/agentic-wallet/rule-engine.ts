@@ -39,7 +39,7 @@ export interface CreateRuleParams {
 
 /** Safety limits — these are hard caps, not configurable by users */
 const ABSOLUTE_MAX_TRADE_TON = 100;
-const ABSOLUTE_MAX_DAILY_TON = 500;
+const _ABSOLUTE_MAX_DAILY_TON = 500;
 const MAX_ACTIVE_RULES_PER_USER = 20;
 const MAX_STOP_LOSS_PERCENT = 0.5; // 50%
 
@@ -56,8 +56,12 @@ export function createRule(db: Database.Database, params: CreateRuleParams): Tra
 
   // Check user's per-wallet limits
   const wallet = db
-    .prepare("SELECT max_trade_amount, daily_limit FROM agentic_wallets WHERE id = ? AND user_id = ?")
-    .get(params.walletId, params.userId) as { max_trade_amount: number; daily_limit: number } | undefined;
+    .prepare(
+      "SELECT max_trade_amount, daily_limit FROM agentic_wallets WHERE id = ? AND user_id = ?"
+    )
+    .get(params.walletId, params.userId) as
+    | { max_trade_amount: number; daily_limit: number }
+    | undefined;
 
   if (!wallet) {
     throw new Error("Wallet not found or doesn't belong to this user.");
@@ -89,7 +93,11 @@ export function createRule(db: Database.Database, params: CreateRuleParams): Tra
   }
 
   // Validate stop_loss
-  if (params.ruleType === "stop_loss" && params.conditionValue && params.conditionValue > MAX_STOP_LOSS_PERCENT) {
+  if (
+    params.ruleType === "stop_loss" &&
+    params.conditionValue &&
+    params.conditionValue > MAX_STOP_LOSS_PERCENT
+  ) {
     throw new Error(`Stop-loss cannot exceed ${MAX_STOP_LOSS_PERCENT * 100}% of wallet value.`);
   }
 
@@ -133,7 +141,9 @@ export function createRule(db: Database.Database, params: CreateRuleParams): Tra
  */
 export function listRules(db: Database.Database, userId: number): TradingRule[] {
   return db
-    .prepare("SELECT * FROM trading_rules WHERE user_id = ? AND active = 1 ORDER BY created_at DESC")
+    .prepare(
+      "SELECT * FROM trading_rules WHERE user_id = ? AND active = 1 ORDER BY created_at DESC"
+    )
     .all(userId) as TradingRule[];
 }
 
@@ -190,9 +200,7 @@ export function evaluateRules(
 
     // Check if there's already a pending execution for this rule (prevent duplicates)
     const pendingExists = db
-      .prepare(
-        "SELECT 1 FROM trade_executions WHERE rule_id = ? AND status = 'pending'"
-      )
+      .prepare("SELECT 1 FROM trade_executions WHERE rule_id = ? AND status = 'pending'")
       .get(rule.id);
 
     if (pendingExists) continue; // Don't trigger again while pending
@@ -354,18 +362,20 @@ export function getExecution(
   expires_at: number | null;
 } | null {
   return (
-    (db.prepare("SELECT * FROM trade_executions WHERE id = ?").get(executionId) as {
-      id: string;
-      rule_id: string;
-      wallet_id: string;
-      user_id: number;
-      action: string;
-      asset: string;
-      amount: number;
-      price_at_execution: number;
-      status: string;
-      expires_at: number | null;
-    } | undefined) ?? null
+    (db.prepare("SELECT * FROM trade_executions WHERE id = ?").get(executionId) as
+      | {
+          id: string;
+          rule_id: string;
+          wallet_id: string;
+          user_id: number;
+          action: string;
+          asset: string;
+          amount: number;
+          price_at_execution: number;
+          status: string;
+          expires_at: number | null;
+        }
+      | undefined) ?? null
   );
 }
 

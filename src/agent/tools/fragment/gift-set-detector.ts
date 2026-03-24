@@ -6,11 +6,8 @@
  */
 
 import { Type } from "@sinclair/typebox";
-import type { Tool, ToolExecutor, ToolResult, ToolContext } from "../types.js";
-import {
-  getAllCollections,
-  getCollection,
-} from "./gifts-service.js";
+import type { Tool, ToolExecutor, ToolResult } from "../types.js";
+import { getAllCollections, getCollection } from "./gifts-service.js";
 import { createLogger } from "../../../utils/logger.js";
 
 const log = createLogger("GiftSetDetector");
@@ -49,10 +46,7 @@ interface SetGroup {
   completionSuggestions: Array<{ collection: string; rarity: string }>;
 }
 
-export const giftSetScanExecutor: ToolExecutor = async (
-  _params,
-  context
-): Promise<ToolResult> => {
+export const giftSetScanExecutor: ToolExecutor = async (_params, context): Promise<ToolResult> => {
   try {
     // Ensure portfolio table exists (created by gift-portfolio.ts)
     context.db.exec(`
@@ -78,7 +72,9 @@ export const giftSetScanExecutor: ToolExecutor = async (
     `);
 
     const entries = context.db
-      .prepare(`SELECT id, collection, gift_num, model, backdrop, symbol, rarity_tier FROM gift_portfolio WHERE user_id = ?`)
+      .prepare(
+        `SELECT id, collection, gift_num, model, backdrop, symbol, rarity_tier FROM gift_portfolio WHERE user_id = ?`
+      )
       .all(context.senderId) as PortfolioRow[];
 
     if (entries.length < 2) {
@@ -86,9 +82,10 @@ export const giftSetScanExecutor: ToolExecutor = async (
         success: true,
         data: {
           total: entries.length,
-          message: entries.length === 0
-            ? "Your portfolio is empty. Add gifts with gift_portfolio_add first."
-            : "You need at least 2 gifts to detect sets. Add more gifts!",
+          message:
+            entries.length === 0
+              ? "Your portfolio is empty. Add gifts with gift_portfolio_add first."
+              : "You need at least 2 gifts to detect sets. Add more gifts!",
         },
       };
     }
@@ -105,7 +102,7 @@ export const giftSetScanExecutor: ToolExecutor = async (
       for (const entry of entries) {
         const traitVal = entry[traitType].toLowerCase();
         if (!traitMap.has(traitVal)) traitMap.set(traitVal, []);
-        traitMap.get(traitVal)!.push(entry);
+        traitMap.get(traitVal)?.push(entry);
       }
 
       for (const [traitVal, giftsInGroup] of traitMap) {
@@ -117,29 +114,30 @@ export const giftSetScanExecutor: ToolExecutor = async (
         for (const colName of allCollectionNames) {
           if (ownedCollections.has(colName.toLowerCase())) continue;
           // Check if already in this group from a different gift
-          if (giftsInGroup.some((g) => g.collection.toLowerCase() === colName.toLowerCase())) continue;
+          if (giftsInGroup.some((g) => g.collection.toLowerCase() === colName.toLowerCase()))
+            continue;
 
           const col = getCollection(colName);
           if (!col) continue;
 
-          let found = false;
+          let _found = false;
           if (traitType === "model") {
             const match = col.models.find((m) => m.name.toLowerCase() === traitVal);
             if (match) {
               suggestions.push({ collection: colName, rarity: `${match.rarityPercent}%` });
-              found = true;
+              _found = true;
             }
           } else if (traitType === "backdrop") {
             const match = col.backdrops.find((b) => b.name.toLowerCase() === traitVal);
             if (match) {
               suggestions.push({ collection: colName, rarity: `${match.rarityPercent}%` });
-              found = true;
+              _found = true;
             }
           } else {
             const match = col.symbols.find((s) => s.name.toLowerCase() === traitVal);
             if (match) {
               suggestions.push({ collection: colName, rarity: `${match.rarityPercent}%` });
-              found = true;
+              _found = true;
             }
           }
         }
@@ -176,14 +174,18 @@ export const giftSetScanExecutor: ToolExecutor = async (
           canExpandTo: g.completionSuggestions.length,
           suggestions: g.completionSuggestions,
         })),
-        tip: groups.length === 0
-          ? "No shared traits found yet. Your gifts all have unique traits — very diverse collection!"
-          : `Found ${groups.length} trait groups. Look at completion suggestions to build themed sets!`,
+        tip:
+          groups.length === 0
+            ? "No shared traits found yet. Your gifts all have unique traits — very diverse collection!"
+            : `Found ${groups.length} trait groups. Look at completion suggestions to build themed sets!`,
       },
     };
   } catch (err: unknown) {
     log.error({ err }, "Error scanning gift sets");
-    return { success: false, error: `Scan failed: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      success: false,
+      error: `Scan failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 };
 
@@ -205,12 +207,13 @@ export const giftSetSuggestTool: Tool = {
   category: "data-bearing",
   parameters: Type.Object({
     trait_name: Type.String({ description: "Trait name (e.g. 'Onyx Black', 'Illuminati')" }),
-    trait_type: Type.Union([
-      Type.Literal("model"),
-      Type.Literal("backdrop"),
-      Type.Literal("symbol"),
-    ], { description: "Trait type" }),
-    limit: Type.Optional(Type.Number({ description: "Max results (default 20)", minimum: 1, maximum: 50 })),
+    trait_type: Type.Union(
+      [Type.Literal("model"), Type.Literal("backdrop"), Type.Literal("symbol")],
+      { description: "Trait type" }
+    ),
+    limit: Type.Optional(
+      Type.Number({ description: "Max results (default 20)", minimum: 1, maximum: 50 })
+    ),
   }),
 };
 
@@ -233,13 +236,31 @@ export const giftSetSuggestExecutor: ToolExecutor<SetSuggestParams> = async (
 
     if (params.trait_type === "model") {
       const m = col.models.find((t) => t.name.toLowerCase() === query);
-      if (m) matches.push({ collection: name, traitName: m.name, rarityPercent: m.rarityPercent, rarityPermille: m.rarity });
+      if (m)
+        matches.push({
+          collection: name,
+          traitName: m.name,
+          rarityPercent: m.rarityPercent,
+          rarityPermille: m.rarity,
+        });
     } else if (params.trait_type === "backdrop") {
       const b = col.backdrops.find((t) => t.name.toLowerCase() === query);
-      if (b) matches.push({ collection: name, traitName: b.name, rarityPercent: b.rarityPercent, rarityPermille: b.rarity });
+      if (b)
+        matches.push({
+          collection: name,
+          traitName: b.name,
+          rarityPercent: b.rarityPercent,
+          rarityPermille: b.rarity,
+        });
     } else {
       const s = col.symbols.find((t) => t.name.toLowerCase() === query);
-      if (s) matches.push({ collection: name, traitName: s.name, rarityPercent: s.rarityPercent, rarityPermille: s.rarity });
+      if (s)
+        matches.push({
+          collection: name,
+          traitName: s.name,
+          rarityPercent: s.rarityPercent,
+          rarityPermille: s.rarity,
+        });
     }
   }
 
@@ -253,15 +274,17 @@ export const giftSetSuggestExecutor: ToolExecutor<SetSuggestParams> = async (
       trait: params.trait_name,
       type: params.trait_type,
       foundInCollections: matches.length,
-      easiestToGet: capped.length > 0
-        ? { collection: capped[0].collection, rarity: `${capped[0].rarityPercent}%` }
-        : null,
-      rarestVersion: matches.length > 0
-        ? {
-            collection: matches[matches.length - 1].collection,
-            rarity: `${matches[matches.length - 1].rarityPercent}%`,
-          }
-        : null,
+      easiestToGet:
+        capped.length > 0
+          ? { collection: capped[0].collection, rarity: `${capped[0].rarityPercent}%` }
+          : null,
+      rarestVersion:
+        matches.length > 0
+          ? {
+              collection: matches[matches.length - 1].collection,
+              rarity: `${matches[matches.length - 1].rarityPercent}%`,
+            }
+          : null,
       collections: capped.map((m) => ({
         collection: m.collection,
         rarity: `${m.rarityPercent}%`,
@@ -269,10 +292,10 @@ export const giftSetSuggestExecutor: ToolExecutor<SetSuggestParams> = async (
           m.rarityPermille >= 100
             ? "🟢 Easy"
             : m.rarityPermille >= 50
-            ? "🟡 Medium"
-            : m.rarityPermille >= 20
-            ? "🟠 Hard"
-            : "🔴 Very Hard",
+              ? "🟡 Medium"
+              : m.rarityPermille >= 20
+                ? "🟠 Hard"
+                : "🔴 Very Hard",
       })),
     },
   };

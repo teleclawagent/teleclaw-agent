@@ -26,9 +26,7 @@ export const giftPriceCompareTool: Tool = {
     collection: Type.String({
       description: "Gift collection name (e.g. 'Plush Pepe', 'Scared Cat')",
     }),
-    model: Type.Optional(
-      Type.String({ description: "Filter by model name (e.g. 'Pumpkin')" })
-    ),
+    model: Type.Optional(Type.String({ description: "Filter by model name (e.g. 'Pumpkin')" })),
     backdrop: Type.Optional(
       Type.String({ description: "Filter by backdrop name (e.g. 'Onyx Black')" })
     ),
@@ -156,12 +154,7 @@ export const giftSniperExecutor: ToolExecutor<SniperParams> = async (
         // Calculate rarity score if we have model/backdrop/symbol
         let rarityScore: ReturnType<typeof calculateRarityScore> = null;
         if (l.model && l.backdrop && l.symbol) {
-          rarityScore = calculateRarityScore(
-            params.collection,
-            l.model,
-            l.backdrop,
-            l.symbol
-          );
+          rarityScore = calculateRarityScore(params.collection, l.model, l.backdrop, l.symbol);
         }
 
         const combinedRarity = rarityScore?.combinedPermille ?? 999;
@@ -190,15 +183,9 @@ export const giftSniperExecutor: ToolExecutor<SniperParams> = async (
           backdrop: s.backdrop,
           symbol: s.symbol,
           tier: s.tier,
-          modelRarity: s.rarityScore
-            ? `${s.rarityScore.modelRarity / 10}%`
-            : undefined,
-          backdropRarity: s.rarityScore
-            ? `${s.rarityScore.backdropRarity / 10}%`
-            : undefined,
-          symbolRarity: s.rarityScore
-            ? `${s.rarityScore.symbolRarity / 10}%`
-            : undefined,
+          modelRarity: s.rarityScore ? `${s.rarityScore.modelRarity / 10}%` : undefined,
+          backdropRarity: s.rarityScore ? `${s.rarityScore.backdropRarity / 10}%` : undefined,
+          symbolRarity: s.rarityScore ? `${s.rarityScore.symbolRarity / 10}%` : undefined,
           valueScore: s.valueScore,
           giftNum: s.giftNum,
           url: s.url,
@@ -254,9 +241,10 @@ export const giftBestDealExecutor: ToolExecutor<BestDealParams> = async (
           ? {
               marketplace: result.bestDeal.marketplace,
               price: `${result.bestDeal.priceTon} TON`,
-              savings: result.floors.length > 1
-                ? `${Math.round(((result.floors[result.floors.length - 1].priceTon! - result.bestDeal.priceTon!) / result.floors[result.floors.length - 1].priceTon!) * 100)}% cheaper than ${result.floors[result.floors.length - 1].marketplace}`
-                : undefined,
+              savings:
+                result.floors.length > 1
+                  ? `${Math.round((((result.floors[result.floors.length - 1]?.priceTon ?? 0) - (result.bestDeal.priceTon ?? 0)) / (result.floors[result.floors.length - 1]?.priceTon ?? 1)) * 100)}% cheaper than ${result.floors[result.floors.length - 1]?.marketplace}`
+                  : undefined,
             }
           : "No listings found across any marketplace",
         errors: result.errors.length > 0 ? result.errors : undefined,
@@ -325,8 +313,9 @@ export const giftArbitrageExecutor: ToolExecutor<ArbitrageParams> = async (
         return spread >= minSpread;
       })
       .map((f) => {
-        const spread = ((f.priceTon! - cheapest.priceTon!) / cheapest.priceTon!) * 100;
-        const profit = f.priceTon! - cheapest.priceTon!;
+        const spread =
+          (((f.priceTon ?? 0) - (cheapest.priceTon ?? 0)) / (cheapest.priceTon ?? 1)) * 100;
+        const profit = (f.priceTon ?? 0) - (cheapest.priceTon ?? 0);
         return {
           buyOn: cheapest.marketplace,
           buyPrice: `${cheapest.priceTon} TON`,
@@ -341,7 +330,8 @@ export const giftArbitrageExecutor: ToolExecutor<ArbitrageParams> = async (
       success: true,
       data: {
         collection: params.collection,
-        opportunities: opportunities.length > 0 ? opportunities : "No arbitrage found above threshold",
+        opportunities:
+          opportunities.length > 0 ? opportunities : "No arbitrage found above threshold",
         minSpreadThreshold: `${params.minSpreadPercent ?? 10}%`,
         floors: result.floors.map((f) => ({
           marketplace: f.marketplace,

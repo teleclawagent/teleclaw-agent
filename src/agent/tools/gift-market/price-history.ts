@@ -25,6 +25,7 @@ function getDb(): Database.Database {
 
   // Ensure data dir exists
   const dir = path.dirname(DB_PATH);
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   const fs = require("fs") as typeof import("fs");
   fs.mkdirSync(dir, { recursive: true });
 
@@ -73,9 +74,7 @@ export async function snapshotFloorPrices(): Promise<{
   // Process in batches of 5
   for (let i = 0; i < slugs.length; i += 5) {
     const batch = slugs.slice(i, i + 5);
-    const results = await Promise.allSettled(
-      batch.map((slug) => fetchFloorPrice(slug))
-    );
+    const results = await Promise.allSettled(batch.map((slug) => fetchFloorPrice(slug)));
 
     for (const result of results) {
       if (result.status === "fulfilled" && result.value) {
@@ -135,7 +134,11 @@ export function getHistory(
     ORDER BY timestamp ASC
   `
     )
-    .all(collection, collection.toLowerCase().replace(/[^a-z0-9]/g, ""), periodMap[period]) as PriceSnapshotRow[];
+    .all(
+      collection,
+      collection.toLowerCase().replace(/[^a-z0-9]/g, ""),
+      periodMap[period]
+    ) as PriceSnapshotRow[];
 
   return rows;
 }

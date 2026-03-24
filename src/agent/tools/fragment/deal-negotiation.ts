@@ -113,9 +113,7 @@ export const fragmentCreateDealExecutor: ToolExecutor<CreateDealParams> = async 
     const valuation = await estimateValue(clean);
 
     const id = generateId();
-    const expiresAt = new Date(
-      Date.now() + expires_hours * 3600 * 1000
-    ).toISOString();
+    const expiresAt = new Date(Date.now() + expires_hours * 3600 * 1000).toISOString();
 
     context.db
       .prepare(
@@ -156,12 +154,7 @@ export const fragmentCreateDealExecutor: ToolExecutor<CreateDealParams> = async 
     const matchText =
       matches.length > 0
         ? `\n\n🔗 ${matches.length} matching ${matchType} offer${matches.length !== 1 ? "s" : ""} found:\n` +
-          matches
-            .map(
-              (m, i) =>
-                `  ${i + 1}. ${m.price} TON (Deal #${m.id.slice(-8)})`
-            )
-            .join("\n") +
+          matches.map((m, i) => `  ${i + 1}. ${m.price} TON (Deal #${m.id.slice(-8)})`).join("\n") +
           "\n\nUse fragment_deal_match to connect with a match."
         : `\n\nNo matching ${matchType} offers yet. Your offer is now visible to other users.`;
 
@@ -283,9 +276,7 @@ export const fragmentBrowseDealsExecutor: ToolExecutor<BrowseParams> = async (
       .map(
         (d, i) =>
           `${i + 1}. ${d.type.toUpperCase()} ${d.username} — ${d.price} TON` +
-          (d.estimatedValue
-            ? ` (est. ${Math.round(d.estimatedValue)} TON)`
-            : "") +
+          (d.estimatedValue ? ` (est. ${Math.round(d.estimatedValue)} TON)` : "") +
           `\n   ID: ${d.id.slice(-8)} | Expires: ${new Date(d.expiresAt).toLocaleDateString()}`
       )
       .join("\n");
@@ -402,12 +393,7 @@ export const fragmentCancelDealExecutor: ToolExecutor<CancelParams> = async (
          AND (seller_id = ? OR buyer_id = ?)
          AND status = 'open'`
       )
-      .get(
-        deal_id,
-        `%${deal_id}`,
-        context.senderId,
-        context.senderId
-      ) as DealListing | undefined;
+      .get(deal_id, `%${deal_id}`, context.senderId, context.senderId) as DealListing | undefined;
 
     if (!deal) {
       return {
@@ -416,9 +402,7 @@ export const fragmentCancelDealExecutor: ToolExecutor<CancelParams> = async (
       };
     }
 
-    context.db
-      .prepare(`UPDATE fragment_deals SET status = 'cancelled' WHERE id = ?`)
-      .run(deal.id);
+    context.db.prepare(`UPDATE fragment_deals SET status = 'cancelled' WHERE id = ?`).run(deal.id);
 
     return {
       success: true,
@@ -449,14 +433,11 @@ export const fragmentCompareTool: Tool = {
     "estimated value, and which is the best deal. Great for deciding between similar options.",
   category: "data-bearing",
   parameters: Type.Object({
-    usernames: Type.Array(
-      Type.String({ description: "Username (with or without @)" }),
-      {
-        description: "2-5 usernames to compare",
-        minItems: 2,
-        maxItems: 5,
-      }
-    ),
+    usernames: Type.Array(Type.String({ description: "Username (with or without @)" }), {
+      description: "2-5 usernames to compare",
+      minItems: 2,
+      maxItems: 5,
+    }),
   }),
 };
 
@@ -470,10 +451,7 @@ export const fragmentCompareExecutor: ToolExecutor<CompareParams> = async (
     const results = await Promise.all(
       usernames.map(async (u) => {
         const clean = u.replace(/^@/, "").toLowerCase();
-        const [status, valuation] = await Promise.all([
-          checkUsername(clean),
-          estimateValue(clean),
-        ]);
+        const [status, valuation] = await Promise.all([checkUsername(clean), estimateValue(clean)]);
         return { username: `@${clean}`, status, valuation };
       })
     );
@@ -484,17 +462,9 @@ export const fragmentCompareExecutor: ToolExecutor<CompareParams> = async (
         const statusStr = r.status?.status?.toUpperCase() ?? "UNKNOWN";
         const estMid = r.valuation.estimated.mid;
         const priceRaw = r.status?.priceRaw;
-        const dealScore = priceRaw
-          ? Math.round(((estMid - priceRaw) / estMid) * 100)
-          : null;
+        const dealScore = priceRaw ? Math.round(((estMid - priceRaw) / estMid) * 100) : null;
         const dealEmoji =
-          dealScore !== null
-            ? dealScore > 30
-              ? "🟢"
-              : dealScore > 0
-                ? "🟡"
-                : "🔴"
-            : "⚪";
+          dealScore !== null ? (dealScore > 30 ? "🟢" : dealScore > 0 ? "🟡" : "🔴") : "⚪";
 
         return (
           `${i + 1}. ${r.username}\n` +
@@ -512,8 +482,7 @@ export const fragmentCompareExecutor: ToolExecutor<CompareParams> = async (
       .map((r) => ({
         username: r.username,
         score:
-          ((r.valuation.estimated.mid - r.status!.priceRaw!) /
-            r.valuation.estimated.mid) *
+          ((r.valuation.estimated.mid - (r.status?.priceRaw ?? 0)) / r.valuation.estimated.mid) *
           100,
       }))
       .sort((a, b) => b.score - a.score);

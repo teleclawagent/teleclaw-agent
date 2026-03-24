@@ -26,8 +26,8 @@ import {
   readdirSync,
   statSync,
 } from "fs";
-import { join, basename } from "path";
-import { WORKSPACE_PATHS, TELECLAW_ROOT } from "../../../workspace/paths.js";
+import { join } from "path";
+import { WORKSPACE_PATHS } from "../../../workspace/paths.js";
 import { fetchWithTimeout } from "../../../utils/fetch.js";
 import { createLogger } from "../../../utils/logger.js";
 
@@ -218,7 +218,16 @@ const skillAddExecutor: ToolExecutor<SkillAddParams> = async (
   }
 
   // Reserved names
-  const RESERVED = ["teleclaw", "core", "system", "ton", "telegram", "fragment", "dedust", "stonfi"];
+  const RESERVED = [
+    "teleclaw",
+    "core",
+    "system",
+    "ton",
+    "telegram",
+    "fragment",
+    "dedust",
+    "stonfi",
+  ];
   if (RESERVED.includes(name)) {
     return { success: false, error: `"${name}" is a reserved name. Choose a different name.` };
   }
@@ -383,7 +392,7 @@ const skillRemoveExecutor: ToolExecutor<SkillRemoveParams> = async (
 // ── Export ─────────────────────────────────────────────────────────────────
 
 export const tools: ToolEntry[] = [
-  { tool: skillListTool,   executor: skillListExecutor,   scope: "dm-only" },
-  { tool: skillAddTool,    executor: skillAddExecutor,    scope: "dm-only" },
+  { tool: skillListTool, executor: skillListExecutor, scope: "dm-only" },
+  { tool: skillAddTool, executor: skillAddExecutor, scope: "dm-only" },
   { tool: skillRemoveTool, executor: skillRemoveExecutor, scope: "dm-only" },
 ];

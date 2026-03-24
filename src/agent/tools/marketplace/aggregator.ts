@@ -46,7 +46,7 @@ for (const adapter of ALL_ADAPTERS) {
 /** Get adapters that support a given asset type */
 function getAdaptersForAsset(assetKind: AssetKind): MarketplaceAdapter[] {
   const ids = getMarketplacesForAsset(assetKind);
-  return ids.map((id) => adapterMap.get(id)!).filter(Boolean);
+  return ids.map((id) => adapterMap.get(id)).filter((a): a is MarketplaceAdapter => Boolean(a));
 }
 
 // ─── Aggregated Search ───────────────────────────────────────────────
@@ -74,10 +74,7 @@ export async function aggregatedSearch(params: SearchParams): Promise<Aggregated
       });
 
       try {
-        const listings = await Promise.race([
-          adapter.search(params),
-          timeoutPromise,
-        ]);
+        const listings = await Promise.race([adapter.search(params), timeoutPromise]);
         return { id: adapter.id, listings };
       } catch (err) {
         log.warn({ marketplace: adapter.id, err }, "Adapter search failed");
@@ -184,6 +181,11 @@ export async function checkMarketplaceHealth(): Promise<
   return results.map((r) =>
     r.status === "fulfilled"
       ? r.value
-      : { id: "unknown" as MarketplaceId, name: "Unknown", available: false, supports: [] as AssetKind[] }
+      : {
+          id: "unknown" as MarketplaceId,
+          name: "Unknown",
+          available: false,
+          supports: [] as AssetKind[],
+        }
   );
 }

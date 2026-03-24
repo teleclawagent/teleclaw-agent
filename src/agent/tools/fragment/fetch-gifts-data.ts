@@ -1,4 +1,5 @@
 #!/usr/bin/env npx tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Fetch complete gift collection data from api.changes.tg
  * Models, Backdrops, Symbols — all with real rarity percentages
@@ -63,7 +64,7 @@ async function main() {
   console.log(`Found ${names.length} collections`);
 
   const collections: GiftCollection[] = [];
-  let failed: string[] = [];
+  const failed: string[] = [];
 
   for (let i = 0; i < names.length; i++) {
     const name = names[i];
@@ -88,9 +89,7 @@ async function main() {
       // Fetch detailed symbols
       let detailedSymbols: any[] = [];
       try {
-        detailedSymbols = await fetchJSON(
-          `${API_BASE}/symbols/${encodeURIComponent(slug)}?sorted`
-        );
+        detailedSymbols = await fetchJSON(`${API_BASE}/symbols/${encodeURIComponent(slug)}?sorted`);
         await sleep(DELAY_MS);
       } catch {
         console.log(`  ⚠ No detailed symbols for ${name}`);
@@ -99,9 +98,7 @@ async function main() {
       // Fetch detailed models
       let detailedModels: any[] = [];
       try {
-        detailedModels = await fetchJSON(
-          `${API_BASE}/models/${encodeURIComponent(slug)}?sorted`
-        );
+        detailedModels = await fetchJSON(`${API_BASE}/models/${encodeURIComponent(slug)}?sorted`);
         await sleep(DELAY_MS);
       } catch {
         console.log(`  ⚠ No detailed models for ${name}`);
@@ -111,7 +108,7 @@ async function main() {
         (m: any) => ({
           name: m.name,
           rarity: m.rarityPermille ?? m.rarity ?? 0,
-          rarityPercent: ((m.rarityPermille ?? m.rarity ?? 0) / 10),
+          rarityPercent: (m.rarityPermille ?? m.rarity ?? 0) / 10,
         })
       );
 
@@ -120,7 +117,7 @@ async function main() {
       ).map((b: any) => ({
         name: b.name,
         rarity: b.rarityPermille ?? b.rarity ?? 0,
-        rarityPercent: ((b.rarityPermille ?? b.rarity ?? 0) / 10),
+        rarityPercent: (b.rarityPermille ?? b.rarity ?? 0) / 10,
         colors: b.hex || {
           centerColor: `#${(b.centerColor ?? 0).toString(16).padStart(6, "0")}`,
           edgeColor: `#${(b.edgeColor ?? 0).toString(16).padStart(6, "0")}`,
@@ -134,7 +131,7 @@ async function main() {
       ).map((s: any) => ({
         name: s.name,
         rarity: s.rarityPermille ?? s.rarity ?? 0,
-        rarityPercent: ((s.rarityPermille ?? s.rarity ?? 0) / 10),
+        rarityPercent: (s.rarityPermille ?? s.rarity ?? 0) / 10,
       }));
 
       collections.push({

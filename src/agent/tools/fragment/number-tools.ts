@@ -3,8 +3,8 @@
  */
 
 import { Type } from "@sinclair/typebox";
-import type { Tool, ToolExecutor, ToolResult, ToolContext } from "../types.js";
-import { calculateRarity, formatRarityReport, compareNumbers, type RarityResult } from "./number-rarity.js";
+import type { Tool, ToolExecutor, ToolResult } from "../types.js";
+import { calculateRarity, formatRarityReport, compareNumbers } from "./number-rarity.js";
 import { createLogger } from "../../../utils/logger.js";
 
 const log = createLogger("NumberTools");
@@ -149,7 +149,8 @@ export const numberPortfolioRarityExecutor: ToolExecutor<Record<string, never>> 
       return {
         success: true,
         data: {
-          message: "📭 No anonymous numbers in your portfolio. Add them with `portfolio add +888 XXXX XXXX`.",
+          message:
+            "📭 No anonymous numbers in your portfolio. Add them with `portfolio add +888 XXXX XXXX`.",
         },
       };
     }

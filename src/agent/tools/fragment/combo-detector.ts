@@ -6,7 +6,7 @@
  */
 
 import { Type } from "@sinclair/typebox";
-import type { Tool, ToolExecutor, ToolResult, ToolContext } from "../types.js";
+import type { Tool, ToolExecutor, ToolResult } from "../types.js";
 import {
   checkUsername,
   estimateValue,
@@ -119,10 +119,7 @@ export const comboScanExecutor: ToolExecutor<ComboScanParams> = async (
     }> = [];
 
     // Check base first
-    const [baseStatus, baseVal] = await Promise.all([
-      checkUsername(clean),
-      estimateValue(clean),
-    ]);
+    const [baseStatus, baseVal] = await Promise.all([checkUsername(clean), estimateValue(clean)]);
     checks.push({ username: `@${clean}`, status: baseStatus, valuation: baseVal });
 
     // Check variants (limit to avoid hammering Fragment)
@@ -137,17 +134,14 @@ export const comboScanExecutor: ToolExecutor<ComboScanParams> = async (
 
     // Categorize
     const available: ComboMatch["available"] = [];
-    const owned: string[] = [];
+    const _owned: string[] = [];
     let totalAvailableCost = 0;
     let totalIndividualValue = 0;
 
     for (const check of checks) {
       totalIndividualValue += check.valuation.estimated.mid;
 
-      if (
-        check.status?.status === "sale" ||
-        check.status?.status === "auction"
-      ) {
+      if (check.status?.status === "sale" || check.status?.status === "auction") {
         available.push({
           username: check.username,
           price: check.status.price,
@@ -171,9 +165,7 @@ export const comboScanExecutor: ToolExecutor<ComboScanParams> = async (
     const comboSize = available.length + 1; // +1 for the base
     const comboMultiplier =
       comboSize >= 5 ? 3.0 : comboSize >= 3 ? 2.0 : comboSize >= 2 ? 1.5 : 1.0;
-    const estimatedSetValue = Math.round(
-      totalIndividualValue * comboMultiplier
-    );
+    const estimatedSetValue = Math.round(totalIndividualValue * comboMultiplier);
 
     const opportunity =
       available.length > 0
@@ -187,8 +179,7 @@ export const comboScanExecutor: ToolExecutor<ComboScanParams> = async (
       available.length > 0
         ? available
             .map(
-              (a, i) =>
-                `  ${i + 1}. ${a.username} — ${a.price ?? "free to register"} (${a.status})`
+              (a, i) => `  ${i + 1}. ${a.username} — ${a.price ?? "free to register"} (${a.status})`
             )
             .join("\n")
         : "  None available";
@@ -302,9 +293,7 @@ export const comboSuggestExecutor: ToolExecutor<ComboSuggestParams> = async (
 
         const multiplier = variantCount >= 3 ? 2.5 : variantCount >= 2 ? 2.0 : 1.5;
         const baseVal = await estimateValue(clean);
-        const setVal = Math.round(
-          (baseVal.estimated.mid + variantCost) * multiplier
-        );
+        const setVal = Math.round((baseVal.estimated.mid + variantCost) * multiplier);
 
         combos.push({
           base: listing.username,

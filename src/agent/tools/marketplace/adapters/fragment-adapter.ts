@@ -8,18 +8,14 @@
  * Rate limit: 2s between requests, 5min cache
  */
 
-import type {
-  MarketplaceAdapter,
-  MarketplaceListing,
-  SearchParams,
-  AssetKind,
-} from "../types.js";
+import type { MarketplaceAdapter, MarketplaceListing, SearchParams, AssetKind } from "../types.js";
 import type { FragmentUsername, FragmentNumber } from "../../fragment/fragment-service.js";
 import { createLogger } from "../../../../utils/logger.js";
 
 const log = createLogger("Marketplace:Fragment");
 
 let fragmentServiceLoaded = false;
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 let fragmentService: typeof import("../../fragment/fragment-service.js") | null = null;
 
 async function getFragmentService() {
@@ -85,7 +81,9 @@ export const fragmentAdapter: MarketplaceAdapter = {
           filtered = filtered.filter((u) => u.username.toLowerCase().includes(q));
         }
         if (params.maxPrice) {
-          filtered = filtered.filter((u) => u.priceRaw != null && u.priceRaw <= params.maxPrice!);
+          filtered = filtered.filter(
+            (u) => u.priceRaw != null && u.priceRaw <= (params.maxPrice as number)
+          );
         }
         return filtered.slice(0, params.limit ?? 20).map(usernameToListing);
       }
@@ -94,10 +92,16 @@ export const fragmentAdapter: MarketplaceAdapter = {
         const results = await svc.fetchNumbers();
         let filtered = results;
         if (params.query) {
-          filtered = filtered.filter((n) => n.number.includes(params.query!) || n.rawDigits.includes(params.query!));
+          filtered = filtered.filter(
+            (n) =>
+              n.number.includes(params.query as string) ||
+              n.rawDigits.includes(params.query as string)
+          );
         }
         if (params.maxPrice) {
-          filtered = filtered.filter((n) => n.priceRaw != null && n.priceRaw <= params.maxPrice!);
+          filtered = filtered.filter(
+            (n) => n.priceRaw != null && n.priceRaw <= (params.maxPrice as number)
+          );
         }
         return filtered.slice(0, params.limit ?? 20).map(numberToListing);
       }

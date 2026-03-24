@@ -92,9 +92,9 @@ function ensureTables(ctx: ToolContext): void {
 
 function loadKnownListings(ctx: ToolContext): void {
   try {
-    const rows = ctx.db
-      .prepare("SELECT username FROM lw_known_listings")
-      .all() as Array<{ username: string }>;
+    const rows = ctx.db.prepare("SELECT username FROM lw_known_listings").all() as Array<{
+      username: string;
+    }>;
     knownListings = new Set(rows.map((r) => r.username.toLowerCase()));
     log.info({ count: knownListings.size }, "Loaded known listings from DB");
   } catch {
@@ -141,9 +141,7 @@ function getRecentNotificationCount(ctx: ToolContext, userId: number): number {
 function wasAlreadyNotified(ctx: ToolContext, userId: number, username: string): boolean {
   try {
     const row = ctx.db
-      .prepare(
-        `SELECT 1 FROM lw_notification_log WHERE user_id = ? AND username = ?`
-      )
+      .prepare(`SELECT 1 FROM lw_notification_log WHERE user_id = ? AND username = ?`)
       .get(userId, username.toLowerCase());
     return !!row;
   } catch {
@@ -282,7 +280,8 @@ async function detectNewListings(ctx: ToolContext): Promise<NewListing[]> {
       // Map rarity tags to category-like labels
       if (rarity.tags.includes("short")) categories.push("ultra_short" as CategoryKey);
       if (rarity.tier === "S" || rarity.tier === "A") categories.push("premium" as CategoryKey);
-      if (rarity.tags.some((t) => t.includes("repeat"))) categories.push("repeating" as CategoryKey);
+      if (rarity.tags.some((t) => t.includes("repeat")))
+        categories.push("repeating" as CategoryKey);
       if (rarity.tags.includes("palindrome")) categories.push("palindrome" as CategoryKey);
     }
 
@@ -307,10 +306,7 @@ async function detectNewListings(ctx: ToolContext): Promise<NewListing[]> {
 
 // ─── Core: Match & Notify ────────────────────────────────────────────
 
-export type NotifySender = (
-  userId: number,
-  message: string
-) => Promise<boolean>;
+export type NotifySender = (userId: number, message: string) => Promise<boolean>;
 
 async function matchAndNotify(
   ctx: ToolContext,
@@ -350,9 +346,7 @@ async function matchAndNotify(
       let score = 0;
 
       if (watcher.categories.length > 0) {
-        const overlap = listing.categories.filter((c) =>
-          watcher.categories.includes(c)
-        );
+        const overlap = listing.categories.filter((c) => watcher.categories.includes(c));
         if (overlap.length > 0) {
           matched = true;
           score = Math.round((overlap.length / listing.categories.length) * 100);
@@ -396,7 +390,14 @@ async function matchAndNotify(
 
       const success = await sendNotification(watcher.userId, message);
       if (success) {
-        logNotification(ctx, watcher.userId, listing.username, score, listing.price, listing.categories);
+        logNotification(
+          ctx,
+          watcher.userId,
+          listing.username,
+          score,
+          listing.price,
+          listing.categories
+        );
         sent++;
       } else {
         skipped++;
@@ -409,10 +410,7 @@ async function matchAndNotify(
 
 // ─── Watcher Lifecycle ───────────────────────────────────────────────
 
-export function startWatcher(
-  ctx: ToolContext,
-  sendNotification: NotifySender
-): void {
+export function startWatcher(ctx: ToolContext, sendNotification: NotifySender): void {
   if (isRunning) {
     log.warn("Watcher already running");
     return;
@@ -425,15 +423,11 @@ export function startWatcher(
   log.info({ interval: POLL_INTERVAL_MS }, "Starting listing watcher");
 
   // Initial poll
-  pollOnce(ctx, sendNotification).catch((err) =>
-    log.error({ err }, "Initial poll failed")
-  );
+  pollOnce(ctx, sendNotification).catch((err) => log.error({ err }, "Initial poll failed"));
 
   // Recurring poll
   watcherInterval = setInterval(() => {
-    pollOnce(ctx, sendNotification).catch((err) =>
-      log.error({ err }, "Poll cycle failed")
-    );
+    pollOnce(ctx, sendNotification).catch((err) => log.error({ err }, "Poll cycle failed"));
   }, POLL_INTERVAL_MS);
 }
 
@@ -490,7 +484,8 @@ export const listingWatchTool: Tool = {
     ),
     minScore: Type.Optional(
       Type.Number({
-        description: "Minimum match score (0-100). Default 60. Higher = fewer but more relevant alerts.",
+        description:
+          "Minimum match score (0-100). Default 60. Higher = fewer but more relevant alerts.",
         minimum: 0,
         maximum: 100,
       })
@@ -498,10 +493,7 @@ export const listingWatchTool: Tool = {
   }),
 };
 
-export const listingWatchExecutor: ToolExecutor<WatchParams> = async (
-  params,
-  ctx
-) => {
+export const listingWatchExecutor: ToolExecutor<WatchParams> = async (params, ctx) => {
   ensureTables(ctx);
   const userId = ctx.senderId;
   if (!userId) {
@@ -526,9 +518,7 @@ export const listingWatchExecutor: ToolExecutor<WatchParams> = async (
     )
     .run(userId, JSON.stringify(categories), maxPrice, minScore);
 
-  const catDisplay = categories.length > 0
-    ? categories.join(", ")
-    : "All (via Taste Profile)";
+  const catDisplay = categories.length > 0 ? categories.join(", ") : "All (via Taste Profile)";
   const priceDisplay = maxPrice ? `${maxPrice} TON` : "No limit";
 
   return {
@@ -541,9 +531,7 @@ export const listingWatchExecutor: ToolExecutor<WatchParams> = async (
       `🎯 Min match score: ${minScore}/100`,
       "",
       "I'll DM you when new listings match your preferences.",
-      categories.length === 0
-        ? "💡 Set up your Taste Profile (`/taste`) for better matching!"
-        : "",
+      categories.length === 0 ? "💡 Set up your Taste Profile (`/taste`) for better matching!" : "",
     ]
       .filter(Boolean)
       .join("\n"),
@@ -558,10 +546,7 @@ export const listingUnwatchTool: Tool = {
   parameters: Type.Object({}),
 };
 
-export const listingUnwatchExecutor: ToolExecutor<Record<string, never>> = async (
-  _params,
-  ctx
-) => {
+export const listingUnwatchExecutor: ToolExecutor<Record<string, never>> = async (_params, ctx) => {
   ensureTables(ctx);
   const userId = ctx.senderId;
   if (!userId) {
@@ -586,10 +571,7 @@ export const watchSettingsTool: Tool = {
   parameters: Type.Object({}),
 };
 
-export const watchSettingsExecutor: ToolExecutor<Record<string, never>> = async (
-  _params,
-  ctx
-) => {
+export const watchSettingsExecutor: ToolExecutor<Record<string, never>> = async (_params, ctx) => {
   ensureTables(ctx);
   const userId = ctx.senderId;
   if (!userId) {
@@ -599,12 +581,13 @@ export const watchSettingsExecutor: ToolExecutor<Record<string, never>> = async 
   const prefs = getWatchPreferences(ctx, userId);
   if (!prefs) {
     return {
-      success: true, data: "📭 No active watch subscription. Use `/watch` to start receiving alerts!",
+      success: true,
+      data: "📭 No active watch subscription. Use `/watch` to start receiving alerts!",
     };
   }
 
   // Get notification stats
-  const cutoff = new Date(Date.now() - NOTIFICATION_WINDOW_MS).toISOString();
+  const _cutoff = new Date(Date.now() - NOTIFICATION_WINDOW_MS).toISOString();
   const recentCount = getRecentNotificationCount(ctx, userId);
 
   const totalRow = ctx.db
@@ -612,9 +595,8 @@ export const watchSettingsExecutor: ToolExecutor<Record<string, never>> = async 
     .get(userId) as { cnt: number } | undefined;
   const totalSent = totalRow?.cnt ?? 0;
 
-  const catDisplay = prefs.categories.length > 0
-    ? prefs.categories.join(", ")
-    : "All (Taste Profile)";
+  const catDisplay =
+    prefs.categories.length > 0 ? prefs.categories.join(", ") : "All (Taste Profile)";
 
   return {
     success: true,

@@ -15,8 +15,8 @@
 
 import { Type } from "@sinclair/typebox";
 import type { Tool, ToolExecutor, ToolResult, ToolContext } from "../types.js";
-import { categorizeUsername, type CategoryKey, type CategorizedUsername } from "./categorizer.js";
-import { checkUsername, estimateValue } from "./fragment-service.js";
+import { categorizeUsername, type CategoryKey } from "./categorizer.js";
+import { checkUsername } from "./fragment-service.js";
 import { createLogger } from "../../../utils/logger.js";
 
 const log = createLogger("TasteProfile");
@@ -101,14 +101,18 @@ function buildProfile(
     .map((v) => v.priceRaw)
     .filter((p): p is number => p !== undefined && p > 0);
   const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
-  const priceRange = prices.length > 0
-    ? { min: Math.min(...prices), max: Math.max(...prices) }
-    : { min: 0, max: 0 };
+  const priceRange =
+    prices.length > 0 ? { min: Math.min(...prices), max: Math.max(...prices) } : { min: 0, max: 0 };
 
   // Pattern preferences
   const patterns: string[] = [];
   const patternCats: CategoryKey[] = [
-    "numeric", "repeating", "palindrome", "brandable", "single_word", "emoji_name",
+    "numeric",
+    "repeating",
+    "palindrome",
+    "brandable",
+    "single_word",
+    "emoji_name",
   ];
   for (const pat of patternCats) {
     if (categoryWeights[pat]) patterns.push(pat);
@@ -149,10 +153,7 @@ export function matchScore(
   const weightedOverlap = targetCategories.reduce((sum, cat) => {
     return sum + (profile.categoryWeights[cat] || 0);
   }, 0);
-  const maxPossibleWeight = Math.max(
-    ...Object.values(profile.categoryWeights),
-    0.01
-  );
+  const maxPossibleWeight = Math.max(...Object.values(profile.categoryWeights), 0.01);
   score += Math.min(50, (weightedOverlap / maxPossibleWeight) * 50);
 
   // ── Length preference (20% weight) ──
@@ -419,9 +420,9 @@ export function findMatchingBuyers(
   minScore: number = 40
 ): Array<{ userId: number; score: number }> {
   try {
-    const profiles = ctx.db
-      .prepare(`SELECT * FROM mm_taste_profiles`)
-      .all() as Array<Record<string, unknown>>;
+    const profiles = ctx.db.prepare(`SELECT * FROM mm_taste_profiles`).all() as Array<
+      Record<string, unknown>
+    >;
 
     const matches: Array<{ userId: number; score: number }> = [];
 
@@ -432,8 +433,8 @@ export function findMatchingBuyers(
         categoryWeights: JSON.parse(row.category_weights as string),
         avgLength: row.avg_length as number,
         lengthRange: { min: row.length_min as number, max: row.length_max as number },
-        avgPrice: row.avg_price as number || 0,
-        priceRange: { min: row.price_min as number || 0, max: row.price_max as number || 0 },
+        avgPrice: (row.avg_price as number) || 0,
+        priceRange: { min: (row.price_min as number) || 0, max: (row.price_max as number) || 0 },
         patterns: JSON.parse(row.patterns as string),
         keywords: JSON.parse(row.keywords as string),
         updatedAt: row.updated_at as string,

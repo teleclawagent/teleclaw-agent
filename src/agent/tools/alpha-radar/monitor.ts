@@ -65,7 +65,7 @@ function getMonitoredChannels(db: Database.Database): Set<string> {
  */
 function getChannelTitle(db: Database.Database, chatId: string): string {
   if (channelTitleCache.has(chatId)) {
-    return channelTitleCache.get(chatId)!;
+    return channelTitleCache.get(chatId) ?? "";
   }
 
   const row = db
@@ -92,11 +92,7 @@ function cleanupAlertMap(): void {
 /**
  * Check if we should send an alert based on user preferences.
  */
-function shouldAlert(
-  db: Database.Database,
-  userId: number,
-  tokenSymbol: string
-): boolean {
+function shouldAlert(db: Database.Database, userId: number, tokenSymbol: string): boolean {
   // Check cooldown
   const key = `${userId}:${tokenSymbol}`;
   const lastAlert = recentAlerts.get(key);
@@ -105,14 +101,14 @@ function shouldAlert(
   }
 
   // Check quiet hours
-  const prefs = db
-    .prepare("SELECT * FROM radar_preferences WHERE user_id = ?")
-    .get(userId) as {
-    alert_mode: string;
-    min_mentions: number;
-    quiet_start: number;
-    quiet_end: number;
-  } | undefined;
+  const prefs = db.prepare("SELECT * FROM radar_preferences WHERE user_id = ?").get(userId) as
+    | {
+        alert_mode: string;
+        min_mentions: number;
+        quiet_start: number;
+        quiet_end: number;
+      }
+    | undefined;
 
   const hour = new Date().getHours();
   const quietStart = prefs?.quiet_start ?? 23;
@@ -142,11 +138,7 @@ function shouldAlert(
 /**
  * Build alert message for a token mention.
  */
-function buildAlertMessage(
-  db: Database.Database,
-  userId: number,
-  tokenSymbol: string
-): string {
+function buildAlertMessage(db: Database.Database, userId: number, tokenSymbol: string): string {
   const mentions = getRecentMentions(db, userId, tokenSymbol, 3600);
   const channelCount = getUniqueChannelCount(db, userId, tokenSymbol, 3600);
 

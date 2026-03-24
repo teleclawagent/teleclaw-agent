@@ -5,7 +5,7 @@ import { Address } from "@ton/core";
 import { getErrorMessage } from "../../../utils/errors.js";
 import { createLogger } from "../../../utils/logger.js";
 
-const log = createLogger("WhaleWatcher");
+const _log = createLogger("WhaleWatcher");
 
 const MAX_WATCHED_WALLETS = 20;
 
@@ -41,7 +41,9 @@ const watchWalletExecutor: ToolExecutor<{ address: string; label?: string }> = a
 
     // Check limit
     const count = context.db
-      .prepare("SELECT COUNT(*) as count FROM whale_watched_wallets WHERE user_id = ? AND active = 1")
+      .prepare(
+        "SELECT COUNT(*) as count FROM whale_watched_wallets WHERE user_id = ? AND active = 1"
+      )
       .get(context.senderId) as { count: number };
 
     if (count.count >= MAX_WATCHED_WALLETS) {
@@ -60,9 +62,7 @@ const watchWalletExecutor: ToolExecutor<{ address: string; label?: string }> = a
     let initialLt: string | null = null;
     try {
       const { tonapiFetch } = await import("../../../constants/api-endpoints.js");
-      const response = await tonapiFetch(
-        `/accounts/${normalizedAddress}/events?limit=1`
-      );
+      const response = await tonapiFetch(`/accounts/${normalizedAddress}/events?limit=1`);
       if (response.ok) {
         const data = await response.json();
         if (data.events && data.events.length > 0) {
@@ -118,10 +118,14 @@ const unwatchWalletExecutor: ToolExecutor<{ address: string }> = async (
   let normalizedAddress = params.address;
   try {
     normalizedAddress = Address.parse(params.address).toRawString();
-  } catch { /* use as-is */ }
+  } catch {
+    /* use as-is */
+  }
 
   const result = context.db
-    .prepare("UPDATE whale_watched_wallets SET active = 0 WHERE user_id = ? AND (address = ? OR address = ?)")
+    .prepare(
+      "UPDATE whale_watched_wallets SET active = 0 WHERE user_id = ? AND (address = ? OR address = ?)"
+    )
     .run(context.senderId, params.address, normalizedAddress);
 
   if (result.changes === 0) {
@@ -130,7 +134,9 @@ const unwatchWalletExecutor: ToolExecutor<{ address: string }> = async (
 
   return {
     success: true,
-    data: { message: `Stopped watching ${params.address.slice(0, 6)}...${params.address.slice(-4)}.` },
+    data: {
+      message: `Stopped watching ${params.address.slice(0, 6)}...${params.address.slice(-4)}.`,
+    },
   };
 };
 
@@ -159,7 +165,10 @@ const listWatchedExecutor: ToolExecutor<Record<string, never>> = async (
   if (wallets.length === 0) {
     return {
       success: true,
-      data: { wallets: [], message: "No wallets being watched. Use whale_watch_add to start tracking." },
+      data: {
+        wallets: [],
+        message: "No wallets being watched. Use whale_watch_add to start tracking.",
+      },
     };
   }
 
@@ -177,11 +186,13 @@ const whaleActivityTool: Tool = {
     "Show recent whale transaction history — all alerts triggered for your watched wallets. Filter by address or show all.",
   category: "data-bearing",
   parameters: Type.Object({
-    address: Type.Optional(
-      Type.String({ description: "Filter by specific wallet address" })
-    ),
+    address: Type.Optional(Type.String({ description: "Filter by specific wallet address" })),
     limit: Type.Optional(
-      Type.Number({ description: "Number of transactions to show (default 20)", minimum: 1, maximum: 100 })
+      Type.Number({
+        description: "Number of transactions to show (default 20)",
+        minimum: 1,
+        maximum: 100,
+      })
     ),
   }),
 };

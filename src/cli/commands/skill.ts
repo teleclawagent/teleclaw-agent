@@ -5,8 +5,16 @@
  * They live in ~/.teleclaw/plugins/<skill-name>/
  */
 
-import { existsSync, mkdirSync, writeFileSync, readdirSync, statSync, readFileSync, renameSync } from "fs";
-import { join, basename } from "path";
+import {
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  readdirSync,
+  statSync,
+  readFileSync,
+  renameSync,
+} from "fs";
+import { join } from "path";
 import { WORKSPACE_PATHS } from "../../workspace/paths.js";
 
 const PLUGINS_DIR = WORKSPACE_PATHS.PLUGINS_DIR;

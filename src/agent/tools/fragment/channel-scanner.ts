@@ -106,11 +106,11 @@ const USERNAME_REGEX = /@([a-zA-Z][a-zA-Z0-9_]{3,31})/g;
 
 // Price extraction
 const PRICE_PATTERNS = [
-  /(\d[\d,]*(?:\.\d+)?)\s*(?:TON|ton|Ton)/,          // 50 TON
-  /(\d[\d,]*(?:\.\d+)?)\s*(?:t\b|T\b)/,              // 50t / 50T
-  /\$\s*(\d[\d,]*(?:\.\d+)?)/,                        // $500
-  /(\d[\d,]*(?:\.\d+)?)\s*(?:⭐|stars?|Stars?)/,      // 150⭐ / 150 stars
-  /(\d[\d,]*(?:\.\d+)?)\s*(?:USD|usd|USDT|usdt)/,    // 500 USD
+  /(\d[\d,]*(?:\.\d+)?)\s*(?:TON|ton|Ton)/, // 50 TON
+  /(\d[\d,]*(?:\.\d+)?)\s*(?:t\b|T\b)/, // 50t / 50T
+  /\$\s*(\d[\d,]*(?:\.\d+)?)/, // $500
+  /(\d[\d,]*(?:\.\d+)?)\s*(?:⭐|stars?|Stars?)/, // 150⭐ / 150 stars
+  /(\d[\d,]*(?:\.\d+)?)\s*(?:USD|usd|USDT|usdt)/, // 500 USD
 ];
 
 export function parseMessage(text: string): ParsedDeal | null {
@@ -188,10 +188,23 @@ export function parseMessage(text: string): ParsedDeal | null {
 
 // Common channel/bot names to exclude from username detection
 const EXCLUDED_NAMES = new Set([
-  "admin", "admins", "here", "everyone", "channel", "group",
-  "fragment", "getgems", "tonkeeper", "wallet", "telegram",
-  "teleclawagent", "teleclaw", "username", "usernames",
-  "fragmentmarket", "tondiamonds",
+  "admin",
+  "admins",
+  "here",
+  "everyone",
+  "channel",
+  "group",
+  "fragment",
+  "getgems",
+  "tonkeeper",
+  "wallet",
+  "telegram",
+  "teleclawagent",
+  "teleclaw",
+  "username",
+  "usernames",
+  "fragmentmarket",
+  "tondiamonds",
 ]);
 
 // ─── Matching Logic ──────────────────────────────────────────────────
@@ -204,10 +217,7 @@ interface WatchedChannel {
   dealTypes: string[];
 }
 
-function getWatchersForChannel(
-  ctx: ToolContext,
-  channel: string
-): WatchedChannel[] {
+function getWatchersForChannel(ctx: ToolContext, channel: string): WatchedChannel[] {
   try {
     const rows = ctx.db
       .prepare(
@@ -250,9 +260,7 @@ function getRecentAlertCount(ctx: ToolContext, userId: number): number {
   try {
     const cutoff = new Date(Date.now() - ALERT_WINDOW_MS).toISOString();
     const row = ctx.db
-      .prepare(
-        `SELECT COUNT(*) as cnt FROM cs_alert_log WHERE user_id = ? AND sent_at > ?`
-      )
+      .prepare(`SELECT COUNT(*) as cnt FROM cs_alert_log WHERE user_id = ? AND sent_at > ?`)
       .get(userId, cutoff) as { cnt: number } | undefined;
     return row?.cnt ?? 0;
   } catch {
@@ -350,9 +358,8 @@ export function processChannelMessage(
     const typeEmoji = parsed.type === "wts" ? "💰" : parsed.type === "wtb" ? "🔍" : "📢";
     const typeLabel = parsed.type === "wts" ? "SELLING" : parsed.type === "wtb" ? "BUYING" : "DEAL";
     const priceStr = parsed.price ? `${parsed.price} ${parsed.currency || "TON"}` : "Price N/A";
-    const usernameStr = parsed.usernames.length > 0
-      ? parsed.usernames.join(", ")
-      : "Category request";
+    const usernameStr =
+      parsed.usernames.length > 0 ? parsed.usernames.join(", ") : "Category request";
     const catStr = parsed.categories.slice(0, 3).join(", ") || "—";
 
     const message = [
@@ -403,12 +410,11 @@ export const channelScanAddTool: Tool = {
         description: 'Categories to watch (e.g. ["crypto", "short"]). Empty = all.',
       })
     ),
-    max_price: Type.Optional(
-      Type.Number({ description: "Max price filter in TON", minimum: 0 })
-    ),
+    max_price: Type.Optional(Type.Number({ description: "Max price filter in TON", minimum: 0 })),
     deal_types: Type.Optional(
       Type.Array(Type.String(), {
-        description: 'Deal types: ["wts"] for sells only, ["wtb"] for buys, ["wts","wtb"] for both. Default: ["wts"].',
+        description:
+          'Deal types: ["wts"] for sells only, ["wtb"] for buys, ["wts","wtb"] for both. Default: ["wts"].',
       })
     ),
   }),
@@ -498,9 +504,7 @@ export const channelScanRemoveExecutor: ToolExecutor<ScanRemoveParams> = async (
     const channel = params.channel.replace(/^@/, "").toLowerCase();
 
     const result = ctx.db
-      .prepare(
-        `UPDATE cs_watched_channels SET enabled = 0 WHERE user_id = ? AND channel = ?`
-      )
+      .prepare(`UPDATE cs_watched_channels SET enabled = 0 WHERE user_id = ? AND channel = ?`)
       .run(ctx.senderId, channel);
 
     if (result.changes === 0) {
@@ -591,15 +595,13 @@ export const channelParseTool: Tool = {
   category: "data-bearing",
   parameters: Type.Object({
     text: Type.String({ description: "The message text to parse for deals" }),
-    channel: Type.Optional(
-      Type.String({ description: "Source channel (if known)" })
-    ),
+    channel: Type.Optional(Type.String({ description: "Source channel (if known)" })),
   }),
 };
 
 export const channelParseExecutor: ToolExecutor<ParseParams> = async (
   params,
-  ctx
+  _ctx
 ): Promise<ToolResult> => {
   try {
     const parsed = parseMessage(params.text);
@@ -611,7 +613,8 @@ export const channelParseExecutor: ToolExecutor<ParseParams> = async (
     }
 
     const typeEmoji = parsed.type === "wts" ? "💰" : parsed.type === "wtb" ? "🔍" : "📢";
-    const typeLabel = parsed.type === "wts" ? "SELLING" : parsed.type === "wtb" ? "BUYING" : "UNCLEAR";
+    const typeLabel =
+      parsed.type === "wts" ? "SELLING" : parsed.type === "wtb" ? "BUYING" : "UNCLEAR";
 
     return {
       success: true,
@@ -636,9 +639,4 @@ export const channelParseExecutor: ToolExecutor<ParseParams> = async (
 
 // ─── Exports ─────────────────────────────────────────────────────────
 
-export {
-  ensureScannerTables,
-  getAllWatchers,
-  type ParsedDeal,
-  type WatchedChannel,
-};
+export { ensureScannerTables, getAllWatchers, type ParsedDeal, type WatchedChannel };
