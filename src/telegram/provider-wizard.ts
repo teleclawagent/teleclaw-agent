@@ -111,62 +111,80 @@ export class ProviderWizard {
     const currentProvider = settings?.provider || globalProvider || "anthropic";
     const currentModel = settings?.model || globalModel || "default";
 
-    // Get models for current provider directly (no provider selection screen)
-    const providerForCatalog = currentProvider === "claude-code" ? "anthropic" : currentProvider;
-    const models = getModelsForProvider(providerForCatalog);
-    const meta = getProviderMetadata(currentProvider as SupportedProvider);
+    // Collect all configured providers: global + user custom (if different)
+    const configuredProviders: Array<{
+      provider: string;
+      catalogKey: string;
+    }> = [];
 
-    if (models.length === 0) {
+    const globalProv = globalProvider || "anthropic";
+    const globalCatalogKey = globalProv === "claude-code" ? "anthropic" : globalProv;
+    configuredProviders.push({ provider: globalProv, catalogKey: globalCatalogKey });
+
+    // User's custom provider (if different from global)
+    if (settings?.provider && settings.provider !== globalProv) {
+      const userCatalogKey = settings.provider === "claude-code" ? "anthropic" : settings.provider;
+      configuredProviders.push({ provider: settings.provider, catalogKey: userCatalogKey });
+    }
+
+    const rows: InlineButton[][] = [];
+    let hasModels = false;
+
+    for (const entry of configuredProviders) {
+      const models = getModelsForProvider(entry.catalogKey);
+      if (models.length === 0) continue;
+      hasModels = true;
+
+      let meta: { displayName: string };
+      try {
+        meta = getProviderMetadata(entry.provider as SupportedProvider);
+      } catch {
+        meta = { displayName: entry.provider };
+      }
+
+      // Section header
+      rows.push([{ text: `── ${meta.displayName} ──`, callback_data: "ms:noop" }]);
+
+      let currentRow: InlineButton[] = [];
+      for (const model of models) {
+        if (currentRow.length >= 2) {
+          rows.push(currentRow);
+          currentRow = [];
+        }
+        const marker = model.value === currentModel ? "✅ " : "";
+        const cbData = `ms:s:${entry.provider}:${model.value.slice(0, 40)}`;
+        currentRow.push({ text: `${marker}${model.name}`, callback_data: cbData });
+      }
+      if (currentRow.length > 0) rows.push(currentRow);
+    }
+
+    if (!hasModels) {
       await this.bridge.sendMessage({
         chatId,
         text:
           `🧠 **Model Switcher**\n\n` +
-          `Current: **${meta.displayName}** / **${currentModel}**\n\n` +
-          `No model catalog available for this provider.\n` +
-          `Use \`/mymodel <model-name>\` to set manually.`,
+          `Current: **${currentProvider}** / **${currentModel}**\n\n` +
+          `No model catalog available.\nUse \`/mymodel <model-name>\` to set manually.`,
         replyToId,
       });
       return;
     }
 
-    const rows: InlineButton[][] = [];
-    let currentRow: InlineButton[] = [];
+    // Add provider setup button at bottom
+    rows.push([{ text: "➕ Add Provider", callback_data: "ms:addprov" }]);
 
-    for (const model of models) {
-      if (currentRow.length >= 2) {
-        rows.push(currentRow);
-        currentRow = [];
-      }
-      const marker = model.value === currentModel ? "✅ " : "";
-      const cbData = `ms:d:${model.value.slice(0, 50)}`;
-      currentRow.push({
-        text: `${marker}${model.name}`,
-        callback_data: cbData,
-      });
+    let currentMeta: { displayName: string };
+    try {
+      currentMeta = getProviderMetadata(currentProvider as SupportedProvider);
+    } catch {
+      currentMeta = { displayName: currentProvider };
     }
-    if (currentRow.length > 0) rows.push(currentRow);
-
-    // Show quick-switch to global default provider if user is on a custom provider
-    const effectiveGlobalProvider = globalProvider || "anthropic";
-    const effectiveGlobalModel = globalModel || "default";
-    if (currentProvider !== effectiveGlobalProvider) {
-      const globalMeta = getProviderMetadata(effectiveGlobalProvider as SupportedProvider);
-      rows.push([
-        {
-          text: `🔄 Switch to ${globalMeta.displayName} (${effectiveGlobalModel})`,
-          callback_data: `ms:reset`,
-        },
-      ]);
-    }
-
-    // Add "Other providers" button at bottom
-    rows.push([{ text: "🌐 Other Providers", callback_data: "ms:all" }]);
 
     await this.bridge.sendMessage({
       chatId,
       text:
-        `🧠 **${meta.displayName}** Models\n\n` +
-        `Current: **${currentModel}**\n\n` +
+        `🧠 **Model Switcher**\n\n` +
+        `Current: **${currentMeta.displayName}** / **${currentModel}**\n\n` +
         `Tap to switch:`,
       inlineKeyboard: rows,
       replyToId,
@@ -551,7 +569,7 @@ export class ProviderWizard {
       return;
     }
 
-    // ms:s:<provider>:<model> — switch to this model
+    // ms:s:<provider>:<model> — switch to this provider + model
     if (data.startsWith("s:")) {
       const rest = data.slice(2);
       const colonIdx = rest.indexOf(":");
@@ -566,29 +584,16 @@ export class ProviderWizard {
       const modelId = rest.slice(colonIdx + 1);
 
       const settings = getUserSettings(this.db, userId);
-
-      // Check if user has API key for this provider
       const currentProvider = settings?.provider;
-      if (currentProvider !== provider && !settings?.apiKey) {
-        await this.bridge.answerCallbackQuery(queryId, {
-          message: `⚠️ You need to set up ${provider} first. Use /addprovider`,
-          alert: true,
-        });
-        return;
-      }
 
-      // If switching providers but user has a key, update provider too
-      if (currentProvider !== provider && settings?.apiKey) {
-        // Keep existing key — user might be switching between providers
-        // They'll need to /addprovider for a different provider's key
-        await this.bridge.answerCallbackQuery(queryId, {
-          message: `⚠️ Your API key is for ${currentProvider}. Use /addprovider for ${provider}.`,
-          alert: true,
-        });
-        return;
+      // Update both provider and model together
+      if (currentProvider !== provider) {
+        // Switching provider — keep existing API key, update provider + model
+        const apiKey = settings?.apiKey || "";
+        setUserProvider(this.db, userId, provider, apiKey, modelId);
+      } else {
+        setUserModel(this.db, userId, modelId);
       }
-
-      setUserModel(this.db, userId, modelId);
 
       const meta = getProviderMetadata(provider);
       await this.bridge.editMessage({
@@ -597,6 +602,19 @@ export class ProviderWizard {
         text: `✅ Switched to **${meta.displayName}** / **${modelId}**`,
       });
       await this.bridge.answerCallbackQuery(queryId, { message: `✅ Switched to ${modelId}` });
+      return;
+    }
+
+    // ms:noop — section header, do nothing
+    if (data === "noop") {
+      await this.bridge.answerCallbackQuery(queryId, {});
+      return;
+    }
+
+    // ms:addprov — redirect to /addprovider flow
+    if (data === "addprov") {
+      await this.bridge.answerCallbackQuery(queryId, { message: "Use /addprovider" });
+      await this.handleAddProvider(chatId, userId);
       return;
     }
 

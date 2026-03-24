@@ -72,7 +72,9 @@ export class AdminHandler {
     }
 
     const parts = trimmed.split(/\s+/);
-    const command = parts[0].slice(1).toLowerCase();
+    // Strip bot mention suffix (e.g. /mymodel@BotName → mymodel)
+    const rawCommand = parts[0].slice(1).toLowerCase();
+    const command = rawCommand.includes("@") ? rawCommand.split("@")[0] : rawCommand;
     const args = parts.slice(1);
 
     return {
