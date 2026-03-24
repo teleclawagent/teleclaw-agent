@@ -1,26 +1,7 @@
-// Note: send-stars and send-stars-gift removed - they don't actually transfer Stars
-// Telegram doesn't have an API to transfer Stars between users
-// Stars can only be used to: tip creators, buy gifts, purchase digital goods
-
-import { telegramGetStarsBalanceTool, telegramGetStarsBalanceExecutor } from "./get-balance.js";
-import {
-  telegramGetStarsTransactionsTool,
-  telegramGetStarsTransactionsExecutor,
-} from "./get-transactions.js";
 import type { ToolEntry } from "../../types.js";
 
-export { telegramGetStarsBalanceTool, telegramGetStarsBalanceExecutor };
-export { telegramGetStarsTransactionsTool, telegramGetStarsTransactionsExecutor };
-
-export const tools: ToolEntry[] = [
-  {
-    tool: telegramGetStarsBalanceTool,
-    executor: telegramGetStarsBalanceExecutor,
-    scope: "userbot-only",
-  },
-  {
-    tool: telegramGetStarsTransactionsTool,
-    executor: telegramGetStarsTransactionsExecutor,
-    scope: "userbot-only",
-  },
-];
+// All stars tools were userbot-only and have been removed
+// Note: send-stars and send-stars-gift were already removed - they don't actually transfer Stars
+// Telegram doesn't have an API to transfer Stars between users
+// Stars can only be used to: tip creators, buy gifts, purchase digital goods
+export const tools: ToolEntry[] = [];
