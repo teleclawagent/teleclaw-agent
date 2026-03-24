@@ -1004,6 +1004,26 @@ export class TeleclawApp {
           }
         }
 
+        // /reset — available to all users (resets conversation context, preserves memory)
+        if (userCmd.command === "reset") {
+          const { resetSession } = await import("./session/store.js");
+          try {
+            resetSession(message.chatId);
+            await this.bridge.sendMessage({
+              chatId: message.chatId,
+              text: "🔄 Session reset. Fresh start — memory preserved.",
+              replyToId: message.id,
+            });
+          } catch (err) {
+            await this.bridge.sendMessage({
+              chatId: message.chatId,
+              text: `❌ Reset failed: ${err}`,
+              replyToId: message.id,
+            });
+          }
+          return;
+        }
+
         // /apikey, /mysettings — user settings
         if (userCmd.command === "apikey" || userCmd.command === "mysettings") {
           const response = await this.handleUserSettingsCommand(

@@ -47,6 +47,7 @@ export class BotBridge implements TelegramTransport {
         { command: "removeprovider", description: "Remove custom AI settings" },
         { command: "apikey", description: "Set your own LLM API key" },
         { command: "mysettings", description: "View your settings" },
+        { command: "reset", description: "Reset conversation (fresh start)" },
       ]);
       // Register admin-only commands separately
       await this.client.getBot().api.setMyCommands(
