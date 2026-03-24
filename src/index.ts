@@ -46,7 +46,11 @@ import { PluginRateLimiter } from "./bot/rate-limiter.js";
 // deals module is loaded via module-loader (matchmaker-only, no escrow)
 import type { TaskDependencyResolver } from "./telegram/task-dependency-resolver.js";
 import type { WebUIServer } from "./webui/server.js";
-import { checkStaleListings, expireOldListings } from "./agent/tools/fragment/stale-checker.js";
+import {
+  checkStaleListings,
+  checkMatchFollowups,
+  expireOldListings,
+} from "./agent/tools/fragment/stale-checker.js";
 import {
   createMatchmakerClient,
   type MatchmakerAPIClient,
@@ -708,6 +712,9 @@ export class TeleclawApp {
         };
         checkStaleListings(ctx, this.bridge).catch((err) =>
           log.warn({ err }, "Stale listing check failed")
+        );
+        checkMatchFollowups(ctx, this.bridge).catch((err) =>
+          log.warn({ err }, "Match follow-up check failed")
         );
         expireOldListings(ctx);
       },

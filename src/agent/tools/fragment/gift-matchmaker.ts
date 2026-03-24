@@ -233,15 +233,17 @@ export const giftMmListExecutor: ToolExecutor<GiftListParams> = async (
 
     // ── Publish to shared OTC matchmaker API ──
     if (context.matchmakerApi) {
-      context.matchmakerApi.publishListing({
-        type: "gift",
-        item_name: `${collection} #${gift_num ?? "?"}`,
-        item_details: { model, backdrop, symbol, rarity: rarity.rarityTier },
-        price: asking_price ?? null,
-        currency,
-        price_usd: null,
-        expires_days,
-      }).catch((err) => log.warn({ err }, "Failed to publish gift to shared matchmaker"));
+      context.matchmakerApi
+        .publishListing({
+          type: "gift",
+          item_name: `${collection} #${gift_num ?? "?"}`,
+          item_details: { model, backdrop, symbol, rarity: rarity.rarityTier },
+          price: asking_price ?? null,
+          currency,
+          price_usd: null,
+          expires_days,
+        })
+        .catch((err) => log.warn({ err }, "Failed to publish gift to shared matchmaker"));
     }
 
     // Find matching buyers
@@ -997,3 +999,72 @@ interface GiftInterestRow {
   created_at: string;
   active: number;
 }
+
+// ─── Buyer Confirm Purchase ─────────────────────────────────────────
+
+interface GiftBuyerConfirmParams {
+  listing_id: string;
+}
+
+export const giftMmBuyerConfirmTool: Tool = {
+  name: "gift_mm_buyer_confirm",
+  description:
+    "✅ As a buyer, confirm you've purchased a gift from a listing.\n\n" +
+    "Notifies the seller that you claim the deal is done. " +
+    "The seller will be asked to confirm and mark it as sold.\n" +
+    "Teleclaw does NOT verify the trade — courtesy notification only.",
+  category: "action",
+  parameters: Type.Object({
+    listing_id: Type.String({ description: "Listing ID of the gift" }),
+  }),
+};
+
+export const giftMmBuyerConfirmExecutor: ToolExecutor<GiftBuyerConfirmParams> = async (
+  params,
+  context
+): Promise<ToolResult> => {
+  try {
+    ensureGiftMatchmakerTables(context);
+
+    const listing = context.db
+      .prepare(`SELECT * FROM gift_listings WHERE (id = ? OR id LIKE ?) AND status = 'active'`)
+      .get(params.listing_id, `%${params.listing_id}`) as GiftListingRow | undefined;
+
+    if (!listing) {
+      return { success: false, error: "No matching active listing found." };
+    }
+
+    if (listing.seller_id === context.senderId) {
+      return { success: false, error: "You're the seller — use gift_mm_sold instead." };
+    }
+
+    const buyerName = context.senderUsername
+      ? `@${context.senderUsername}`
+      : `User #${context.senderId}`;
+
+    return {
+      success: true,
+      data: {
+        listingId: listing.id,
+        collection: listing.collection,
+        giftNum: listing.gift_num,
+        sellerId: listing.seller_id,
+        _notifySeller: {
+          userId: listing.seller_id,
+          message:
+            `🔔 A buyer says they've purchased your gift!\n\n` +
+            `🎁 ${listing.collection}${listing.gift_num ? ` #${listing.gift_num}` : ""} — ${listing.model}\n` +
+            `👤 Buyer: ${buyerName}\n\n` +
+            `If the trade is complete, tell me "mark gift listing as sold".\n` +
+            `If not, no action needed.`,
+        },
+        message: `Seller has been notified. They'll confirm and close the listing once verified.`,
+      },
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: `Buyer confirm failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+};

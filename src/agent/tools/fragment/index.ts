@@ -89,6 +89,8 @@ import {
   mmCancelExecutor,
   mmSoldTool,
   mmSoldExecutor,
+  mmBuyerConfirmTool,
+  mmBuyerConfirmExecutor,
 } from "./matchmaker.js";
 
 // Listing Watcher
@@ -139,6 +141,8 @@ import {
   numberCancelExecutor,
   numberMyListingsTool,
   numberMyListingsExecutor,
+  numberBuyerConfirmTool,
+  numberBuyerConfirmExecutor,
 } from "./number-profile.js";
 
 // OTC Consent
@@ -227,6 +231,8 @@ import {
   giftMmExpressExecutor,
   giftMmSoldTool,
   giftMmSoldExecutor,
+  giftMmBuyerConfirmTool,
+  giftMmBuyerConfirmExecutor,
 } from "./gift-matchmaker.js";
 
 // 🎁 Gift Portfolio + P&L
@@ -308,6 +314,7 @@ export const tools: ToolEntry[] = [
   { tool: mmMyListingsTool, executor: mmMyListingsExecutor, scope: "dm-only" },
   { tool: mmCancelTool, executor: mmCancelExecutor, scope: "dm-only" },
   { tool: mmSoldTool, executor: mmSoldExecutor, scope: "dm-only" },
+  { tool: mmBuyerConfirmTool, executor: mmBuyerConfirmExecutor, scope: "dm-only" },
 
   // 🔔 Listing Watcher
   { tool: listingWatchTool, executor: listingWatchExecutor, scope: "dm-only" },
@@ -331,6 +338,7 @@ export const tools: ToolEntry[] = [
   { tool: numberBrowseListingsTool, executor: numberBrowseListingsExecutor },
   { tool: numberExpressInterestTool, executor: numberExpressInterestExecutor, scope: "dm-only" },
   { tool: numberMyListingsTool, executor: numberMyListingsExecutor, scope: "dm-only" },
+  { tool: numberBuyerConfirmTool, executor: numberBuyerConfirmExecutor, scope: "dm-only" },
   { tool: numberCancelTool, executor: numberCancelExecutor, scope: "dm-only" },
   { tool: numberSoldTool, executor: numberSoldExecutor, scope: "dm-only" },
 
@@ -377,6 +385,7 @@ export const tools: ToolEntry[] = [
   { tool: giftMmCancelTool, executor: giftMmCancelExecutor, scope: "dm-only" },
   { tool: giftMmExpressTool, executor: giftMmExpressExecutor, scope: "dm-only" },
   { tool: giftMmSoldTool, executor: giftMmSoldExecutor, scope: "dm-only" },
+  { tool: giftMmBuyerConfirmTool, executor: giftMmBuyerConfirmExecutor, scope: "dm-only" },
 
   // 🎁 Gift Portfolio + P&L
   { tool: giftPortfolioAddTool, executor: giftPortfolioAddExecutor, scope: "dm-only" },

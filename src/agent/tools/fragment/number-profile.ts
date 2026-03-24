@@ -898,3 +898,68 @@ export function markNumberListingReminded(ctx: ToolContext, number: string): voi
 // ─── Exports ─────────────────────────────────────────────────────────
 
 export { ensureNumberProfileTables, matchNumberToProfile, type NumberProfile };
+
+// ─── Buyer Confirm Purchase ─────────────────────────────────────────
+
+interface NumberBuyerConfirmParams {
+  number: string;
+}
+
+export const numberBuyerConfirmTool: Tool = {
+  name: "number_buyer_confirm",
+  description:
+    "✅ As a buyer, confirm you've purchased an anonymous number from a listing.\n\n" +
+    "Notifies the seller that you claim the deal is done. " +
+    "The seller will be asked to confirm and mark it as sold.\n" +
+    "Teleclaw does NOT verify the trade — courtesy notification only.",
+  category: "action",
+  parameters: Type.Object({
+    number: Type.String({ description: "The anonymous number (e.g. +888 612 3456)" }),
+  }),
+};
+
+export const numberBuyerConfirmExecutor: ToolExecutor<NumberBuyerConfirmParams> = async (
+  params,
+  ctx
+): Promise<ToolResult> => {
+  try {
+    ensureNumberProfileTables(ctx);
+
+    const listing = ctx.db
+      .prepare(
+        `SELECT * FROM number_listings WHERE number = ? AND active = 1 AND status = 'active'`
+      )
+      .get(params.number) as Record<string, unknown> | undefined;
+
+    if (!listing) {
+      return { success: false, error: "No matching active listing found for this number." };
+    }
+
+    if ((listing.seller_id as number) === ctx.senderId) {
+      return { success: false, error: "You're the seller — use number_sold instead." };
+    }
+
+    const buyerName = ctx.senderUsername ? `@${ctx.senderUsername}` : `User #${ctx.senderId}`;
+
+    return {
+      success: true,
+      data: {
+        number: listing.number,
+        sellerId: listing.seller_id,
+        _notifySeller: {
+          userId: listing.seller_id as number,
+          message:
+            `🔔 A buyer says they've purchased your number!\n\n` +
+            `📞 ${listing.number}\n` +
+            `👤 Buyer: ${buyerName}\n\n` +
+            `If the trade is complete, tell me "mark number as sold".\n` +
+            `If not, no action needed.`,
+        },
+        message: `Seller has been notified. They'll confirm and close the listing once verified.`,
+      },
+    };
+  } catch (error) {
+    log.error({ err: error }, "Number buyer confirm error");
+    return { success: false, error: String(error) };
+  }
+};

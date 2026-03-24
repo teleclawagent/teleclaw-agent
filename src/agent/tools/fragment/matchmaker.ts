@@ -169,15 +169,17 @@ export const mmListExecutor: ToolExecutor<ListForSaleParams> = async (
 
     // ── Publish to shared OTC matchmaker API ──
     if (context.matchmakerApi) {
-      context.matchmakerApi.publishListing({
-        type: "username",
-        item_name: clean,
-        item_details: { categories, estimated: valuation.estimated },
-        price: asking_price ?? null,
-        currency: currency.toUpperCase(),
-        price_usd: null,
-        expires_days,
-      }).catch((err) => log.warn({ err }, "Failed to publish to shared matchmaker"));
+      context.matchmakerApi
+        .publishListing({
+          type: "username",
+          item_name: clean,
+          item_details: { categories, estimated: valuation.estimated },
+          price: asking_price ?? null,
+          currency: currency.toUpperCase(),
+          price_usd: null,
+          expires_days,
+        })
+        .catch((err) => log.warn({ err }, "Failed to publish to shared matchmaker"));
     }
 
     // ── Match via Taste Profiles (AI-powered) ──
@@ -1014,3 +1016,86 @@ export function markUsernameListingReminded(ctx: ToolContext, listingId: string)
     .prepare(`UPDATE mm_listings SET last_reminder_at = datetime('now') WHERE id = ?`)
     .run(listingId);
 }
+
+// ─── Buyer Confirm Purchase ─────────────────────────────────────────
+
+interface BuyerConfirmParams {
+  listing_id?: string;
+  username?: string;
+}
+
+export const mmBuyerConfirmTool: Tool = {
+  name: "mm_buyer_confirm_username",
+  description:
+    "✅ As a buyer, confirm you've purchased a username from a listing.\n\n" +
+    "This notifies the seller that you claim the deal is done. " +
+    "The seller will be asked to confirm and mark it as sold.\n" +
+    "Teleclaw does NOT verify the trade — this is a courtesy notification only.",
+  category: "action",
+  parameters: Type.Object({
+    listing_id: Type.Optional(Type.String({ description: "Listing ID" })),
+    username: Type.Optional(Type.String({ description: "Or specify the username" })),
+  }),
+};
+
+export const mmBuyerConfirmExecutor: ToolExecutor<BuyerConfirmParams> = async (
+  params,
+  context
+): Promise<ToolResult> => {
+  try {
+    ensureMatchmakerTables(context);
+    const { listing_id, username } = params;
+
+    if (!listing_id && !username) {
+      return { success: false, error: "Provide listing_id or username." };
+    }
+
+    let listing: Record<string, unknown> | undefined;
+    if (listing_id) {
+      listing = context.db
+        .prepare(`SELECT * FROM mm_listings WHERE (id = ? OR id LIKE ?) AND status = 'active'`)
+        .get(listing_id, `%${listing_id}`) as Record<string, unknown> | undefined;
+    } else {
+      const clean = `@${(username ?? "").replace(/^@/, "").toLowerCase()}`;
+      listing = context.db
+        .prepare(
+          `SELECT * FROM mm_listings WHERE username = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1`
+        )
+        .get(clean) as Record<string, unknown> | undefined;
+    }
+
+    if (!listing) {
+      return { success: false, error: "No matching active listing found." };
+    }
+
+    if ((listing.seller_id as number) === context.senderId) {
+      return { success: false, error: "You're the seller — use mm_sold_username instead." };
+    }
+
+    const buyerName = context.senderUsername
+      ? `@${context.senderUsername}`
+      : `User #${context.senderId}`;
+
+    return {
+      success: true,
+      data: {
+        listingId: listing.id,
+        username: listing.username,
+        sellerId: listing.seller_id,
+        _notifySeller: {
+          userId: listing.seller_id as number,
+          message:
+            `🔔 A buyer says they've purchased your username!\n\n` +
+            `🔗 ${listing.username}\n` +
+            `👤 Buyer: ${buyerName}\n\n` +
+            `If the trade is complete, tell me "mark ${listing.username} as sold".\n` +
+            `If not, no action needed.`,
+        },
+        message: `Seller has been notified. They'll confirm and close the listing once verified.`,
+      },
+    };
+  } catch (error) {
+    log.error({ err: error }, "Buyer confirm error");
+    return { success: false, error: String(error) };
+  }
+};
