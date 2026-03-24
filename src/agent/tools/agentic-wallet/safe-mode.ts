@@ -15,7 +15,7 @@
 import { Type } from "@sinclair/typebox";
 import type { Tool, ToolExecutor, ToolResult, ToolContext } from "../types.js";
 import { createLogger } from "../../../utils/logger.js";
-import { getErrorMessage } from "../../../utils/errors.js";
+import { getErrorMessage as _getErrorMessage } from "../../../utils/errors.js";
 
 const log = createLogger("SafeMode");
 
@@ -68,7 +68,7 @@ function buildTransferDeeplink(
   to: string,
   amount: string, // in nanotons
   payload?: string, // base64 encoded BOC
-  stateInit?: string,
+  stateInit?: string
 ): string {
   const base = `${DEEPLINK_PREFIXES[walletApp]}${to}`;
   const params = new URLSearchParams();
@@ -78,11 +78,7 @@ function buildTransferDeeplink(
   return `${base}?${params.toString()}`;
 }
 
-function buildUniversalLink(
-  to: string,
-  amount: string,
-  payload?: string,
-): string {
+function _buildUniversalLink(to: string, amount: string, payload?: string): string {
   // tc:// universal link format (works with any TON Connect-compatible wallet)
   const params = new URLSearchParams();
   params.set("to", to);
@@ -133,7 +129,10 @@ export const safeConnectExecutor: ToolExecutor<ConnectWalletParams> = async (
       const { Address } = await import("@ton/core");
       Address.parse(params.wallet_address);
     } catch {
-      return { success: false, error: "Invalid TON address format. Should start with EQ or UQ (e.g. from Tonkeeper)." };
+      return {
+        success: false,
+        error: "Invalid TON address format. Should start with EQ or UQ (e.g. from Tonkeeper).",
+      };
     }
 
     context.db
@@ -142,13 +141,7 @@ export const safeConnectExecutor: ToolExecutor<ConnectWalletParams> = async (
          VALUES (?, ?, ?, datetime('now'))
          ON CONFLICT(user_id) DO UPDATE SET wallet_address = ?, wallet_app = ?, updated_at = datetime('now')`
       )
-      .run(
-        context.senderId,
-        params.wallet_address,
-        walletApp,
-        params.wallet_address,
-        walletApp
-      );
+      .run(context.senderId, params.wallet_address, walletApp, params.wallet_address, walletApp);
 
     return {
       success: true,
@@ -198,7 +191,13 @@ export const safeSwapTool: Tool = {
     from_asset: Type.String({ description: "Asset to sell (e.g. 'TON', or jetton address)" }),
     to_asset: Type.String({ description: "Asset to buy (e.g. 'DOGS', or jetton address)" }),
     amount: Type.Number({ description: "Amount to swap", minimum: 0.01 }),
-    slippage: Type.Optional(Type.Number({ description: "Slippage tolerance 0.01 = 1% (default: 1%)", minimum: 0.001, maximum: 0.5 })),
+    slippage: Type.Optional(
+      Type.Number({
+        description: "Slippage tolerance 0.01 = 1% (default: 1%)",
+        minimum: 0.001,
+        maximum: 0.5,
+      })
+    ),
   }),
 };
 
@@ -222,20 +221,10 @@ export const safeSwapExecutor: ToolExecutor<SafeSwapParams> = async (
 
     const slippage = params.slippage ?? 0.01;
 
-    // Resolve well-known token tickers to addresses
-    const KNOWN_TOKENS: Record<string, string> = {
-      ton: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
-      dogs: "EQCvxJy4eG8hyHBFsZ7eePxrRsUQSFE_jpptRAYBmcG_DOGS",
-      not: "EQAvlWFDxGF2lXm67y4yzC17wYKD9A0guwPkMs1gOsM__NOT",
-      cati: "EQD-cvR0Nz6XAyRBvbhz-abTrRC6sI5tvHvvpeQraV9LABELS",
-      hmstr: "EQAJ8uWd7EBqsmpSWaRdf_I-8R8-XHwh3gsNKhy-UrdrPcUo",
-      major: "EQCuPm0XlMFkNNn_ZPVBsEgaqcNjq-OLFv_jMjmFXyGCRKtZ",
-      durev: "EQBf6-YoR9v5JFO7pSPpBXYJPkEVlkQNS3JGfqVVlfSKNm5E",
-    };
-
-    const NATIVE_TON = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c";
-    const fromAddress = KNOWN_TOKENS[params.from_asset.toLowerCase()] || params.from_asset;
-    const toAddress = KNOWN_TOKENS[params.to_asset.toLowerCase()] || params.to_asset;
+    // Resolve well-known token tickers to addresses (shared registry)
+    const { resolveTokenAddress, NATIVE_TON } = await import("../../../constants/known-tokens.js");
+    const fromAddress = resolveTokenAddress(params.from_asset);
+    const toAddress = resolveTokenAddress(params.to_asset);
     const isTonInput = fromAddress === NATIVE_TON;
 
     // Simulate swap via STON.fi API
@@ -307,14 +296,15 @@ export const safeSwapExecutor: ToolExecutor<SafeSwapParams> = async (
     // Build deeplink
     const walletApp = wallet.wallet_app as WalletApp;
     // txParams.to is an Address object — convert to user-friendly string
-    const toAddr = typeof txParams.to === "string"
-      ? txParams.to
-      : txParams.to.toString({ bounceable: true, testOnly: false });
+    const toAddr =
+      typeof txParams.to === "string"
+        ? txParams.to
+        : txParams.to.toString({ bounceable: true, testOnly: false });
     const deeplink = buildTransferDeeplink(
       walletApp,
       toAddr,
       txParams.value.toString(),
-      txParams.body ? txParams.body.toBoc().toString("base64") : undefined,
+      txParams.body ? txParams.body.toBoc().toString("base64") : undefined
     );
 
     // Save TX record
@@ -337,9 +327,10 @@ export const safeSwapExecutor: ToolExecutor<SafeSwapParams> = async (
         expiresAt
       );
 
-    const priceImpactStr = priceImpact > 0.01
-      ? `⚠️ ${(priceImpact * 100).toFixed(1)}%`
-      : `✅ ${(priceImpact * 100).toFixed(2)}%`;
+    const priceImpactStr =
+      priceImpact > 0.01
+        ? `⚠️ ${(priceImpact * 100).toFixed(1)}%`
+        : `✅ ${(priceImpact * 100).toFixed(2)}%`;
 
     return {
       success: true,
@@ -368,7 +359,10 @@ export const safeSwapExecutor: ToolExecutor<SafeSwapParams> = async (
     };
   } catch (err: unknown) {
     log.error({ err }, "Error preparing safe swap");
-    return { success: false, error: `Swap preparation failed: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      success: false,
+      error: `Swap preparation failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 };
 
@@ -428,7 +422,16 @@ export const safeTransferExecutor: ToolExecutor<SafeTransferParams> = async (
         `INSERT INTO safe_mode_txs (id, user_id, tx_type, description, deeplink, amount, asset, expires_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(txId, context.senderId, "transfer", `Send ${params.amount} TON to ${params.to_address}`, deeplink, params.amount, "TON", expiresAt);
+      .run(
+        txId,
+        context.senderId,
+        "transfer",
+        `Send ${params.amount} TON to ${params.to_address}`,
+        deeplink,
+        params.amount,
+        "TON",
+        expiresAt
+      );
 
     return {
       success: true,
@@ -460,7 +463,9 @@ export const safeTxHistoryTool: Tool = {
   description: "🟢 View your recent Safe Mode transaction history.",
   category: "data-bearing",
   parameters: Type.Object({
-    limit: Type.Optional(Type.Number({ description: "Max results (default 10)", minimum: 1, maximum: 50 })),
+    limit: Type.Optional(
+      Type.Number({ description: "Max results (default 10)", minimum: 1, maximum: 50 })
+    ),
   }),
 };
 

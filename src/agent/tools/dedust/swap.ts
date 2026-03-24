@@ -69,12 +69,16 @@ export const dedustSwapExecutor: ToolExecutor<DedustSwapParams> = async (
       };
     }
 
-    const isTonInput = from_asset.toLowerCase() === "ton";
-    const isTonOutput = to_asset.toLowerCase() === "ton";
+    // Resolve token tickers to addresses (USDT, NOT, DOGS, etc.)
+    const { resolveTokenAddress, NATIVE_TON } = await import("../../../constants/known-tokens.js");
+    const resolvedFrom = resolveTokenAddress(from_asset);
+    const resolvedTo = resolveTokenAddress(to_asset);
+    const isTonInput = resolvedFrom === NATIVE_TON;
+    const isTonOutput = resolvedTo === NATIVE_TON;
 
     // Convert addresses to friendly format if needed
-    let fromAssetAddr = from_asset;
-    let toAssetAddr = to_asset;
+    let fromAssetAddr = resolvedFrom;
+    let toAssetAddr = resolvedTo;
 
     if (!isTonInput) {
       try {

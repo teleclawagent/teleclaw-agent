@@ -17,7 +17,10 @@ import { createLogger } from "../../../utils/logger.js";
 const log = createLogger("Tools");
 
 // Native TON address used by STON.fi API
-const NATIVE_TON_ADDRESS = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c";
+import {
+  resolveTokenAddress,
+  NATIVE_TON as NATIVE_TON_ADDRESS,
+} from "../../../constants/known-tokens.js";
 interface JettonSwapParams {
   from_asset: string;
   to_asset: string;
@@ -65,11 +68,11 @@ export const stonfiSwapExecutor: ToolExecutor<JettonSwapParams> = async (
       };
     }
 
-    // STON.fi API requires the native TON address, not the string "ton"
-    const isTonInput = from_asset.toLowerCase() === "ton" || from_asset === NATIVE_TON_ADDRESS;
-    const isTonOutput = to_asset.toLowerCase() === "ton" || to_asset === NATIVE_TON_ADDRESS;
-    const fromAddress = isTonInput ? NATIVE_TON_ADDRESS : from_asset;
-    const toAddress = isTonOutput ? NATIVE_TON_ADDRESS : to_asset;
+    // Resolve token tickers to addresses (USDT, NOT, DOGS, etc.)
+    const fromAddress = resolveTokenAddress(from_asset);
+    const toAddress = resolveTokenAddress(to_asset);
+    const isTonInput = fromAddress === NATIVE_TON_ADDRESS;
+    const isTonOutput = toAddress === NATIVE_TON_ADDRESS;
 
     if (!isTonInput && !fromAddress.match(/^[EUe][Qq][A-Za-z0-9_-]{46}$/)) {
       return {
