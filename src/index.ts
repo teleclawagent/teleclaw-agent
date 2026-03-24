@@ -16,7 +16,7 @@ import { getWalletAddress } from "./ton/wallet-service.js";
 import { setTonapiKey } from "./constants/api-endpoints.js";
 import { setToncenterApiKey } from "./ton/endpoint.js";
 import { TELECLAW_ROOT } from "./workspace/paths.js";
-import { TELEGRAM_CONNECTION_RETRIES, TELEGRAM_FLOOD_SLEEP_THRESHOLD } from "./constants/limits.js";
+// Connection constants available in constants/limits.js if needed
 import { join } from "path";
 import { ToolRegistry } from "./agent/tools/registry.js";
 import { registerAllTools } from "./agent/tools/register-all.js";
@@ -25,7 +25,7 @@ import type { HookName, AgentStartEvent, AgentStopEvent } from "./sdk/hooks/type
 import { createHookRunner } from "./sdk/hooks/runner.js";
 import type { SDKDependencies } from "./sdk/index.js";
 import { getProviderMetadata, type SupportedProvider } from "./config/providers.js";
-import { readRawConfig, setNestedValue, writeRawConfig } from "./config/configurable-keys.js";
+// Config helpers available in config/configurable-keys.js if needed
 import { loadModules } from "./agent/tools/module-loader.js";
 import { ModulePermissions } from "./agent/tools/module-permissions.js";
 import { SHUTDOWN_TIMEOUT_MS } from "./constants/timeouts.js";
@@ -43,7 +43,7 @@ import { createLogger, initLoggerFromConfig } from "./utils/logger.js";
 import { AgentLifecycle } from "./agent/lifecycle.js";
 import { InlineRouter } from "./bot/inline-router.js";
 import { PluginRateLimiter } from "./bot/rate-limiter.js";
-import { setBotPreMiddleware, getDealBot } from "./deals/module.js";
+// deals module is loaded via module-loader (matchmaker-only, no escrow)
 import type { TaskDependencyResolver } from "./telegram/task-dependency-resolver.js";
 import type { WebUIServer } from "./webui/server.js";
 import { checkStaleListings, expireOldListings } from "./agent/tools/fragment/stale-checker.js";
@@ -513,11 +513,7 @@ export class TeleclawApp {
     const inlineRouter = new InlineRouter();
     const rateLimiter = new PluginRateLimiter();
 
-    // Install router middleware on the DealBot's Grammy instance
-    // setBotPreMiddleware must be called BEFORE deals module start()
-    setBotPreMiddleware(inlineRouter.middleware());
-
-    // Start module background jobs (after bridge connect — deals needs bridge)
+    // Start module background jobs (after bridge connect)
     const moduleDb = getDatabase().getDb();
     const pluginContext: PluginContext = {
       bridge: this.bridge,
@@ -542,16 +538,10 @@ export class TeleclawApp {
       throw error;
     }
 
-    // Wire bot references into SDK deps (after DealBot has started)
-    const activeDealBot = getDealBot();
-    if (activeDealBot) {
-      this.sdkDeps.inlineRouter = inlineRouter;
-      this.sdkDeps.gramjsBot = activeDealBot.getGramJSBot();
-      this.sdkDeps.grammyBot = activeDealBot.getBot();
-      this.sdkDeps.rateLimiter = rateLimiter;
-      inlineRouter.setGramJSBot(activeDealBot.getGramJSBot());
-      log.info("🔌 Bot SDK: inline router installed");
-    }
+    // Wire SDK deps for plugin system
+    this.sdkDeps.inlineRouter = inlineRouter;
+    this.sdkDeps.rateLimiter = rateLimiter;
+    log.info("🔌 Bot SDK: inline router installed");
 
     // Create hook runner if any plugins registered hooks
     if (hookRegistry.hasAnyHooks()) {
@@ -742,9 +732,7 @@ export class TeleclawApp {
       }
 
       // Bot API mode — owner name/username must be set in config manually
-      log.info(
-        "Owner resolution skipped (Bot API mode — set owner_name/owner_username in config)"
-      );
+      log.info("Owner resolution skipped (Bot API mode — set owner_name/owner_username in config)");
     } catch (error) {
       log.warn(
         `⚠️ Could not resolve owner info: ${error instanceof Error ? error.message : error}`

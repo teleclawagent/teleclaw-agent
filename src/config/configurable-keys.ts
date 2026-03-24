@@ -521,50 +521,17 @@ export const CONFIGURABLE_KEYS: Record<string, ConfigKeyMeta> = {
     parse: (v) => v === "true",
   },
 
-  // ─── Deals ─────────────────────────────────────────────────────────
+  // ─── Deals / OTC Matchmaker ─────────────────────────────────────────
   "deals.enabled": {
     type: "boolean",
     category: "Deals",
-    label: "Deals Enabled",
-    description: "Enable the deals/escrow module",
+    label: "OTC Matchmaker Enabled",
+    description: "Enable the OTC matchmaker module (matchmaker-only, no escrow)",
     sensitive: false,
     hotReload: "instant",
     validate: enumValidator(["true", "false"]),
     mask: identity,
     parse: (v) => v === "true",
-  },
-  "deals.expiry_seconds": {
-    type: "number",
-    category: "Deals",
-    label: "Deal Expiry",
-    description: "Deal expiry timeout in seconds",
-    sensitive: false,
-    hotReload: "instant",
-    validate: numberInRange(10, 3600),
-    mask: identity,
-    parse: (v) => Number(v),
-  },
-  "deals.buy_max_floor_percent": {
-    type: "number",
-    category: "Deals",
-    label: "Buy Max Floor %",
-    description: "Maximum floor % for buy deals",
-    sensitive: false,
-    hotReload: "instant",
-    validate: numberInRange(1, 100),
-    mask: identity,
-    parse: (v) => Number(v),
-  },
-  "deals.sell_min_floor_percent": {
-    type: "number",
-    category: "Deals",
-    label: "Sell Min Floor %",
-    description: "Minimum floor % for sell deals",
-    sensitive: false,
-    hotReload: "instant",
-    validate: numberInRange(100, 500),
-    mask: identity,
-    parse: (v) => Number(v),
   },
 
   // ─── TON Proxy ────────────────────────────────────────────────────

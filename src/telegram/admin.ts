@@ -3,7 +3,7 @@ import type { AgentRuntime } from "../agent/runtime.js";
 import type { TelegramTransport } from "./transport.js";
 import { getWalletAddress, getWalletBalance } from "../ton/wallet-service.js";
 import { Address } from "@ton/core";
-import { DEALS_CONFIG } from "../deals/config.js";
+
 import { loadTemplate } from "../workspace/manager.js";
 import { isVerbose, setVerbose, createLogger } from "../utils/logger.js";
 import { resetSession } from "../session/store.js";
@@ -383,40 +383,8 @@ export class AdminHandler {
     return "▶️ Agent resumed.";
   }
 
-  private handleStrategyCommand(command: AdminCommand): string {
-    if (command.args.length === 0) {
-      const buy = Math.round(DEALS_CONFIG.strategy.buyMaxMultiplier * 100);
-      const sell = Math.round(DEALS_CONFIG.strategy.sellMinMultiplier * 100);
-      return (
-        `📊 **Trading Strategy**\n\n` +
-        `Buy: max **${buy}%** of floor\n` +
-        `Sell: min **${sell}%** of floor\n\n` +
-        `Usage:\n/strategy buy <percent>\n/strategy sell <percent>`
-      );
-    }
-
-    const [target, valueStr] = command.args;
-    const value = parseInt(valueStr, 10);
-
-    if (target === "buy") {
-      if (isNaN(value) || value < 50 || value > 150) {
-        return "❌ Buy threshold must be between 50 and 150";
-      }
-      const old = Math.round(DEALS_CONFIG.strategy.buyMaxMultiplier * 100);
-      DEALS_CONFIG.strategy.buyMaxMultiplier = value / 100;
-      return `📊 Buy threshold: **${old}%** → **${value}%** of floor`;
-    }
-
-    if (target === "sell") {
-      if (isNaN(value) || value < 100 || value > 200) {
-        return "❌ Sell threshold must be between 100 and 200";
-      }
-      const old = Math.round(DEALS_CONFIG.strategy.sellMinMultiplier * 100);
-      DEALS_CONFIG.strategy.sellMinMultiplier = value / 100;
-      return `📊 Sell threshold: **${old}%** → **${value}%** of floor`;
-    }
-
-    return `❌ Unknown target: ${target}. Use "buy" or "sell".`;
+  private handleStrategyCommand(_command: AdminCommand): string {
+    return `📊 Strategy settings moved to STRATEGY.md workspace file. Edit it directly.`;
   }
 
   private async handleStopCommand(): Promise<string> {
@@ -739,9 +707,6 @@ export class AdminHandler {
       ? `${address.slice(0, 6)}…${address.slice(-4)}`
       : "Not configured";
 
-    const buy = Math.round(DEALS_CONFIG.strategy.buyMaxMultiplier * 100);
-    const sell = Math.round(DEALS_CONFIG.strategy.sellMinMultiplier * 100);
-
     const ragEnabled = cfg.tool_rag.enabled;
     const ragTopK = cfg.tool_rag.top_k;
 
@@ -753,7 +718,6 @@ export class AdminHandler {
       `📬 **DM policy:** ${this.config.dm_policy}\n` +
       `👥 **Group policy:** ${this.config.group_policy}\n` +
       `🔔 **Require mention:** ${this.config.require_mention ? "Yes" : "No"}\n\n` +
-      `📊 **Strategy:** Buy ≤${buy}% / Sell ≥${sell}% of floor\n\n` +
       `🔍 **Tool RAG:** ${ragEnabled ? "ON" : "OFF"} (top_k: ${ragTopK})\n\n` +
       `💎 **Wallet:** \`${truncatedAddr}\``
     );

@@ -9,5 +9,4 @@ export const TELEGRAM_SEND_TOOLS = new Set([
   "telegram_send_poll",
   "telegram_forward_message",
   "telegram_reply_message",
-  "deal_propose",
 ]);
