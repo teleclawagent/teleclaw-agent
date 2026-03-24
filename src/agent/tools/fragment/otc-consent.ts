@@ -88,7 +88,7 @@ export const otcJoinExecutor: ToolExecutor<Record<string, never>> = async (
           error:
             "🔐 You need to verify your wallet before joining OTC.\n\n" +
             "Use /verify or say 'verify my wallet' to get started.\n" +
-            "(0.01 TON verification fee applies — spam protection.)",
+            "(0.01 TON verification deposit required — this confirms wallet ownership and prevents spam.)",
         };
       }
       return {

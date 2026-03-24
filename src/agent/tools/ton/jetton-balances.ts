@@ -139,28 +139,53 @@ export const jettonBalancesExecutor: ToolExecutor<JettonBalancesParams> = async 
         const tcResponse = await fetch(tcUrl, { headers: { Accept: "application/json" } });
         if (tcResponse.ok) {
           const tcData = await tcResponse.json();
-          const tcWallets = tcData.jetton_wallets || [];
-          // Reformat to match TonAPI structure
-          const reformattedBalances = tcWallets.map((w: Record<string, unknown>) => ({
-            balance: String(w.balance || "0"),
-            wallet_address: { address: w.address },
-            jetton: {
-              address: (w.jetton as string) || "",
-              symbol:
-                ((w as Record<string, unknown>).metadata as Record<string, unknown>)?.symbol ||
-                "UNKNOWN",
-              name:
-                ((w as Record<string, unknown>).metadata as Record<string, unknown>)?.name ||
-                "Unknown Token",
-              decimals: Number(
-                ((w as Record<string, unknown>).metadata as Record<string, unknown>)?.decimals || 9
-              ),
-              verification: "none",
-              score: 0,
-              image: ((w as Record<string, unknown>).metadata as Record<string, unknown>)?.image,
-            },
-          }));
-          // Use Toncenter data instead
+          const tcWallets = (tcData.jetton_wallets || []) as Record<string, unknown>[];
+
+          // Toncenter doesn't return metadata in jetton/wallets — fetch each jetton master
+          const reformattedBalances = await Promise.all(
+            tcWallets.map(async (w) => {
+              const jettonAddr = (w.jetton as string) || "";
+              let symbol = "UNKNOWN";
+              let name = "Unknown Token";
+              let decimals = 9;
+              let image: string | undefined;
+
+              // Try to fetch jetton metadata from TonAPI (might work for reads even if 401 on account endpoints)
+              // Fall back to Toncenter jetton/masters
+              try {
+                const metaUrl = `https://toncenter.com/api/v3/jetton/masters?address=${encodeURIComponent(jettonAddr)}&limit=1`;
+                const metaRes = await fetch(metaUrl, { headers: { Accept: "application/json" } });
+                if (metaRes.ok) {
+                  const metaData = await metaRes.json();
+                  const content = metaData.jetton_masters?.[0]?.jetton_content;
+                  if (content) {
+                    // On-chain metadata
+                    symbol = content.symbol || symbol;
+                    name = content.name || name;
+                    decimals = content.decimals ? Number(content.decimals) : decimals;
+                    image = content.image || content.image_data;
+                  }
+                }
+              } catch {
+                // Metadata fetch failed, keep defaults
+              }
+
+              return {
+                balance: String(w.balance || "0"),
+                wallet_address: { address: w.address },
+                jetton: {
+                  address: jettonAddr,
+                  symbol,
+                  name,
+                  decimals,
+                  verification: "none",
+                  score: 0,
+                  image,
+                },
+              };
+            })
+          );
+
           const data = { balances: reformattedBalances };
           return processBalances(data);
         }
