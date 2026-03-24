@@ -62,16 +62,14 @@ Config lives at `~/.teleclaw/config.yaml`. Key settings:
 telegram:
   mode: bot              # Bot API mode
   bot_token: "..."       # from @BotFather
-  dm_policy: open        # who can DM the bot
-  # admin_ids set automatically via claim code
 
 agent:
   provider: anthropic    # claude, openai, google, local, etc.
-  model: claude-sonnet-4-20250514
+  model: claude-sonnet-4-20250514  # or any model you prefer
   api_key: "..."         # your provider API key
 ```
 
-After setup, send `/start <claim-code>` to your bot to become admin.
+Use `/addprovider` to configure AI providers and `/models` to switch between them.
 
 ## Commands
 
