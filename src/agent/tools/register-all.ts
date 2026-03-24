@@ -29,6 +29,10 @@ import { tools as cronTools } from "./cron/index.js";
 import { tools as subagentTools } from "./subagent/index.js";
 import { tools as pdfTools } from "./pdf/index.js";
 import { tools as summarizeTools } from "./summarize/index.js";
+import { tools as portfolioTools } from "./portfolio/index.js";
+import { tools as alphaRadarTools } from "./alpha-radar/index.js";
+import { tools as whaleWatcherTools } from "./whale-watcher/index.js";
+import { tools as dealsTools } from "./deals/index.js";
 
 const ALL_CATEGORIES: ToolEntry[][] = [
   telegramTools,
@@ -52,6 +56,10 @@ const ALL_CATEGORIES: ToolEntry[][] = [
   subagentTools,
   pdfTools,
   summarizeTools,
+  portfolioTools,
+  alphaRadarTools,
+  whaleWatcherTools,
+  dealsTools,
 ];
 
 export function registerAllTools(registry: ToolRegistry): void {

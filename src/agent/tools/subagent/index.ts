@@ -82,36 +82,43 @@ const subAgentSpawnExecutor: ToolExecutor<SubAgentSpawnParams> = async (
 
     const startTime = Date.now();
 
-    const response = await chatWithContext(
-      {
-        ...config.agent,
-        model: utilityModel,
-        max_tokens: 4096,
-      },
-      {
-        systemPrompt,
-        context: {
-          messages: [
-            { role: "user", content: [{ type: "text", text: userMessage }], timestamp: Date.now() },
-          ],
+    try {
+      const response = await chatWithContext(
+        {
+          ...config.agent,
+          model: utilityModel,
+          max_tokens: 4096,
         },
-      }
-    );
+        {
+          systemPrompt,
+          context: {
+            messages: [
+              {
+                role: "user",
+                content: [{ type: "text", text: userMessage }],
+                timestamp: Date.now(),
+              },
+            ],
+          },
+        }
+      );
 
-    const elapsed = Date.now() - startTime;
-    chatAgents.delete(agentId);
+      const elapsed = Date.now() - startTime;
+      log.info({ agentId, elapsed }, "Sub-agent completed");
 
-    log.info({ agentId, elapsed }, "Sub-agent completed");
-
-    return {
-      success: true,
-      data: {
-        agentId,
-        result: response.text,
-        model: utilityModel,
-        durationMs: elapsed,
-      },
-    };
+      return {
+        success: true,
+        data: {
+          agentId,
+          result: response.text,
+          model: utilityModel,
+          durationMs: elapsed,
+        },
+      };
+    } finally {
+      // Always clean up — prevents permanent "max 3" lockout on errors
+      chatAgents.delete(agentId);
+    }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }

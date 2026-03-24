@@ -48,17 +48,40 @@ export { telegramDeleteScheduledMessageTool, telegramDeleteScheduledMessageExecu
 export { telegramSendScheduledNowTool, telegramSendScheduledNowExecutor };
 
 export const tools: ToolEntry[] = [
+  // Bot API compatible — no scope restriction
   { tool: telegramSendMessageTool, executor: telegramSendMessageExecutor },
   { tool: telegramQuoteReplyTool, executor: telegramQuoteReplyExecutor },
-  { tool: telegramGetRepliesTool, executor: telegramGetRepliesExecutor },
   { tool: telegramEditMessageTool, executor: telegramEditMessageExecutor },
-  { tool: telegramScheduleMessageTool, executor: telegramScheduleMessageExecutor },
-  { tool: telegramGetScheduledMessagesTool, executor: telegramGetScheduledMessagesExecutor },
-  { tool: telegramDeleteScheduledMessageTool, executor: telegramDeleteScheduledMessageExecutor },
-  { tool: telegramSendScheduledNowTool, executor: telegramSendScheduledNowExecutor },
-  { tool: telegramSearchMessagesTool, executor: telegramSearchMessagesExecutor },
   { tool: telegramPinMessageTool, executor: telegramPinMessageExecutor },
   { tool: telegramUnpinMessageTool, executor: telegramUnpinMessageExecutor },
   { tool: telegramForwardMessageTool, executor: telegramForwardMessageExecutor },
   { tool: telegramDeleteMessageTool, executor: telegramDeleteMessageExecutor },
+
+  // GramJS required — userbot-only
+  { tool: telegramGetRepliesTool, executor: telegramGetRepliesExecutor, scope: "userbot-only" },
+  {
+    tool: telegramScheduleMessageTool,
+    executor: telegramScheduleMessageExecutor,
+    scope: "userbot-only",
+  },
+  {
+    tool: telegramGetScheduledMessagesTool,
+    executor: telegramGetScheduledMessagesExecutor,
+    scope: "userbot-only",
+  },
+  {
+    tool: telegramDeleteScheduledMessageTool,
+    executor: telegramDeleteScheduledMessageExecutor,
+    scope: "userbot-only",
+  },
+  {
+    tool: telegramSendScheduledNowTool,
+    executor: telegramSendScheduledNowExecutor,
+    scope: "userbot-only",
+  },
+  {
+    tool: telegramSearchMessagesTool,
+    executor: telegramSearchMessagesExecutor,
+    scope: "userbot-only",
+  },
 ];

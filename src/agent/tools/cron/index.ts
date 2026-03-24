@@ -112,8 +112,9 @@ const reminderSetExecutor: ToolExecutor<ReminderSetParams> = async (
     });
 
     const triggerDate = new Date(triggerAt);
+    const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     const timeStr = triggerDate.toLocaleString("en-GB", {
-      timeZone: "Europe/Istanbul",
+      timeZone: userTz,
       hour: "2-digit",
       minute: "2-digit",
       day: "2-digit",
