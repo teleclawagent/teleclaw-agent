@@ -10,6 +10,7 @@
 import type { TelegramTransport, CallbackQueryEvent, InlineButton } from "./transport.js";
 import type Database from "better-sqlite3";
 import { createLogger } from "../utils/logger.js";
+import { encrypt, decrypt } from "../session/user-settings.js";
 
 const log = createLogger("MarketappWizard");
 
@@ -222,15 +223,21 @@ export class MarketappWizard {
            marketapp_token = excluded.marketapp_token,
            updated_at = datetime('now')`
       )
-      .run(userId, token);
-    log.info({ userId }, "Marketapp token saved");
+      .run(userId, encrypt(token));
+    log.info({ userId }, "Marketapp token saved (encrypted)");
   }
 
   getToken(userId: number): string | null {
     const row = this.db
       .prepare("SELECT marketapp_token FROM user_settings WHERE user_id = ?")
       .get(userId) as { marketapp_token: string | null } | undefined;
-    return row?.marketapp_token ?? null;
+    if (!row?.marketapp_token) return null;
+    try {
+      return decrypt(row.marketapp_token);
+    } catch {
+      log.warn({ userId }, "Failed to decrypt marketapp token");
+      return null;
+    }
   }
 
   private removeToken(userId: number): void {

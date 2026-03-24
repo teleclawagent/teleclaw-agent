@@ -32,7 +32,7 @@ function getKey(): Buffer {
   return Buffer.from(hex, "hex");
 }
 
-function encrypt(plaintext: string): string {
+export function encrypt(plaintext: string): string {
   const key = getKey();
   const iv = randomBytes(IV_LEN);
   const cipher = createCipheriv(ALGO, key, iv);
@@ -41,7 +41,7 @@ function encrypt(plaintext: string): string {
   return `${iv.toString("hex")}:${tag.toString("hex")}:${ct.toString("hex")}`;
 }
 
-function decrypt(encoded: string): string {
+export function decrypt(encoded: string): string {
   const key = getKey();
   const parts = encoded.split(":");
   if (parts.length !== 3) throw new Error("Geçersiz şifreli format");
