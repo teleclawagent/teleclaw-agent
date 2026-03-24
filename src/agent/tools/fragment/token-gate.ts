@@ -140,6 +140,12 @@ async function fetchTeleclawBalance(walletAddress: string): Promise<bigint | nul
       return 0n;
     }
 
+    // TonAPI 401 — try Toncenter fallback
+    if (response.status === 401) {
+      log.warn({ walletAddress }, "TonAPI 401 — trying Toncenter fallback for jetton balance");
+      return await fetchTeleclawBalanceToncenter(walletAddress);
+    }
+
     if (!response.ok) {
       log.error({ status: response.status, walletAddress }, "TonAPI error fetching jetton balance");
       // 429 = rate limited, distinct from real errors
@@ -165,6 +171,45 @@ async function fetchTeleclawBalance(walletAddress: string): Promise<bigint | nul
   } catch (error) {
     log.error({ err: error, walletAddress }, "Network error fetching TELECLAW balance");
     return null; // Fail closed
+  }
+}
+
+/**
+ * Toncenter fallback for fetching $TELECLAW balance when TonAPI returns 401.
+ * Uses the public Toncenter v3 API (no key required for low-volume).
+ */
+async function fetchTeleclawBalanceToncenter(walletAddress: string): Promise<bigint | null> {
+  try {
+    const url = `https://toncenter.com/api/v3/jetton/wallets?owner_address=${encodeURIComponent(walletAddress)}&jetton_address=${encodeURIComponent(TELECLAW_JETTON_ADDRESS)}&limit=1`;
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+    });
+
+    if (!response.ok) {
+      log.error({ status: response.status }, "Toncenter fallback failed");
+      return null;
+    }
+
+    const data = await response.json();
+    const wallets = data.jetton_wallets || [];
+
+    if (wallets.length === 0) {
+      // User doesn't hold this jetton
+      return 0n;
+    }
+
+    const balance = wallets[0].balance;
+    if (!balance) return 0n;
+
+    try {
+      return BigInt(balance);
+    } catch {
+      log.error({ balance }, "Failed to parse Toncenter balance as BigInt");
+      return null;
+    }
+  } catch (error) {
+    log.error({ err: error }, "Toncenter fallback network error");
+    return null;
   }
 }
 

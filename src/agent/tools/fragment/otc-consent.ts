@@ -1,7 +1,7 @@
 /**
  * OTC Consent Gate — Users must opt-in before using OTC matchmaker features.
  * Stores consent in SQLite per user. Explains how the system works before asking.
- * 
+ *
  * IMPORTANT: All OTC executors MUST call checkTokenGate() before proceeding.
  * Token gate = verified wallet + minimum 0.1% TELECLAW supply.
  */
@@ -79,27 +79,25 @@ export const otcJoinExecutor: ToolExecutor<Record<string, never>> = async (
 ): Promise<ToolResult> => {
   try {
     // ═══ TOKEN GATE CHECK ═══
-    console.log("=== OTC JOIN: checking token gate for userId:", ctx.senderId);
     const gateResult = await checkTokenGate(ctx.db, ctx.senderId);
-    console.log("=== OTC JOIN: gate result:", JSON.stringify({ allowed: gateResult.allowed, reason: gateResult.reason }));
-    
+
     if (!gateResult.allowed) {
       if (!gateResult.walletAddress) {
         return {
           success: false,
           error:
-            "🔐 OTC'ye katılmak için önce cüzdanını doğrula.\n\n" +
-            "Cüzdan doğrulama için: /verify veya 'cüzdanımı doğrula' yaz.\n" +
-            "(0.01 TON doğrulama ücreti alınır, iade edilmez — spam koruması.)",
+            "🔐 You need to verify your wallet before joining OTC.\n\n" +
+            "Use /verify or say 'verify my wallet' to get started.\n" +
+            "(0.01 TON verification fee applies — spam protection.)",
         };
       }
       return {
         success: false,
         error:
-          `🔐 OTC'ye katılmak için minimum %0.1 TELECLAW supply tutman gerekli.\n\n` +
-          `Bakiyen: ${gateResult.balance || "0"} $TELECLAW\n` +
-          `Gerekli: ${gateResult.required || "100,000"} $TELECLAW\n\n` +
-          `$TELECLAW al: https://dedust.io/swap/TON/EQD01TwE1plYpYKvRwWOLwAzzAJaDKwpB2bR3nfg-wkJJwks`,
+          `🔐 You need to hold at least 0.1% of $TELECLAW supply to join OTC.\n\n` +
+          `Your balance: ${gateResult.balance || "0"} $TELECLAW\n` +
+          `Required: ${gateResult.required || "100,000"} $TELECLAW\n\n` +
+          `Buy $TELECLAW: https://dedust.io/swap/TON/EQD01TwE1plYpYKvRwWOLwAzzAJaDKwpB2bR3nfg-wkJJwks`,
       };
     }
     // ═══ END TOKEN GATE ═══
@@ -114,7 +112,10 @@ export const otcJoinExecutor: ToolExecutor<Record<string, never>> = async (
       )
       .run(ctx.senderId);
 
-    log.info({ userId: ctx.senderId, wallet: gateResult.walletAddress }, "User joined OTC (token gate passed)");
+    log.info(
+      { userId: ctx.senderId, wallet: gateResult.walletAddress },
+      "User joined OTC (token gate passed)"
+    );
 
     return {
       success: true,
@@ -189,25 +190,23 @@ export const otcStatusExecutor: ToolExecutor<Record<string, never>> = async (
   ctx
 ): Promise<ToolResult> => {
   // ═══ TOKEN GATE CHECK ═══
-  console.log("=== OTC STATUS: checking token gate for userId:", ctx.senderId);
   const gate = await checkTokenGate(ctx.db, ctx.senderId);
-  console.log("=== OTC STATUS: gate result:", JSON.stringify({ allowed: gate.allowed, reason: gate.reason }));
-  
+
   if (!gate.allowed) {
     if (!gate.walletAddress) {
       return {
         success: false,
         error:
-          "🔐 OTC durumunu görmek için önce cüzdanını doğrula.\n\n" +
-          "Cüzdan doğrulama için: /verify veya 'cüzdanımı doğrula' yaz.",
+          "🔐 You need to verify your wallet first to check OTC status.\n\n" +
+          "Use /verify or say 'verify my wallet' to get started.",
       };
     }
     return {
       success: false,
       error:
-        `🔐 OTC erişimi için minimum %0.1 TELECLAW supply tutman gerekli.\n\n` +
-        `Bakiyen: ${gate.balance || "0"} $TELECLAW\n` +
-        `Gerekli: ${gate.required || "100,000"} $TELECLAW`,
+        `🔐 You need to hold at least 0.1% of $TELECLAW supply for OTC access.\n\n` +
+        `Your balance: ${gate.balance || "0"} $TELECLAW\n` +
+        `Required: ${gate.required || "100,000"} $TELECLAW`,
     };
   }
   // ═══ END TOKEN GATE ═══

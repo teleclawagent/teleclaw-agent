@@ -32,6 +32,83 @@ export const jettonBalancesTool: Tool = {
   parameters: Type.Object({}),
   category: "data-bearing",
 };
+function processBalances(data: Record<string, unknown[]>): ToolResult {
+  const balances: JettonBalance[] = [];
+
+  for (const item of (data.balances || []) as Record<string, unknown>[]) {
+    const { balance, wallet_address, jetton } = item as {
+      balance: string;
+      wallet_address: { address: string };
+      jetton: Record<string, unknown>;
+    };
+
+    if ((jetton.verification as string) === "blacklist") continue;
+
+    const decimals = (jetton.decimals as number) || 9;
+    const rawBalance = BigInt(balance);
+    const divisor = BigInt(10 ** decimals);
+    const wholePart = rawBalance / divisor;
+    const fractionalPart = rawBalance % divisor;
+
+    const formattedBalance =
+      fractionalPart === BigInt(0)
+        ? wholePart.toString()
+        : `${wholePart}.${fractionalPart.toString().padStart(decimals, "0").replace(/0+$/, "")}`;
+
+    balances.push({
+      symbol: (jetton.symbol as string) || "UNKNOWN",
+      name: (jetton.name as string) || "Unknown Token",
+      balance: formattedBalance,
+      rawBalance: balance,
+      decimals,
+      jettonAddress: (jetton.address as string) || "",
+      walletAddress: wallet_address?.address || "",
+      verification: (jetton.verification as string) || "none",
+      score: (jetton.score as number) || 0,
+      image: jetton.image as string | undefined,
+    });
+  }
+
+  balances.sort((a, b) => {
+    if (a.verification === "whitelist" && b.verification !== "whitelist") return -1;
+    if (a.verification !== "whitelist" && b.verification === "whitelist") return 1;
+    return b.score - a.score;
+  });
+
+  const totalJettons = balances.length;
+  const whitelisted = balances.filter((b) => b.verification === "whitelist").length;
+
+  let message = `You own ${totalJettons} jetton${totalJettons !== 1 ? "s" : ""}`;
+  if (whitelisted > 0) message += ` (${whitelisted} verified)`;
+
+  if (totalJettons === 0) {
+    message = "You don't own any jettons yet.";
+  } else {
+    message += ":\n\n";
+    balances.forEach((b) => {
+      const verifiedIcon = b.verification === "whitelist" ? "✅" : "";
+      message += `${verifiedIcon} ${b.symbol}: ${b.balance}\n`;
+      message += `   ${b.name}\n`;
+      if (b.verification !== "whitelist" && b.verification !== "none") {
+        message += `   ⚠️ ${b.verification}\n`;
+      }
+    });
+  }
+
+  let summary = `${totalJettons} jetton${totalJettons !== 1 ? "s" : ""}`;
+  if (whitelisted > 0) summary += ` (${whitelisted} verified)`;
+  if (totalJettons > 0) {
+    const topTokens = balances.slice(0, 5).map((b) => `${b.symbol} ${b.balance}`);
+    summary += `: ${topTokens.join(", ")}`;
+    if (balances.length > 5) summary += `, +${balances.length - 5} more`;
+  }
+
+  return {
+    success: true,
+    data: { totalJettons, whitelisted, balances, message, summary },
+  };
+}
+
 export const jettonBalancesExecutor: ToolExecutor<JettonBalancesParams> = async (
   _params,
   _context
@@ -46,7 +123,55 @@ export const jettonBalancesExecutor: ToolExecutor<JettonBalancesParams> = async 
     }
 
     // Fetch jetton balances from TonAPI
-    const response = await tonapiFetch(`/accounts/${walletData.address}/jettons`);
+    let response = await tonapiFetch(`/accounts/${walletData.address}/jettons`);
+
+    // Retry on transient errors
+    if (response.status === 502 || response.status === 429) {
+      await new Promise((r) => setTimeout(r, 2000));
+      response = await tonapiFetch(`/accounts/${walletData.address}/jettons`);
+    }
+
+    // TonAPI 401 — try Toncenter fallback
+    if (response.status === 401) {
+      log.warn("TonAPI 401 — trying Toncenter fallback for jetton balances");
+      try {
+        const tcUrl = `https://toncenter.com/api/v3/jetton/wallets?owner_address=${encodeURIComponent(walletData.address)}&limit=100`;
+        const tcResponse = await fetch(tcUrl, { headers: { Accept: "application/json" } });
+        if (tcResponse.ok) {
+          const tcData = await tcResponse.json();
+          const tcWallets = tcData.jetton_wallets || [];
+          // Reformat to match TonAPI structure
+          const reformattedBalances = tcWallets.map((w: Record<string, unknown>) => ({
+            balance: String(w.balance || "0"),
+            wallet_address: { address: w.address },
+            jetton: {
+              address: (w.jetton as string) || "",
+              symbol:
+                ((w as Record<string, unknown>).metadata as Record<string, unknown>)?.symbol ||
+                "UNKNOWN",
+              name:
+                ((w as Record<string, unknown>).metadata as Record<string, unknown>)?.name ||
+                "Unknown Token",
+              decimals: Number(
+                ((w as Record<string, unknown>).metadata as Record<string, unknown>)?.decimals || 9
+              ),
+              verification: "none",
+              score: 0,
+              image: ((w as Record<string, unknown>).metadata as Record<string, unknown>)?.image,
+            },
+          }));
+          // Use Toncenter data instead
+          const data = { balances: reformattedBalances };
+          return processBalances(data);
+        }
+      } catch (tcErr) {
+        log.error({ err: tcErr }, "Toncenter fallback also failed");
+      }
+      return {
+        success: false,
+        error: "TonAPI authentication error (401). Please check your TonAPI key configuration.",
+      };
+    }
 
     if (!response.ok) {
       return {
@@ -56,95 +181,7 @@ export const jettonBalancesExecutor: ToolExecutor<JettonBalancesParams> = async 
     }
 
     const data = await response.json();
-    const balances: JettonBalance[] = [];
-
-    // Parse each jetton balance
-    for (const item of data.balances || []) {
-      const { balance, wallet_address, jetton } = item;
-
-      // Skip blacklisted/scam tokens
-      if (jetton.verification === "blacklist") {
-        continue;
-      }
-
-      // Convert balance from blockchain units to human-readable
-      const decimals = jetton.decimals || 9;
-      const rawBalance = BigInt(balance);
-      const divisor = BigInt(10 ** decimals);
-      const wholePart = rawBalance / divisor;
-      const fractionalPart = rawBalance % divisor;
-
-      // Format balance with decimals
-      const formattedBalance =
-        fractionalPart === BigInt(0)
-          ? wholePart.toString()
-          : `${wholePart}.${fractionalPart.toString().padStart(decimals, "0").replace(/0+$/, "")}`;
-
-      balances.push({
-        symbol: jetton.symbol || "UNKNOWN",
-        name: jetton.name || "Unknown Token",
-        balance: formattedBalance,
-        rawBalance: balance,
-        decimals,
-        jettonAddress: jetton.address,
-        walletAddress: wallet_address.address,
-        verification: jetton.verification || "none",
-        score: jetton.score || 0,
-        image: jetton.image,
-      });
-    }
-
-    // Sort by verification score (whitelisted first, then by score)
-    balances.sort((a, b) => {
-      if (a.verification === "whitelist" && b.verification !== "whitelist") return -1;
-      if (a.verification !== "whitelist" && b.verification === "whitelist") return 1;
-      return b.score - a.score;
-    });
-
-    // Build summary message
-    const totalJettons = balances.length;
-    const whitelisted = balances.filter((b) => b.verification === "whitelist").length;
-
-    let message = `You own ${totalJettons} jetton${totalJettons !== 1 ? "s" : ""}`;
-    if (whitelisted > 0) {
-      message += ` (${whitelisted} verified)`;
-    }
-
-    if (totalJettons === 0) {
-      message = "You don't own any jettons yet.";
-    } else {
-      message += ":\n\n";
-      balances.forEach((b) => {
-        const verifiedIcon = b.verification === "whitelist" ? "✅" : "";
-        message += `${verifiedIcon} ${b.symbol}: ${b.balance}\n`;
-        message += `   ${b.name}\n`;
-        if (b.verification !== "whitelist" && b.verification !== "none") {
-          message += `   ⚠️ ${b.verification}\n`;
-        }
-      });
-    }
-
-    // Build compact summary for truncation/masking
-    let summary = `${totalJettons} jetton${totalJettons !== 1 ? "s" : ""}`;
-    if (whitelisted > 0) {
-      summary += ` (${whitelisted} verified)`;
-    }
-    if (totalJettons > 0) {
-      const topTokens = balances.slice(0, 5).map((b) => `${b.symbol} ${b.balance}`);
-      summary += `: ${topTokens.join(", ")}`;
-      if (balances.length > 5) summary += `, +${balances.length - 5} more`;
-    }
-
-    return {
-      success: true,
-      data: {
-        totalJettons,
-        whitelisted,
-        balances,
-        message,
-        summary,
-      },
-    };
+    return processBalances(data);
   } catch (error) {
     log.error({ err: error }, "Error in jetton_balances");
     return {
