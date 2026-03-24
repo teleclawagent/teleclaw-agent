@@ -192,9 +192,9 @@ export class VerificationPoller {
 
       const botUserId = Number(me.id);
 
-      // Import gift executor
-      const { telegramGetMyGiftsExecutor } =
-        await import("../../agent/tools/telegram/gifts/get-my-gifts.js");
+      // GramJS gift executor removed — stub for bot-only mode
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+      const telegramGetMyGiftsExecutor = async (_p: any, _c: any): Promise<any> => ({ success: false, data: { gifts: [] }, error: "Gift tools unavailable in bot-only mode" });
 
       const toolContext: ToolContext = {
         bridge: this.bridge,

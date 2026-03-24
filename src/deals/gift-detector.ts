@@ -3,7 +3,9 @@
  */
 
 import type { ToolContext } from "../agent/tools/types.js";
-import { telegramGetMyGiftsExecutor } from "../agent/tools/telegram/gifts/get-my-gifts.js";
+// GramJS gift executor removed — stub for bot-only mode
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+const telegramGetMyGiftsExecutor = async (_params: any, _ctx: any) => ({ success: false as const, data: { gifts: [] } as any, error: "Gift detection unavailable in bot-only mode" });
 import type { ReceivedGift } from "./types.js";
 import { DEFAULT_GIFTS_QUERY_LIMIT } from "../constants/limits.js";
 import { createLogger } from "../utils/logger.js";

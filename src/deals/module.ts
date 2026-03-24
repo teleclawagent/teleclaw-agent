@@ -113,9 +113,7 @@ const dealsModule: PluginModule = {
           {
             token: botToken,
             username: botUsername || "deals_bot",
-            apiId: config.telegram.api_id,
-            apiHash: config.telegram.api_hash,
-            gramjsSessionPath: join(TELECLAW_ROOT, "gramjs_bot_session.txt"),
+
           },
           dealsDb,
           botPreMiddleware

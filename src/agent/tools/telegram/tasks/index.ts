@@ -1,11 +1,5 @@
-import {
-  telegramCreateScheduledTaskTool,
-  telegramCreateScheduledTaskExecutor,
-} from "./create-scheduled-task.js";
+// Scheduled tasks required GramJS and have been removed (bot-only mode)
+// TODO: Re-implement using Bot API scheduled messages
 import type { ToolEntry } from "../../types.js";
 
-export { telegramCreateScheduledTaskTool, telegramCreateScheduledTaskExecutor };
-
-export const tools: ToolEntry[] = [
-  { tool: telegramCreateScheduledTaskTool, executor: telegramCreateScheduledTaskExecutor },
-];
+export const tools: ToolEntry[] = [];
