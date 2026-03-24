@@ -11,6 +11,7 @@ import { MessageHandler } from "./telegram/handlers.js";
 import { AdminHandler } from "./telegram/admin.js";
 import { MessageDebouncer } from "./telegram/debounce.js";
 import { ProviderWizard } from "./telegram/provider-wizard.js";
+import { MarketappWizard } from "./telegram/marketapp-wizard.js";
 import { getDatabase, closeDatabase, initializeMemory, type MemorySystem } from "./memory/index.js";
 import { getWalletAddress } from "./ton/wallet-service.js";
 import { setTonapiKey } from "./constants/api-endpoints.js";
@@ -75,6 +76,7 @@ export class TeleclawApp {
   private pluginWatcher: PluginWatcher | null = null;
   private mcpConnections: McpConnection[] = [];
   private providerWizard: ProviderWizard | null = null;
+  private marketappWizard: MarketappWizard | null = null;
   private callbackHandlerRegistered = false;
   private messageHandlersRegistered = false;
   private lifecycle = new AgentLifecycle();
@@ -169,6 +171,7 @@ export class TeleclawApp {
 
     // Provider wizard for multi-model management
     this.providerWizard = new ProviderWizard(this.bridge, getDatabase().getDb());
+    this.marketappWizard = new MarketappWizard(this.bridge, getDatabase().getDb());
   }
 
   /**
@@ -821,7 +824,8 @@ export class TeleclawApp {
                   `/ping — Check if agent is alive\n\n` +
                   `🔐 **Wallet & OTC**\n` +
                   `/verify — Verify your TON wallet (0.01 TON)\n` +
-                  `/otc — OTC Matchmaker info\n\n` +
+                  `/otc — OTC Matchmaker info\n` +
+                  `/marketapp — Connect Marketapp API\n\n` +
                   `🔌 **AI Provider**\n` +
                   `/addprovider — Add a new AI provider\n` +
                   `/models — Switch AI model\n` +
@@ -959,6 +963,14 @@ export class TeleclawApp {
               });
               return;
             }
+            if (this.marketappWizard?.cancelWizard(message.senderId)) {
+              await this.bridge.sendMessage({
+                chatId: message.chatId,
+                text: "❌ Wizard cancelled.",
+                replyToId: message.id,
+              });
+              return;
+            }
           }
         }
 
@@ -979,6 +991,12 @@ export class TeleclawApp {
               replyToId: message.id,
             });
           }
+          return;
+        }
+
+        // /marketapp — Marketapp API integration
+        if (userCmd.command === "marketapp" && this.marketappWizard) {
+          await this.marketappWizard.handleMarketapp(message.chatId, message.senderId, message.id);
           return;
         }
 
@@ -1063,6 +1081,16 @@ export class TeleclawApp {
         const handled = await this.providerWizard.handleTextMessage(
           message.chatId,
           message.senderId,
+          message.text
+        );
+        if (handled) return;
+      }
+
+      // Intercept text messages during Marketapp wizard (token input)
+      if (this.marketappWizard && this.marketappWizard.hasActiveWizard(message.senderId)) {
+        const handled = await this.marketappWizard.interceptText(
+          message.senderId,
+          message.chatId,
           message.text
         );
         if (handled) return;
@@ -1369,6 +1397,12 @@ export class TeleclawApp {
         // Provider wizard callbacks (pw:, ms:, rp:)
         if (this.providerWizard) {
           const handled = await this.providerWizard.handleCallback(cbEvent);
+          if (handled) return;
+        }
+
+        // Marketapp wizard callbacks (ma:)
+        if (this.marketappWizard) {
+          const handled = await this.marketappWizard.handleCallback(cbEvent);
           if (handled) return;
         }
 
