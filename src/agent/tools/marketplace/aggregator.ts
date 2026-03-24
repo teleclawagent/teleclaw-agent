@@ -19,7 +19,7 @@ import type {
 import { getMarketplacesForAsset } from "./types.js";
 import { fragmentAdapter } from "./adapters/fragment-adapter.js";
 import { getgemsAdapter } from "./adapters/getgems-adapter.js";
-import { marketAppAdapter } from "./adapters/marketapp-adapter.js";
+import { marketAppAdapter, setMarketappToken } from "./adapters/marketapp-adapter.js";
 import { tonnelAdapter } from "./adapters/tonnel-adapter.js";
 import { portalsAdapter } from "./adapters/portals-adapter.js";
 import { mrktAdapter } from "./adapters/mrkt-adapter.js";
@@ -52,6 +52,14 @@ function getAdaptersForAsset(assetKind: AssetKind): MarketplaceAdapter[] {
 // ─── Aggregated Search ───────────────────────────────────────────────
 
 const SEARCH_TIMEOUT_MS = 8000; // 8s per marketplace max
+
+/**
+ * Configure Marketapp API token for the adapter.
+ * Call this when a user's token is available from user_settings.
+ */
+export function configureMarketappToken(token: string | null): void {
+  setMarketappToken(token);
+}
 
 /**
  * Search across all marketplaces for a given asset type.

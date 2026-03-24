@@ -9,6 +9,7 @@ import { readOffset, writeOffset } from "./offset-store.js";
 import { PendingHistory } from "../memory/pending-history.js";
 import type { ToolContext } from "../agent/tools/types.js";
 import { TELEGRAM_SEND_TOOLS } from "../constants/tools.js";
+import { configureMarketappToken } from "../agent/tools/marketplace/aggregator.js";
 // GramJS transcribe removed — stub for bot-only mode
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const telegramTranscribeAudioExecutor = async (_params: any, _ctx: any) => ({
@@ -417,6 +418,16 @@ export class MessageHandler {
             } catch (err) {
               log.warn({ err }, `Failed to auto-transcribe voice message ${message.id}`);
             }
+          }
+
+          // 5.5 Set Marketapp token for marketplace tools (if user has one)
+          try {
+            const maRow = this.db
+              .prepare("SELECT marketapp_token FROM user_settings WHERE user_id = ?")
+              .get(message.senderId) as { marketapp_token: string | null } | undefined;
+            configureMarketappToken(maRow?.marketapp_token ?? null);
+          } catch {
+            // Column may not exist yet — ignore
           }
 
           // 6. Build tool context
