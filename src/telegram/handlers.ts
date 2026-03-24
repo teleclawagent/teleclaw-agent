@@ -515,9 +515,21 @@ export class MessageHandler {
         // Send user-facing error message so the user isn't left hanging
         try {
           const errMsg = error instanceof Error ? error.message : String(error);
-          const userMessage = errMsg.includes("rate limit")
-            ? "⚠️ I hit an API rate limit. Give me a moment and try again."
-            : "⚠️ Something went wrong processing your message. Please try again.";
+          const errLower = errMsg.toLowerCase();
+          let userMessage: string;
+          if (errLower.includes("rate limit") || errLower.includes("429") || errLower.includes("too many requests") || errLower.includes("rate_limit")) {
+            userMessage = "⚠️ Hit an API rate limit — your AI provider is throttling requests. Wait a minute and try again, or switch to a different model with /models.";
+          } else if (errLower.includes("overloaded") || errLower.includes("capacity") || errLower.includes("503")) {
+            userMessage = "⚠️ AI provider is overloaded right now. Try again in a moment, or switch models with /models.";
+          } else if (errLower.includes("401") || errLower.includes("unauthorized") || errLower.includes("invalid api key") || errLower.includes("authentication")) {
+            userMessage = "⚠️ API key issue — your AI provider rejected the request. Check your API key with /mysettings or switch providers with /addprovider.";
+          } else if (errLower.includes("insufficient") || errLower.includes("quota") || errLower.includes("billing") || errLower.includes("402")) {
+            userMessage = "⚠️ API quota exceeded or billing issue. Check your provider account, or switch to a free model with /models.";
+          } else if (errLower.includes("timeout") || errLower.includes("timed out") || errLower.includes("econnreset")) {
+            userMessage = "⚠️ Request timed out — the AI provider took too long. Try again.";
+          } else {
+            userMessage = "⚠️ Something went wrong processing your message. Try again, or switch models with /models if the issue persists.";
+          }
           await this.bridge.sendMessage({
             chatId: message.chatId,
             text: userMessage,
