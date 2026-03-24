@@ -899,7 +899,7 @@ export class TeleclawApp {
                   `/removeprovider — Remove custom settings\n\n` +
                   `⚙️ **Settings**\n` +
                   `/apikey — Set your own LLM API key\n` +
-                  `/mymodel — Set your preferred model\n` +
+                  `/models — Switch AI model\n` +
                   `/mysettings — View your settings\n\n` +
                   `💡 You can also just chat naturally — ask about gifts, prices, usernames, or anything TON & Telegram related.`
               );
@@ -1004,12 +1004,8 @@ export class TeleclawApp {
           }
         }
 
-        // /apikey, /mymodel, /mysettings — user settings
-        if (
-          userCmd.command === "apikey" ||
-          userCmd.command === "mymodel" ||
-          userCmd.command === "mysettings"
-        ) {
+        // /apikey, /mysettings — user settings
+        if (userCmd.command === "apikey" || userCmd.command === "mysettings") {
           const response = await this.handleUserSettingsCommand(
             userCmd.command,
             userCmd.args,

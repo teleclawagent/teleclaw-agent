@@ -46,7 +46,7 @@ export class BotBridge implements TelegramTransport {
         { command: "models", description: "Switch AI model" },
         { command: "removeprovider", description: "Remove custom AI settings" },
         { command: "apikey", description: "Set your own LLM API key" },
-        { command: "mymodel", description: "Set your preferred model" },
+
         { command: "mysettings", description: "View your settings" },
       ]);
       // Register admin-only commands separately

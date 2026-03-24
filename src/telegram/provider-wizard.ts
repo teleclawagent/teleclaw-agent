@@ -18,9 +18,10 @@ import {
 import {
   validateApiKeyFormat,
   getProviderMetadata,
+  PROVIDER_REGISTRY,
   type SupportedProvider,
 } from "../config/providers.js";
-import { getModelsForProvider } from "../config/model-catalog.js";
+import { getModelsForProvider, MODEL_OPTIONS } from "../config/model-catalog.js";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -111,35 +112,55 @@ export class ProviderWizard {
     const currentProvider = settings?.provider || globalProvider || "anthropic";
     const currentModel = settings?.model || globalModel || "default";
 
-    // Collect all configured providers: global + user custom (if different)
-    const configuredProviders: Array<{
-      provider: string;
-      catalogKey: string;
-    }> = [];
+    // Detect ALL active providers:
+    // 1. Global config provider (always)
+    // 2. User's custom provider from user_settings
+    // 3. Any provider with a configured env var API key
+    const activeProviders = new Set<string>();
 
     const globalProv = globalProvider || "anthropic";
-    const globalCatalogKey = globalProv === "claude-code" ? "anthropic" : globalProv;
-    configuredProviders.push({ provider: globalProv, catalogKey: globalCatalogKey });
+    activeProviders.add(globalProv === "claude-code" ? "anthropic" : globalProv);
 
-    // User's custom provider (if different from global)
-    if (settings?.provider && settings.provider !== globalProv) {
-      const userCatalogKey = settings.provider === "claude-code" ? "anthropic" : settings.provider;
-      configuredProviders.push({ provider: settings.provider, catalogKey: userCatalogKey });
+    if (settings?.provider) {
+      const key = settings.provider === "claude-code" ? "anthropic" : settings.provider;
+      activeProviders.add(key);
+    }
+
+    // Check env vars for all known providers
+    for (const [id, meta] of Object.entries(PROVIDER_REGISTRY)) {
+      if (id === "claude-code" || id === "custom" || id === "local") continue;
+      if (meta.envVar && process.env[meta.envVar]) {
+        const catalogKey = id;
+        if (MODEL_OPTIONS[catalogKey]?.length) {
+          activeProviders.add(id);
+        }
+      }
+    }
+
+    // Detect openai-codex (ChatGPT sub) via Codex CLI
+    try {
+      const { isCodexOAuthConfigured } = await import("../providers/openai-codex-oauth.js");
+      if (isCodexOAuthConfigured()) {
+        activeProviders.add("openai-codex");
+      }
+    } catch {
+      /* not installed */
     }
 
     const rows: InlineButton[][] = [];
     let hasModels = false;
 
-    for (const entry of configuredProviders) {
-      const models = getModelsForProvider(entry.catalogKey);
+    for (const provId of activeProviders) {
+      const catalogKey = provId === "claude-code" ? "anthropic" : provId;
+      const models = getModelsForProvider(catalogKey);
       if (models.length === 0) continue;
       hasModels = true;
 
       let meta: { displayName: string };
       try {
-        meta = getProviderMetadata(entry.provider as SupportedProvider);
+        meta = getProviderMetadata(provId as SupportedProvider);
       } catch {
-        meta = { displayName: entry.provider };
+        meta = { displayName: provId };
       }
 
       // Section header
@@ -152,7 +173,7 @@ export class ProviderWizard {
           currentRow = [];
         }
         const marker = model.value === currentModel ? "✅ " : "";
-        const cbData = `ms:s:${entry.provider}:${model.value.slice(0, 40)}`;
+        const cbData = `ms:s:${provId}:${model.value.slice(0, 40)}`;
         currentRow.push({ text: `${marker}${model.name}`, callback_data: cbData });
       }
       if (currentRow.length > 0) rows.push(currentRow);
@@ -164,13 +185,12 @@ export class ProviderWizard {
         text:
           `🧠 **Model Switcher**\n\n` +
           `Current: **${currentProvider}** / **${currentModel}**\n\n` +
-          `No model catalog available.\nUse \`/mymodel <model-name>\` to set manually.`,
+          `No models available. Use /addprovider to set up a provider.`,
         replyToId,
       });
       return;
     }
 
-    // Add provider setup button at bottom
     rows.push([{ text: "➕ Add Provider", callback_data: "ms:addprov" }]);
 
     let currentMeta: { displayName: string };
