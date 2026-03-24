@@ -1122,26 +1122,50 @@ export class TeleclawApp {
     const db = getDatabase().getDb();
 
     if (command === "mysettings") {
-      const settings = getSettings(db, senderId);
+      const globalProvider = this.config.agent.provider || "anthropic";
+      const globalModel = this.config.agent.model || "unknown";
+
+      let settings: ReturnType<typeof getSettings> = null;
+      try {
+        settings = getSettings(db, senderId);
+      } catch (err) {
+        log.error({ err }, "Failed to read user settings");
+        return (
+          "⚙️ **Your Settings**\n\n" +
+          `⚠️ Error reading settings (encryption key mismatch?)\n\n` +
+          `Bot defaults: **${globalProvider}** / **${globalModel}**\n\n` +
+          "Use /apikey clear to reset, then reconfigure."
+        );
+      }
+
       if (!settings) {
         return (
           "⚙️ **Your Settings**\n\n" +
-          "No custom settings — using bot defaults.\n\n" +
+          `Using bot defaults: **${globalProvider}** / **${globalModel}**\n\n` +
           "Commands:\n" +
-          "/apikey <provider> <key> — Set your LLM API key\n" +
-          "/mymodel <model> — Set preferred model\n" +
-          "/apikey clear — Remove custom settings"
+          "/addprovider — Set up a new AI provider\n" +
+          "/models — Switch AI model\n" +
+          "/apikey <provider> <key> — Set API key manually\n" +
+          "/mymodel <model> — Set preferred model"
         );
       }
+
+      const effectiveProvider = settings.provider || globalProvider;
+      const effectiveModel = settings.model || globalModel;
+      const keyDisplay = settings.apiKey
+        ? `${"•".repeat(8)}${settings.apiKey.slice(-4)}`
+        : "(auto/none)";
+
       return (
         "⚙️ **Your Settings**\n\n" +
-        `Provider: **${settings.provider || "default"}**\n` +
-        `Model: **${settings.model || "default"}**\n` +
-        `API Key: **${"•".repeat(8)}${settings.apiKey?.slice(-4) || "none"}**\n\n` +
+        `🧠 Provider: **${effectiveProvider}**\n` +
+        `🤖 Model: **${effectiveModel}**\n` +
+        `🔑 API Key: **${keyDisplay}**\n\n` +
+        `📌 Bot defaults: ${globalProvider} / ${globalModel}\n\n` +
         "Commands:\n" +
-        "/apikey <provider> <key> — Change provider\n" +
-        "/mymodel <model> — Change model\n" +
-        "/apikey clear — Remove custom settings"
+        "/addprovider — Change provider\n" +
+        "/models — Switch model\n" +
+        "/removeprovider — Reset to defaults"
       );
     }
 

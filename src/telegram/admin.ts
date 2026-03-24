@@ -210,22 +210,49 @@ export class AdminHandler {
     }
   }
 
-  private async handleStatusCommand(_command: AdminCommand): Promise<string> {
+  private async handleStatusCommand(command: AdminCommand): Promise<string> {
     const activeChatIds = this.agent.getActiveChatIds();
     const chatCount = activeChatIds.length;
     const cfg = this.agent.getConfig();
 
+    // Show per-user effective config if available
+    let effectiveProvider: string = cfg.agent.provider;
+    let effectiveModel: string = cfg.agent.model;
+    let isCustom = false;
+    try {
+      const { getUserSettings } = await import("../session/user-settings.js");
+      const { getDatabase } = await import("../memory/database.js");
+      const db = getDatabase().getDb();
+      const settings = getUserSettings(db, command.senderId);
+      if (settings) {
+        if (settings.provider) {
+          effectiveProvider = settings.provider;
+          isCustom = true;
+        }
+        if (settings.model) {
+          effectiveModel = settings.model;
+          isCustom = true;
+        }
+      }
+    } catch {
+      /* fallback to global */
+    }
+
     let status = "🤖 **Teleclaw Status**\n\n";
     status += `${this.paused ? "⏸️ **PAUSED**\n" : ""}`;
     status += `💬 Active conversations: ${chatCount}\n`;
-    status += `🧠 Provider: ${cfg.agent.provider}\n`;
-    status += `🤖 Model: ${cfg.agent.model}\n`;
+    status += `🧠 Provider: ${effectiveProvider}${isCustom ? " (custom)" : ""}\n`;
+    status += `🤖 Model: ${effectiveModel}${isCustom ? " (custom)" : ""}\n`;
     status += `🔄 Max iterations: ${cfg.agent.max_agentic_iterations}\n`;
     status += `📬 DM policy: ${this.config.dm_policy}\n`;
     status += `👥 Group policy: ${this.config.group_policy}\n`;
 
     if (this.config.require_mention) {
       status += `🔔 Mention required: Yes\n`;
+    }
+
+    if (isCustom) {
+      status += `\n📌 _Default: ${cfg.agent.provider}/${cfg.agent.model}_`;
     }
 
     return status;

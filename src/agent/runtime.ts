@@ -509,6 +509,8 @@ export class AgentRuntime {
         toolCapabilities = lines.join("\n");
       }
 
+      // Use per-user effective config for model info in system prompt
+      const effectiveForPrompt = this.getEffectiveAgentConfig(toolContext?.senderId);
       const systemPrompt = buildSystemPrompt({
         soul: this.soul,
         userName,
@@ -520,7 +522,7 @@ export class AgentRuntime {
         includeMemory: !effectiveIsGroup,
         includeStrategy: !effectiveIsGroup,
         memoryFlushWarning: needsMemoryFlush,
-        modelInfo: `${this.config.agent.provider || "anthropic"}/${this.config.agent.model}`,
+        modelInfo: `${effectiveForPrompt.provider || "anthropic"}/${effectiveForPrompt.model}`,
         toolCapabilities,
       });
 

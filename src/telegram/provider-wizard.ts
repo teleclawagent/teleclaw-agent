@@ -146,8 +146,21 @@ export class ProviderWizard {
     }
     if (currentRow.length > 0) rows.push(currentRow);
 
+    // Show quick-switch to global default provider if user is on a custom provider
+    const effectiveGlobalProvider = globalProvider || "anthropic";
+    const effectiveGlobalModel = globalModel || "default";
+    if (currentProvider !== effectiveGlobalProvider) {
+      const globalMeta = getProviderMetadata(effectiveGlobalProvider as SupportedProvider);
+      rows.push([
+        {
+          text: `🔄 Switch to ${globalMeta.displayName} (${effectiveGlobalModel})`,
+          callback_data: `ms:reset`,
+        },
+      ]);
+    }
+
     // Add "Other providers" button at bottom
-    rows.push([{ text: "🔄 Other Providers", callback_data: "ms:all" }]);
+    rows.push([{ text: "🌐 Other Providers", callback_data: "ms:all" }]);
 
     await this.bridge.sendMessage({
       chatId,
@@ -584,6 +597,18 @@ export class ProviderWizard {
         text: `✅ Switched to **${meta.displayName}** / **${modelId}**`,
       });
       await this.bridge.answerCallbackQuery(queryId, { message: `✅ Switched to ${modelId}` });
+      return;
+    }
+
+    // ms:reset — clear user settings, revert to bot defaults
+    if (data === "reset") {
+      clearUserSettings(this.db, userId);
+      await this.bridge.editMessage({
+        chatId,
+        messageId,
+        text: `✅ Switched back to bot defaults. Use /models to see available models.`,
+      });
+      await this.bridge.answerCallbackQuery(queryId, { message: "✅ Using bot defaults" });
       return;
     }
 
