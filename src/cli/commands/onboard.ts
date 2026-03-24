@@ -1062,9 +1062,6 @@ async function runInteractiveOnboarding(
     },
     telegram: {
       mode: "bot" as const,
-      api_id: 0,
-      api_hash: "",
-      phone: "",
       session_name: "teleclaw_session",
       session_path: workspace.sessionPath,
       dm_policy: dmPolicy,
@@ -1320,9 +1317,6 @@ async function runNonInteractiveOnboarding(
     },
     telegram: {
       mode: "bot" as const,
-      api_id: 0,
-      api_hash: "",
-      phone: "",
       session_name: "teleclaw_session",
       session_path: workspace.sessionPath,
       dm_policy: "admin-only",

@@ -9,7 +9,9 @@ import { readOffset, writeOffset } from "./offset-store.js";
 import { PendingHistory } from "../memory/pending-history.js";
 import type { ToolContext } from "../agent/tools/types.js";
 import { TELEGRAM_SEND_TOOLS } from "../constants/tools.js";
-import { telegramTranscribeAudioExecutor } from "../agent/tools/telegram/media/transcribe-audio.js";
+// GramJS transcribe removed — stub for bot-only mode
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+const telegramTranscribeAudioExecutor = async (_params: any, _ctx: any) => ({ success: false as const, data: undefined, error: "Voice transcription unavailable in bot-only mode" });
 import { TYPING_REFRESH_MS } from "../constants/timeouts.js";
 import { createLogger } from "../utils/logger.js";
 import type { MatchmakerAPIClient } from "../agent/tools/fragment/matchmaker-api.js";

@@ -34,7 +34,7 @@ export class ToolRegistry {
   private pluginToolNames: Map<string, string[]> = new Map();
   private toolIndex: ToolIndex | null = null;
   private onToolsChangedCallbacks: Array<(removed: string[], added: PiAiTool[]) => void> = [];
-  private isBotMode = false;
+
 
   register<TParams = unknown>(
     tool: Tool,
@@ -52,9 +52,7 @@ export class ToolRegistry {
     this.toolArrayCache = null;
   }
 
-  setBotMode(enabled: boolean): void {
-    this.isBotMode = enabled;
-  }
+
 
   setPermissions(mp: ModulePermissions): void {
     this.permissions = mp;
@@ -209,8 +207,7 @@ export class ToolRegistry {
         const effectiveScope = this.getEffectiveScope(rt.tool.name);
         if (effectiveScope === excluded) return false;
         if (effectiveScope === "admin-only" && !isAdmin) return false;
-        // Filter out userbot-only tools when in bot mode
-        if (effectiveScope === "userbot-only" && this.isBotMode) return false;
+
 
         if (isGroup && chatId && this.permissions) {
           const module = this.toolModules.get(rt.tool.name);

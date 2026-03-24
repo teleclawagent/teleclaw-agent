@@ -68,21 +68,7 @@ export function loadConfig(configPath: string = DEFAULT_CONFIG_PATH): Config {
   if (process.env.TELECLAW_API_KEY) {
     config.agent.api_key = process.env.TELECLAW_API_KEY;
   }
-  if (process.env.TELECLAW_TG_API_ID) {
-    const apiId = parseInt(process.env.TELECLAW_TG_API_ID, 10);
-    if (isNaN(apiId)) {
-      throw new Error(
-        `Invalid TELECLAW_TG_API_ID environment variable: "${process.env.TELECLAW_TG_API_ID}" is not a valid integer`
-      );
-    }
-    config.telegram.api_id = apiId;
-  }
-  if (process.env.TELECLAW_TG_API_HASH) {
-    config.telegram.api_hash = process.env.TELECLAW_TG_API_HASH;
-  }
-  if (process.env.TELECLAW_TG_PHONE) {
-    config.telegram.phone = process.env.TELECLAW_TG_PHONE;
-  }
+  // GramJS env vars removed — bot-only mode
 
   // WebUI environment variable overrides
   if (process.env.TELECLAW_WEBUI_ENABLED) {

@@ -1,10 +1,10 @@
-import type { Api } from "telegram";
+// GramJS removed — bot-only mode
 import type { PluginMessageEvent, PluginCallbackEvent } from "@teleclaw-agent/sdk";
 import { loadConfig, getDefaultConfigPath } from "./config/index.js";
 import { ensureAndLoadEnv } from "./config/env.js";
 import { loadSoul } from "./soul/index.js";
 import { AgentRuntime } from "./agent/runtime.js";
-import { TelegramBridge, type TelegramMessage } from "./telegram/bridge.js";
+import { type TelegramMessage } from "./telegram/bridge.js";
 import { BotBridge } from "./telegram/bot-bridge.js";
 import type { TelegramTransport, CallbackQueryEvent } from "./telegram/transport.js";
 import { MessageHandler } from "./telegram/handlers.js";
@@ -107,33 +107,13 @@ export class TeleclawApp {
 
     this.agent = new AgentRuntime(this.config, soul, this.toolRegistry);
 
-    // Create transport based on mode: 'bot' (Bot API) or 'userbot' (GramJS MTProto)
-    const telegramMode = this.config.telegram.mode || "bot";
-
-    // Filter out userbot-only tools when in bot mode
-    if (telegramMode === "bot") {
-      this.toolRegistry.setBotMode(true);
-    }
+    // Bot API only
     const botToken = this.config.telegram.bot_token;
-
-    if (telegramMode === "bot") {
-      if (!botToken) {
-        throw new Error("telegram.bot_token is required when telegram.mode = 'bot'");
-      }
-      this.bridge = new BotBridge({ token: botToken });
-      log.info("🤖 Mode: Bot API (grammY)");
-    } else {
-      this.bridge = new TelegramBridge({
-        apiId: this.config.telegram.api_id,
-        apiHash: this.config.telegram.api_hash,
-        phone: this.config.telegram.phone,
-        sessionPath: join(TELECLAW_ROOT, "telegram_session.txt"),
-        connectionRetries: TELEGRAM_CONNECTION_RETRIES,
-        autoReconnect: true,
-        floodSleepThreshold: TELEGRAM_FLOOD_SLEEP_THRESHOLD,
-      });
-      log.info("👤 Mode: Userbot (GramJS MTProto)");
+    if (!botToken) {
+      throw new Error("telegram.bot_token is required");
     }
+    this.bridge = new BotBridge({ token: botToken });
+    log.info("🤖 Mode: Bot API (grammY)");
 
     const embeddingProvider = this.config.embedding.provider;
     this.memory = initializeMemory({
@@ -761,56 +741,10 @@ export class TeleclawApp {
         return;
       }
 
-      // getEntity is optional (only userbot mode)
-      if (!this.bridge.getEntity) {
-        log.info(
-          "Skipping owner resolution (Bot API mode — set owner_name/owner_username in config)"
-        );
-        return;
-      }
-
-      const entity = await this.bridge.getEntity(String(this.config.telegram.owner_id));
-
-      // Check that the entity is a User (has firstName)
-      if (!entity || typeof entity !== "object" || !("firstName" in entity)) {
-        return;
-      }
-
-      const user = entity as Api.User;
-      const firstName = user.firstName || "";
-      const lastName = user.lastName || "";
-      const fullName = lastName ? `${firstName} ${lastName}` : firstName;
-      const username = user.username || "";
-
-      let updated = false;
-
-      if (!this.config.telegram.owner_name && fullName) {
-        this.config.telegram.owner_name = fullName;
-        updated = true;
-      }
-
-      if (!this.config.telegram.owner_username && username) {
-        this.config.telegram.owner_username = username;
-        updated = true;
-      }
-
-      if (updated) {
-        // Persist to disk
-        const raw = readRawConfig(this.configPath);
-        if (this.config.telegram.owner_name) {
-          setNestedValue(raw, "telegram.owner_name", this.config.telegram.owner_name);
-        }
-        if (this.config.telegram.owner_username) {
-          setNestedValue(raw, "telegram.owner_username", this.config.telegram.owner_username);
-        }
-        writeRawConfig(raw, this.configPath);
-
-        const displayName = this.config.telegram.owner_name || "Unknown";
-        const displayUsername = this.config.telegram.owner_username
-          ? ` (@${this.config.telegram.owner_username})`
-          : "";
-        log.info(`👤 Owner resolved: ${displayName}${displayUsername}`);
-      }
+      // Bot API mode — owner name/username must be set in config manually
+      log.info(
+        "Owner resolution skipped (Bot API mode — set owner_name/owner_username in config)"
+      );
     } catch (error) {
       log.warn(
         `⚠️ Could not resolve owner info: ${error instanceof Error ? error.message : error}`
