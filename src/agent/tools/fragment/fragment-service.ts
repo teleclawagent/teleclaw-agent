@@ -521,10 +521,29 @@ export async function estimateValue(username: string): Promise<{
   // Get market data for comparisons
   const soldHistory = await fetchSoldHistory(100);
 
-  // Find comparable sales (same length ±1)
+  // Classify the username quality
+  const isReadableWord = /^[a-z]+$/.test(clean) && clean.length >= 3;
+  const isNumeric = /^\d+$/.test(clean);
+  const isMixed = /[a-z]/.test(clean) && /\d/.test(clean); // e.g. "hvvtb13"
+  const isGibberish =
+    !isReadableWord && !isNumeric && !isMixed
+      ? true
+      : isMixed && !/^[a-z]+\d+$/.test(clean) && !/^\d+[a-z]+$/.test(clean); // random mix like "hvvtb13"
+
+  // Find comparable sales — match by length AND quality tier
   const comparables = soldHistory.filter((s) => {
-    const sLen = s.username.replace(/^@/, "").length;
-    return Math.abs(sLen - len) <= 1;
+    const sClean = s.username.replace(/^@/, "").toLowerCase();
+    const sLen = sClean.length;
+    if (Math.abs(sLen - len) > 1) return false;
+
+    // Don't compare gibberish usernames against dictionary words
+    const sIsReadable = /^[a-z]+$/.test(sClean);
+    const sIsNumeric = /^\d+$/.test(sClean);
+    if (isGibberish && sIsReadable) return false; // Don't compare "hvvtb13" against "casino"
+    if (isNumeric && !sIsNumeric) return false; // Don't compare "88888" against "hello"
+    if (isReadableWord && !sIsReadable && !sIsNumeric) return false;
+
+    return true;
   });
 
   const factors: string[] = [];
@@ -632,6 +651,12 @@ export async function estimateValue(username: string): Promise<{
     }
   }
 
+  // Gibberish/random string penalty
+  if (isGibberish || (isMixed && !isWord)) {
+    multiplier *= 0.3; // Heavy discount for random strings
+    factors.push("⚠️ Random/gibberish string — very low demand");
+  }
+
   // Base price from comparables (use MEDIAN, not average — avoids outlier skew)
   let basePrice: number;
   if (comparables.length > 0) {
@@ -641,17 +666,23 @@ export async function estimateValue(username: string): Promise<{
       sorted.length % 2 === 0 ? (sorted[midIdx - 1] + sorted[midIdx]) / 2 : sorted[midIdx];
   } else {
     // Conservative defaults when no comparables
-    basePrice = len <= 3 ? 50 : len === 4 ? 20 : len === 5 ? 8 : len <= 7 ? 3 : 1;
+    if (isGibberish || isMixed) {
+      // Random strings: near-zero value
+      basePrice = len <= 5 ? 2 : 1;
+    } else {
+      basePrice = len <= 3 ? 50 : len === 4 ? 20 : len === 5 ? 8 : len <= 7 ? 3 : 1;
+    }
   }
 
   const mid = Math.round(basePrice * multiplier);
-  // Hard cap: no username is worth more than 50K TON without strong comparables
-  const cappedMid = comparables.length >= 5 ? mid : Math.min(mid, 50000);
+  // Hard caps based on quality
+  const maxCap = isGibberish ? 50 : comparables.length >= 5 ? Infinity : 50000;
+  const cappedMid = Math.min(mid, maxCap);
   const low = Math.round(cappedMid * 0.5);
   const high = Math.round(cappedMid * 2.0);
 
   if (cappedMid < mid) {
-    factors.push("⚠️ Capped — low comparable data, estimate may be unreliable");
+    factors.push("⚠️ Capped — low comparable data or low-demand pattern");
   }
 
   const confidence: "low" | "medium" | "high" =

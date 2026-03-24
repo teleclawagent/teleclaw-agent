@@ -159,11 +159,30 @@ export const jettonBalancesExecutor: ToolExecutor<JettonBalancesParams> = async 
                   const metaData = await metaRes.json();
                   const content = metaData.jetton_masters?.[0]?.jetton_content;
                   if (content) {
-                    // On-chain metadata
-                    symbol = content.symbol || symbol;
-                    name = content.name || name;
-                    decimals = content.decimals ? Number(content.decimals) : decimals;
-                    image = content.image || content.image_data;
+                    if (content.symbol) {
+                      // On-chain metadata directly available
+                      symbol = content.symbol;
+                      name = content.name || name;
+                      decimals = content.decimals ? Number(content.decimals) : decimals;
+                      image = content.image || content.image_data;
+                    } else if (content.uri) {
+                      // Off-chain metadata — fetch the URI
+                      try {
+                        const uriRes = await fetch(content.uri, {
+                          headers: { Accept: "application/json" },
+                          signal: AbortSignal.timeout(5000),
+                        });
+                        if (uriRes.ok) {
+                          const offChain = await uriRes.json();
+                          symbol = offChain.symbol || symbol;
+                          name = offChain.name || name;
+                          decimals = offChain.decimals ? Number(offChain.decimals) : decimals;
+                          image = offChain.image || offChain.image_data;
+                        }
+                      } catch {
+                        // Off-chain fetch failed, keep defaults
+                      }
+                    }
                   }
                 }
               } catch {

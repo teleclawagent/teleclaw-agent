@@ -87,10 +87,7 @@ export async function getCollectionNFTs(
 
 // ─── NFT Transfer/Sale History ───────────────────────────────────────
 
-export async function getNFTHistory(
-  nftAddress: string,
-  limit = 20
-): Promise<TonTransferEvent[]> {
+export async function getNFTHistory(nftAddress: string, limit = 20): Promise<TonTransferEvent[]> {
   const cacheKey = `nft-hist:${nftAddress}:${limit}`;
   const cached = getCached<TonTransferEvent[]>(cacheKey);
   if (cached) return cached;
@@ -100,21 +97,22 @@ export async function getNFTHistory(
     if (!res.ok) return [];
     const data = await res.json();
 
-    const events: TonTransferEvent[] = (data.events || []).map((e: any) => {
-      const action = e.actions?.[0];
-      const nftTransfer = action?.NftItemTransfer;
-      const tonTransfer = action?.TonTransfer;
+    const events: TonTransferEvent[] = // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (data.events || []).map((e: any) => {
+        const action = e.actions?.[0];
+        const nftTransfer = action?.NftItemTransfer;
+        const tonTransfer = action?.TonTransfer;
 
-      return {
-        type: action?.type || "unknown",
-        timestamp: e.timestamp,
-        nftAddress,
-        from: nftTransfer?.sender?.address || tonTransfer?.sender?.address,
-        to: nftTransfer?.recipient?.address || tonTransfer?.recipient?.address,
-        priceTon: tonTransfer ? Number(tonTransfer.amount) / 1e9 : undefined,
-        txHash: e.event_id,
-      };
-    });
+        return {
+          type: action?.type || "unknown",
+          timestamp: e.timestamp,
+          nftAddress,
+          from: nftTransfer?.sender?.address || tonTransfer?.sender?.address,
+          to: nftTransfer?.recipient?.address || tonTransfer?.recipient?.address,
+          priceTon: tonTransfer ? Number(tonTransfer.amount) / 1e9 : undefined,
+          txHash: e.event_id,
+        };
+      });
 
     setCache(cacheKey, events);
     return events;
@@ -206,16 +204,40 @@ export async function getTonPriceUsd(): Promise<number> {
     return _tonPriceCache.usd;
   }
 
+  // Try TonAPI first
   try {
     const res = await tonapiFetch("/rates?tokens=ton&currencies=usd");
-    if (!res.ok) return _tonPriceCache?.usd || 0;
-    const data = await res.json();
-    const usd = parseFloat(data.rates?.TON?.prices?.USD || "0");
-    _tonPriceCache = { usd, ts: Date.now() };
-    return usd;
+    if (res.ok) {
+      const data = await res.json();
+      const usd = parseFloat(data.rates?.TON?.prices?.USD || "0");
+      if (usd > 0) {
+        _tonPriceCache = { usd, ts: Date.now() };
+        return usd;
+      }
+    }
   } catch {
-    return _tonPriceCache?.usd || 0;
+    // TonAPI failed, try fallback
   }
+
+  // Fallback: CoinGecko
+  try {
+    const res = await fetch(
+      "https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=usd",
+      { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(5000) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const usd = data?.["the-open-network"]?.usd;
+      if (usd && usd > 0) {
+        _tonPriceCache = { usd, ts: Date.now() };
+        return usd;
+      }
+    }
+  } catch {
+    // CoinGecko also failed
+  }
+
+  return _tonPriceCache?.usd || 0;
 }
 
 // ─── Collection Events (buys/transfers) ──────────────────────────────
@@ -229,26 +251,23 @@ export async function getCollectionEvents(
   if (cached) return cached;
 
   try {
-    const res = await tonapiFetch(
-      `/events?account=${collectionAddress}&limit=${limit}`
-    );
+    const res = await tonapiFetch(`/events?account=${collectionAddress}&limit=${limit}`);
     if (!res.ok) return [];
     const data = await res.json();
 
-    const events: TonTransferEvent[] = (data.events || []).map((e: any) => {
-      const action = e.actions?.[0];
-      return {
-        type: action?.type || "unknown",
-        timestamp: e.timestamp,
-        nftAddress: collectionAddress,
-        from: action?.NftItemTransfer?.sender?.address,
-        to: action?.NftItemTransfer?.recipient?.address,
-        priceTon: action?.TonTransfer
-          ? Number(action.TonTransfer.amount) / 1e9
-          : undefined,
-        txHash: e.event_id,
-      };
-    });
+    const events: TonTransferEvent[] = // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (data.events || []).map((e: any) => {
+        const action = e.actions?.[0];
+        return {
+          type: action?.type || "unknown",
+          timestamp: e.timestamp,
+          nftAddress: collectionAddress,
+          from: action?.NftItemTransfer?.sender?.address,
+          to: action?.NftItemTransfer?.recipient?.address,
+          priceTon: action?.TonTransfer ? Number(action.TonTransfer.amount) / 1e9 : undefined,
+          txHash: e.event_id,
+        };
+      });
 
     setCache(cacheKey, events);
     return events;

@@ -114,6 +114,39 @@ export const dedustPricesExecutor: ToolExecutor<DedustPricesParams> = async (
 
     let prices: PriceEntry[] = await response.json();
 
+    // Check data freshness — DeDust sometimes returns stale data
+    const now = Date.now();
+    const staleThreshold = 24 * 60 * 60 * 1000; // 24 hours
+    const hasStaleData = prices.some((p) => {
+      if (!p.updatedAt) return false;
+      const updated = new Date(p.updatedAt).getTime();
+      return now - updated > staleThreshold;
+    });
+
+    if (hasStaleData) {
+      log.warn("DeDust returned stale data (>24h old), enriching with CoinGecko for TON");
+      // At minimum, get fresh TON price from CoinGecko
+      try {
+        const cgRes = await fetchWithTimeout(
+          "https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=usd",
+          { timeoutMs: 5000 }
+        );
+        if (cgRes.ok) {
+          const cgData = await cgRes.json();
+          const freshTonPrice = cgData?.["the-open-network"]?.usd;
+          if (freshTonPrice) {
+            const tonEntry = prices.find((p) => p.symbol.toUpperCase() === "TON");
+            if (tonEntry) {
+              tonEntry.price = freshTonPrice;
+              tonEntry.updatedAt = new Date().toISOString();
+            }
+          }
+        }
+      } catch {
+        // CoinGecko failed, keep DeDust data as-is
+      }
+    }
+
     // Filter by symbols if provided
     if (symbols && symbols.length > 0) {
       const upper = symbols.map((s) => s.toUpperCase());
@@ -132,6 +165,10 @@ export const dedustPricesExecutor: ToolExecutor<DedustPricesParams> = async (
       message += `${p.symbol}: ${priceStr}\n`;
     }
 
+    if (hasStaleData) {
+      message += `\n⚠️ Some prices may be outdated. TON price refreshed from CoinGecko.`;
+    }
+
     return {
       success: true,
       data: {
@@ -142,6 +179,9 @@ export const dedustPricesExecutor: ToolExecutor<DedustPricesParams> = async (
         })),
         count: prices.length,
         message,
+        staleWarning: hasStaleData
+          ? "Some DeDust prices are >24h old. TON price was refreshed from CoinGecko."
+          : undefined,
       },
     };
   } catch (error) {
