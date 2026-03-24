@@ -110,7 +110,7 @@ OTC Matchmaker features require holding 0.1% of $TELECLAW supply. This keeps the
 ## Links
 
 - **GitHub:** https://github.com/teleclawagent/teleclaw-agent
-- **Telegram:** @ton_cabal
+- **Telegram:** @teleclawtg
 - **X:** @teleclawonton
 
 ## License
