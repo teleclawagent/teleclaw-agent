@@ -174,7 +174,32 @@ export const dedustQuoteExecutor: ToolExecutor<DedustQuoteParams> = async (
         message,
       },
     };
-  } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- DEX API response is untyped
+  } catch (error: any) {
+    const status = error?.status || error?.response?.status;
+    const isTransient =
+      status === 429 ||
+      status === 502 ||
+      status === 503 ||
+      status === 504 ||
+      error?.code === "ETIMEDOUT" ||
+      error?.code === "ECONNRESET";
+
+    if (isTransient) {
+      log.warn({ err: error, status }, "Transient error in dedust_quote, retrying...");
+      try {
+        await new Promise((r) => setTimeout(r, 2000));
+        return await dedustQuoteExecutor(params, _context);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- retry error handling
+      } catch (retryError: any) {
+        log.error({ err: retryError }, "Retry also failed in dedust_quote");
+        return {
+          success: false,
+          error: `Quote failed after retry: ${getErrorMessage(retryError)}. DeDust API may be temporarily down.`,
+        };
+      }
+    }
+
     log.error({ err: error }, "Error in dedust_quote");
     return {
       success: false,

@@ -247,9 +247,32 @@ export const dedustSwapExecutor: ToolExecutor<DedustSwapParams> = async (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- DEX API response is untyped
   } catch (error: any) {
     const status = error?.status || error?.response?.status;
-    if (status === 429 || status >= 500) {
+    const isTransient =
+      status === 429 ||
+      status === 502 ||
+      status === 503 ||
+      status === 504 ||
+      error?.code === "ETIMEDOUT" ||
+      error?.code === "ECONNRESET";
+
+    if (isTransient) {
       invalidateTonClientCache();
+
+      // Auto-retry once on transient errors
+      log.warn({ err: error, status }, "Transient error in dedust_swap, retrying...");
+      try {
+        await new Promise((r) => setTimeout(r, 2000)); // brief backoff
+        return await dedustSwapExecutor(params, _context);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- retry error handling
+      } catch (retryError: any) {
+        log.error({ err: retryError }, "Retry also failed in dedust_swap");
+        return {
+          success: false,
+          error: `Swap failed after retry: ${getErrorMessage(retryError)}. DeDust API may be temporarily down — try again in a minute.`,
+        };
+      }
     }
+
     log.error({ err: error }, "Error in dedust_swap");
     return {
       success: false,
