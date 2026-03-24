@@ -898,6 +898,35 @@ export class TeleclawApp {
           return;
         }
 
+        // /otc — OTC Matchmaker info
+        if (userCmd.command === "otc") {
+          await this.bridge.sendMessage({
+            chatId: message.chatId,
+            text:
+              `🤝 **OTC Matchmaker**\n\n` +
+              `Peer-to-peer trading between Teleclaw users. No middleman, anonymous matching.\n\n` +
+              `**What you can trade:**\n` +
+              `• Telegram usernames\n` +
+              `• Telegram numbers (+888)\n` +
+              `• Gifts (on-chain & off-chain)\n\n` +
+              `**How it works:**\n` +
+              `1. Verify your wallet: /verify\n` +
+              `2. List an item for sale or express buying interest\n` +
+              `3. Teleclaw matches buyers & sellers\n` +
+              `4. Trade directly between parties\n\n` +
+              `**Requirements:**\n` +
+              `• Verified TON wallet (0.01 TON verification fee)\n` +
+              `• Hold 0.1% of $TELECLAW supply\n\n` +
+              `**Commands:** Just ask naturally:\n` +
+              `• "List @username for sale at 50 TON"\n` +
+              `• "I want to buy a 4-digit number"\n` +
+              `• "Show me gift listings"\n\n` +
+              `⚠️ OTC is separate from marketplace tools. Marketplace checks external prices (Fragment, Getgems). OTC connects Teleclaw users directly.`,
+            replyToId: message.id,
+          });
+          return;
+        }
+
         // /addprovider, /models, /removeprovider — multi-provider wizard
         if (this.providerWizard) {
           if (userCmd.command === "addprovider") {

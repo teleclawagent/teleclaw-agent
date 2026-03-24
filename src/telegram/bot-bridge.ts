@@ -42,6 +42,7 @@ export class BotBridge implements TelegramTransport {
         { command: "help", description: "List all commands" },
         { command: "ping", description: "Check if agent is alive" },
         { command: "verify", description: "Verify your TON wallet" },
+        { command: "otc", description: "OTC Matchmaker — P2P trading" },
         { command: "addprovider", description: "Add a new AI provider" },
         { command: "models", description: "Switch AI model" },
         { command: "removeprovider", description: "Remove custom AI settings" },
