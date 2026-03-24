@@ -430,11 +430,18 @@ export class MessageHandler {
             if (maRow?.marketapp_token) {
               try {
                 maToken = decrypt(maRow.marketapp_token);
-              } catch {
-                // Decrypt failed — token may be corrupted
+                log.debug(
+                  `Marketapp token decrypted OK for user ${message.senderId} (len=${maToken?.length})`
+                );
+              } catch (decErr) {
+                log.warn(
+                  { err: decErr, userId: message.senderId },
+                  "Marketapp token decrypt failed — user should re-add via /marketapp"
+                );
               }
             }
             configureMarketappToken(maToken);
+            log.debug(`Marketapp token configured: ${maToken ? "yes" : "no"}`);
           } catch {
             // Column may not exist yet — ignore
           }

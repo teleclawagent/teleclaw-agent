@@ -105,6 +105,9 @@ export const marketAppAdapter: MarketplaceAdapter = {
     }
 
     try {
+      log.info(
+        `Marketapp search: kind=${params.assetKind}, hasToken=${!!_apiToken}, tokenLen=${_apiToken?.length ?? 0}`
+      );
       if (params.assetKind === "gift") {
         return await searchGifts(params);
       }
@@ -180,7 +183,11 @@ async function searchGifts(params: SearchParams): Promise<MarketplaceListing[]> 
   });
 
   if (!res.ok) {
-    log.warn({ status: res.status }, "Marketapp gifts/onsale returned error");
+    const errBody = await res.text().catch(() => "");
+    log.warn(
+      { status: res.status, body: errBody.slice(0, 200) },
+      "Marketapp gifts/onsale returned error"
+    );
     return [];
   }
 
