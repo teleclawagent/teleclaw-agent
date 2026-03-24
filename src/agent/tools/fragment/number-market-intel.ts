@@ -162,8 +162,12 @@ export const numberCategoryExecutor: ToolExecutor<CategoryParams> = async (
       ...catSold.map((s) => s.soldPrice),
     ].sort((a, b) => a - b);
 
-    const avg = allPrices.length > 0 ? Math.round(allPrices.reduce((a, b) => a + b, 0) / allPrices.length) : 0;
-    const median = allPrices.length > 0 ? Math.round(allPrices[Math.floor(allPrices.length / 2)]) : 0;
+    const avg =
+      allPrices.length > 0
+        ? Math.round(allPrices.reduce((a, b) => a + b, 0) / allPrices.length)
+        : 0;
+    const median =
+      allPrices.length > 0 ? Math.round(allPrices[Math.floor(allPrices.length / 2)]) : 0;
 
     const topListings = [...catSales, ...catAuctions]
       .sort((a, b) => (a.priceRaw ?? Infinity) - (b.priceRaw ?? Infinity))
@@ -171,7 +175,9 @@ export const numberCategoryExecutor: ToolExecutor<CategoryParams> = async (
 
     const listingsText =
       topListings.length > 0
-        ? topListings.map((l, i) => `  ${i + 1}. ${l.number} — ${l.price ?? "?"} (${l.status})`).join("\n")
+        ? topListings
+            .map((l, i) => `  ${i + 1}. ${l.number} — ${l.price ?? "?"} (${l.status})`)
+            .join("\n")
         : "  No listings found in this category";
 
     return {
@@ -183,7 +189,8 @@ export const numberCategoryExecutor: ToolExecutor<CategoryParams> = async (
         recentlySold: catSold.length,
         avgPrice: avg,
         medianPrice: median,
-        priceRange: allPrices.length > 0 ? { min: allPrices[0], max: allPrices[allPrices.length - 1] } : null,
+        priceRange:
+          allPrices.length > 0 ? { min: allPrices[0], max: allPrices[allPrices.length - 1] } : null,
         listings: topListings,
         message:
           `📊 Number Category: ${category.toUpperCase()}\n\n` +
@@ -247,13 +254,16 @@ export const numberWhalesExecutor: ToolExecutor<WhaleParams> = async (
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, limit);
 
-    const biggestSales = [...soldHistory]
-      .sort((a, b) => b.soldPrice - a.soldPrice)
-      .slice(0, limit);
+    const biggestSales = [...soldHistory].sort((a, b) => b.soldPrice - a.soldPrice).slice(0, limit);
 
     const whaleText =
       whales.length > 0
-        ? whales.map((w, i) => `  ${i + 1}. ${w.address} — ${w.count} numbers, ${Math.round(w.totalSpent).toLocaleString()} TON spent`).join("\n")
+        ? whales
+            .map(
+              (w, i) =>
+                `  ${i + 1}. ${w.address} — ${w.count} numbers, ${Math.round(w.totalSpent).toLocaleString()} TON spent`
+            )
+            .join("\n")
         : "  Not enough data to identify whales";
 
     const bigSalesText = biggestSales
@@ -304,7 +314,9 @@ export const numberSearchTool: Tool = {
       })
     ),
     digits: Type.Optional(
-      Type.String({ description: "Search for numbers containing these digits (e.g. '888', '1234')" })
+      Type.String({
+        description: "Search for numbers containing these digits (e.g. '888', '1234')",
+      })
     ),
     length: Type.Optional(
       Type.String({
@@ -385,7 +397,9 @@ export const numberSearchExecutor: ToolExecutor<SearchParams> = async (
       pattern && `pattern=${pattern}`,
       digits && `contains=${digits}`,
       length && `length=${length}`,
-    ].filter(Boolean).join(", ");
+    ]
+      .filter(Boolean)
+      .join(", ");
 
     return {
       success: true,

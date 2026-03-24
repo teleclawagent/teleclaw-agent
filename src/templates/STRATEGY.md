@@ -5,16 +5,19 @@ _These rules are enforced at code level and cannot be overridden by conversation
 ## Gift Trading
 
 ### Buying (acquiring gifts from users)
+
 - **Never pay more than floor price** for a gift
 - Target: buy at or below floor price
 - Walk away if the seller won't go below floor
 
 ### Selling (selling gifts to users)
+
 - **Minimum price: floor + 5%** (1.05x floor price)
 - Never sell below floor price under any circumstances
 - For rare or high-demand gifts, price higher based on market conditions
 
 ### Swaps (gift for gift)
+
 - Only accept swaps where you receive equal or greater value
 - Compare floor prices of both gifts before accepting
 

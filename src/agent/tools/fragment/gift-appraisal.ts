@@ -7,11 +7,7 @@
 
 import { Type } from "@sinclair/typebox";
 import type { Tool, ToolExecutor, ToolResult } from "../types.js";
-import {
-  getCollection,
-  calculateRarityScore,
-  searchCollections,
-} from "./gifts-service.js";
+import { getCollection, calculateRarityScore, searchCollections } from "./gifts-service.js";
 
 // ─── Valuation Logic ─────────────────────────────────────────────────
 
@@ -26,13 +22,31 @@ function getTraitMultiplier(rarityPermille: number): { multiplier: number; label
 
 // Dark, gold, and red backdrops tend to carry aesthetic premiums
 const PREMIUM_BACKDROP_KEYWORDS = [
-  "onyx", "black", "dark", "midnight", "obsidian", "noir",
-  "gold", "golden", "amber", "royal",
-  "crimson", "ruby", "scarlet", "blood", "red",
-  "diamond", "crystal", "platinum", "silver",
+  "onyx",
+  "black",
+  "dark",
+  "midnight",
+  "obsidian",
+  "noir",
+  "gold",
+  "golden",
+  "amber",
+  "royal",
+  "crimson",
+  "ruby",
+  "scarlet",
+  "blood",
+  "red",
+  "diamond",
+  "crystal",
+  "platinum",
+  "silver",
 ];
 
-function getAestheticBonus(backdropName: string, colors: { centerColor?: string; edgeColor?: string } | null): {
+function getAestheticBonus(
+  backdropName: string,
+  colors: { centerColor?: string; edgeColor?: string } | null
+): {
   bonus: number;
   reason: string | null;
 } {
@@ -54,7 +68,10 @@ function getAestheticBonus(backdropName: string, colors: { centerColor?: string;
       const b = parseInt(hex.slice(4, 6), 16);
       const brightness = (r + g + b) / 3;
       if (brightness < 60) {
-        return { bonus: 1.15, reason: `Dark backdrop (#${hex}, brightness ${Math.round(brightness)})` };
+        return {
+          bonus: 1.15,
+          reason: `Dark backdrop (#${hex}, brightness ${Math.round(brightness)})`,
+        };
       }
     }
   }
@@ -98,106 +115,123 @@ export const giftAppraiseExecutor: ToolExecutor<AppraiseParams> = async (
 ): Promise<ToolResult> => {
   try {
     const col = getCollection(params.collection);
-  if (!col) {
-    const suggestions = searchCollections(params.collection);
+    if (!col) {
+      const suggestions = searchCollections(params.collection);
+      return {
+        success: false,
+        error: `Collection "${params.collection}" not found.${
+          suggestions.length > 0
+            ? ` Did you mean: ${suggestions
+                .slice(0, 3)
+                .map((s) => s.name)
+                .join(", ")}?`
+            : ""
+        }`,
+      };
+    }
+
+    const rarity = calculateRarityScore(
+      params.collection,
+      params.model,
+      params.backdrop,
+      params.symbol
+    );
+    if (!rarity) {
+      return {
+        success: false,
+        error: `Could not verify traits. Check model/backdrop/symbol names for "${params.collection}".`,
+      };
+    }
+
+    // Calculate multipliers
+    const modelMult = getTraitMultiplier(rarity.modelRarity);
+    const backdropMult = getTraitMultiplier(rarity.backdropRarity);
+    const symbolMult = getTraitMultiplier(rarity.symbolRarity);
+
+    // Get backdrop colors for aesthetic bonus
+    const backdropData = col.backdrops.find(
+      (b) => b.name.toLowerCase() === params.backdrop.toLowerCase()
+    );
+    const aesthetic = getAestheticBonus(params.backdrop, backdropData?.colors ?? null);
+
+    // Combined score
+    const baseMultiplier = modelMult.multiplier * backdropMult.multiplier * symbolMult.multiplier;
+    const finalMultiplier = baseMultiplier * aesthetic.bonus;
+    const premiumPct = Math.round((finalMultiplier - 1) * 100);
+
+    // Valuation tier
+    let valuationTier: string;
+    let assessment: string;
+
+    if (finalMultiplier >= 500) {
+      valuationTier = "🏆 God-Tier";
+      assessment =
+        "One of the rarest possible combinations. Triple legendary traits. Collector's holy grail — name your price.";
+    } else if (finalMultiplier >= 100) {
+      valuationTier = "💎 Ultra Legendary";
+      assessment =
+        "Extremely rare combo with multiple legendary traits. These rarely trade and command massive premiums.";
+    } else if (finalMultiplier >= 50) {
+      valuationTier = "🔥 Legendary";
+      assessment =
+        "Outstanding rarity. At least one legendary trait paired with other rare traits. Significant premium over floor.";
+    } else if (finalMultiplier >= 15) {
+      valuationTier = "⭐ Epic";
+      assessment =
+        "Well above average. Multiple uncommon+ traits combine for a strong premium. Solid collector's piece.";
+    } else if (finalMultiplier >= 5) {
+      valuationTier = "📈 Rare";
+      assessment =
+        "Noticeably above floor. Some desirable traits that set it apart from common gifts in this collection.";
+    } else if (finalMultiplier >= 2) {
+      valuationTier = "📊 Above Average";
+      assessment =
+        "Slightly better than typical. Minor premium justified by one or two less common traits.";
+    } else {
+      valuationTier = "📉 Floor";
+      assessment =
+        "Common trait combination. Trades near floor price. Value depends on overall collection demand.";
+    }
+
     return {
-      success: false,
-      error: `Collection "${params.collection}" not found.${suggestions.length > 0 ? ` Did you mean: ${suggestions.slice(0, 3).map((s) => s.name).join(", ")}?` : ""}`,
-    };
-  }
-
-  const rarity = calculateRarityScore(params.collection, params.model, params.backdrop, params.symbol);
-  if (!rarity) {
-    return {
-      success: false,
-      error: `Could not verify traits. Check model/backdrop/symbol names for "${params.collection}".`,
-    };
-  }
-
-  // Calculate multipliers
-  const modelMult = getTraitMultiplier(rarity.modelRarity);
-  const backdropMult = getTraitMultiplier(rarity.backdropRarity);
-  const symbolMult = getTraitMultiplier(rarity.symbolRarity);
-
-  // Get backdrop colors for aesthetic bonus
-  const backdropData = col.backdrops.find(
-    (b) => b.name.toLowerCase() === params.backdrop.toLowerCase()
-  );
-  const aesthetic = getAestheticBonus(
-    params.backdrop,
-    backdropData?.colors ?? null
-  );
-
-  // Combined score
-  const baseMultiplier = modelMult.multiplier * backdropMult.multiplier * symbolMult.multiplier;
-  const finalMultiplier = baseMultiplier * aesthetic.bonus;
-  const premiumPct = Math.round((finalMultiplier - 1) * 100);
-
-  // Valuation tier
-  let valuationTier: string;
-  let assessment: string;
-
-  if (finalMultiplier >= 500) {
-    valuationTier = "🏆 God-Tier";
-    assessment = "One of the rarest possible combinations. Triple legendary traits. Collector's holy grail — name your price.";
-  } else if (finalMultiplier >= 100) {
-    valuationTier = "💎 Ultra Legendary";
-    assessment = "Extremely rare combo with multiple legendary traits. These rarely trade and command massive premiums.";
-  } else if (finalMultiplier >= 50) {
-    valuationTier = "🔥 Legendary";
-    assessment = "Outstanding rarity. At least one legendary trait paired with other rare traits. Significant premium over floor.";
-  } else if (finalMultiplier >= 15) {
-    valuationTier = "⭐ Epic";
-    assessment = "Well above average. Multiple uncommon+ traits combine for a strong premium. Solid collector's piece.";
-  } else if (finalMultiplier >= 5) {
-    valuationTier = "📈 Rare";
-    assessment = "Noticeably above floor. Some desirable traits that set it apart from common gifts in this collection.";
-  } else if (finalMultiplier >= 2) {
-    valuationTier = "📊 Above Average";
-    assessment = "Slightly better than typical. Minor premium justified by one or two less common traits.";
-  } else {
-    valuationTier = "📉 Floor";
-    assessment = "Common trait combination. Trades near floor price. Value depends on overall collection demand.";
-  }
-
-  return {
-    success: true,
-    data: {
-      collection: col.name,
-      traits: {
-        model: {
-          name: params.model,
-          rarity: `${rarity.modelRarity / 10}%`,
-          multiplier: `${modelMult.multiplier}x`,
-          tier: modelMult.label,
+      success: true,
+      data: {
+        collection: col.name,
+        traits: {
+          model: {
+            name: params.model,
+            rarity: `${rarity.modelRarity / 10}%`,
+            multiplier: `${modelMult.multiplier}x`,
+            tier: modelMult.label,
+          },
+          backdrop: {
+            name: params.backdrop,
+            rarity: `${rarity.backdropRarity / 10}%`,
+            multiplier: `${backdropMult.multiplier}x`,
+            tier: backdropMult.label,
+          },
+          symbol: {
+            name: params.symbol,
+            rarity: `${rarity.symbolRarity / 10}%`,
+            multiplier: `${symbolMult.multiplier}x`,
+            tier: symbolMult.label,
+          },
         },
-        backdrop: {
-          name: params.backdrop,
-          rarity: `${rarity.backdropRarity / 10}%`,
-          multiplier: `${backdropMult.multiplier}x`,
-          tier: backdropMult.label,
+        aestheticBonus: aesthetic.reason
+          ? { multiplier: `${aesthetic.bonus}x`, reason: aesthetic.reason }
+          : null,
+        score: {
+          baseMultiplier: `${baseMultiplier.toFixed(1)}x`,
+          finalMultiplier: `${finalMultiplier.toFixed(1)}x`,
+          estimatedPremium: `${premiumPct}% over floor`,
         },
-        symbol: {
-          name: params.symbol,
-          rarity: `${rarity.symbolRarity / 10}%`,
-          multiplier: `${symbolMult.multiplier}x`,
-          tier: symbolMult.label,
-        },
+        rarityTier: rarity.rarityTier,
+        valuationTier,
+        assessment,
+        disclaimer:
+          "Rarity-based estimate. Actual market value depends on demand, floor price, and liquidity.",
       },
-      aestheticBonus: aesthetic.reason
-        ? { multiplier: `${aesthetic.bonus}x`, reason: aesthetic.reason }
-        : null,
-      score: {
-        baseMultiplier: `${baseMultiplier.toFixed(1)}x`,
-        finalMultiplier: `${finalMultiplier.toFixed(1)}x`,
-        estimatedPremium: `${premiumPct}% over floor`,
-      },
-      rarityTier: rarity.rarityTier,
-      valuationTier,
-      assessment,
-      disclaimer: "Rarity-based estimate. Actual market value depends on demand, floor price, and liquidity.",
-    },
-  };
+    };
   } catch (error) {
     return {
       success: false,

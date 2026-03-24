@@ -49,23 +49,34 @@ export function setPin(db: Database.Database, userId: number, pin: string): void
  */
 export function verifyPin(db: Database.Database, userId: number, pin: string): boolean {
   const row = db
-    .prepare("SELECT pin_hash, salt, failed_attempts, locked_until FROM wallet_pins WHERE user_id = ?")
-    .get(userId) as {
-    pin_hash: string;
-    salt: string;
-    failed_attempts: number;
-    locked_until: number;
-  } | undefined;
+    .prepare(
+      "SELECT pin_hash, salt, failed_attempts, locked_until FROM wallet_pins WHERE user_id = ?"
+    )
+    .get(userId) as
+    | {
+        pin_hash: string;
+        salt: string;
+        failed_attempts: number;
+        locked_until: number;
+      }
+    | undefined;
 
   if (!row) {
-    throw new Error("No PIN set. Use agentic_wallet_set_pin to create one before making transactions.");
+    throw new Error(
+      "No PIN set. Use agentic_wallet_set_pin to create one before making transactions."
+    );
   }
 
   // Check lockout
   const now = Math.floor(Date.now() / 1000);
   if (row.locked_until > now) {
     const remainingMin = Math.ceil((row.locked_until - now) / 60);
-    auditLog(db, userId, "pin_locked_attempt", `Attempted while locked. ${remainingMin}min remaining`);
+    auditLog(
+      db,
+      userId,
+      "pin_locked_attempt",
+      `Attempted while locked. ${remainingMin}min remaining`
+    );
     throw new Error(
       `Account locked due to too many failed PIN attempts. Try again in ${remainingMin} minutes.`
     );
@@ -75,9 +86,9 @@ export function verifyPin(db: Database.Database, userId: number, pin: string): b
 
   if (inputHash === row.pin_hash) {
     // Reset failed attempts on success
-    db.prepare("UPDATE wallet_pins SET failed_attempts = 0, locked_until = 0 WHERE user_id = ?").run(
-      userId
-    );
+    db.prepare(
+      "UPDATE wallet_pins SET failed_attempts = 0, locked_until = 0 WHERE user_id = ?"
+    ).run(userId);
     return true;
   }
 
@@ -85,11 +96,9 @@ export function verifyPin(db: Database.Database, userId: number, pin: string): b
   const newAttempts = row.failed_attempts + 1;
   if (newAttempts >= MAX_PIN_ATTEMPTS) {
     const lockedUntil = now + LOCKOUT_DURATION_SEC;
-    db.prepare("UPDATE wallet_pins SET failed_attempts = ?, locked_until = ? WHERE user_id = ?").run(
-      newAttempts,
-      lockedUntil,
-      userId
-    );
+    db.prepare(
+      "UPDATE wallet_pins SET failed_attempts = ?, locked_until = ? WHERE user_id = ?"
+    ).run(newAttempts, lockedUntil, userId);
     auditLog(db, userId, "pin_lockout", `Locked after ${newAttempts} failed attempts`);
     log.warn({ userId, attempts: newAttempts }, "Account locked — too many failed PIN attempts");
     throw new Error(
@@ -97,11 +106,16 @@ export function verifyPin(db: Database.Database, userId: number, pin: string): b
     );
   }
 
-  db.prepare("UPDATE wallet_pins SET failed_attempts = ? WHERE user_id = ?").run(newAttempts, userId);
+  db.prepare("UPDATE wallet_pins SET failed_attempts = ? WHERE user_id = ?").run(
+    newAttempts,
+    userId
+  );
   auditLog(db, userId, "pin_failed", `Failed attempt ${newAttempts}/${MAX_PIN_ATTEMPTS}`);
 
   const remaining = MAX_PIN_ATTEMPTS - newAttempts;
-  throw new Error(`Wrong PIN. ${remaining} attempt${remaining > 1 ? "s" : ""} remaining before lockout.`);
+  throw new Error(
+    `Wrong PIN. ${remaining} attempt${remaining > 1 ? "s" : ""} remaining before lockout.`
+  );
 }
 
 /**

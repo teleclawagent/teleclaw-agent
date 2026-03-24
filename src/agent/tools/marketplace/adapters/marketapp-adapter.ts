@@ -5,12 +5,7 @@
  * Method: REST API
  */
 
-import type {
-  MarketplaceAdapter,
-  MarketplaceListing,
-  SearchParams,
-  AssetKind,
-} from "../types.js";
+import type { MarketplaceAdapter, MarketplaceListing, SearchParams, AssetKind } from "../types.js";
 import { createLogger } from "../../../../utils/logger.js";
 
 const log = createLogger("Marketplace:MarketApp");
@@ -37,9 +32,12 @@ export const marketAppAdapter: MarketplaceAdapter = {
 
   async search(params: SearchParams): Promise<MarketplaceListing[]> {
     try {
-      const endpoint = params.assetKind === "gift" ? "/v1/gifts" :
-                        params.assetKind === "number" ? "/v1/numbers" :
-                        "/v1/usernames";
+      const endpoint =
+        params.assetKind === "gift"
+          ? "/v1/gifts"
+          : params.assetKind === "number"
+            ? "/v1/numbers"
+            : "/v1/usernames";
 
       const url = new URL(endpoint, BASE_URL);
       if (params.query) url.searchParams.set("q", params.query);
@@ -49,7 +47,7 @@ export const marketAppAdapter: MarketplaceAdapter = {
       if (params.sortBy === "price") url.searchParams.set("sort", "price_asc");
 
       const res = await fetch(url.toString(), {
-        headers: { "Accept": "application/json" },
+        headers: { Accept: "application/json" },
       });
 
       if (!res.ok) {
@@ -57,24 +55,26 @@ export const marketAppAdapter: MarketplaceAdapter = {
         return [];
       }
 
-      const data = await res.json() as { items?: MarketAppListing[] };
+      const data = (await res.json()) as { items?: MarketAppListing[] };
       if (!data?.items) return [];
 
-      return data.items.map((item): MarketplaceListing => ({
-        marketplace: "marketapp",
-        assetKind: params.assetKind,
-        externalId: item.id,
-        url: item.url || `https://marketapp.ws/${params.assetKind}/${item.id}`,
-        identifier: item.name,
-        collection: item.collection,
-        priceTon: item.currency === "TON" ? (item.price ?? null) : null,
-        priceStars: item.currency === "Stars" ? (item.price ?? null) : null,
-        originalCurrency: item.currency || "TON",
-        originalPrice: item.price ?? null,
-        listingType: "fixed",
-        seller: item.seller,
-        onChain: false,
-      }));
+      return data.items.map(
+        (item): MarketplaceListing => ({
+          marketplace: "marketapp",
+          assetKind: params.assetKind,
+          externalId: item.id,
+          url: item.url || `https://marketapp.ws/${params.assetKind}/${item.id}`,
+          identifier: item.name,
+          collection: item.collection,
+          priceTon: item.currency === "TON" ? (item.price ?? null) : null,
+          priceStars: item.currency === "Stars" ? (item.price ?? null) : null,
+          originalCurrency: item.currency || "TON",
+          originalPrice: item.price ?? null,
+          listingType: "fixed",
+          seller: item.seller,
+          onChain: false,
+        })
+      );
     } catch (err) {
       log.error({ err }, "Market.app search failed");
       return [];
@@ -83,17 +83,20 @@ export const marketAppAdapter: MarketplaceAdapter = {
 
   async getListing(assetKind: AssetKind, identifier: string): Promise<MarketplaceListing | null> {
     try {
-      const endpoint = assetKind === "gift" ? "/v1/gifts" :
-                        assetKind === "number" ? "/v1/numbers" :
-                        "/v1/usernames";
+      const endpoint =
+        assetKind === "gift"
+          ? "/v1/gifts"
+          : assetKind === "number"
+            ? "/v1/numbers"
+            : "/v1/usernames";
 
       const res = await fetch(`${BASE_URL}${endpoint}/${encodeURIComponent(identifier)}`, {
-        headers: { "Accept": "application/json" },
+        headers: { Accept: "application/json" },
       });
 
       if (!res.ok) return null;
 
-      const item = await res.json() as MarketAppListing;
+      const item = (await res.json()) as MarketAppListing;
       return {
         marketplace: "marketapp",
         assetKind,

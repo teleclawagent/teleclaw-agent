@@ -21,10 +21,7 @@ export function getRawClient(bridge: TelegramTransport): unknown {
   if (bridge.getRawClient) {
     return bridge.getRawClient();
   }
-  throw new PluginSDKError(
-    "Raw client not available on this transport",
-    "NO_RAW_CLIENT"
-  );
+  throw new PluginSDKError("Raw client not available on this transport", "NO_RAW_CLIENT");
 }
 
 /** Convert a GramJS message to a SimpleMessage */

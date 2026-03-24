@@ -14,7 +14,8 @@ interface QuoteReplyParams {
 
 export const telegramQuoteReplyTool: Tool = {
   name: "telegram_quote_reply",
-  description: "Reply to a specific message with a quote. The reply will show the original message.",
+  description:
+    "Reply to a specific message with a quote. The reply will show the original message.",
   parameters: Type.Object({
     chatId: Type.String({ description: "The chat ID" }),
     replyToId: Type.Number({ description: "Message ID to reply to" }),

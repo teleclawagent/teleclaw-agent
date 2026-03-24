@@ -488,7 +488,8 @@ export class AgentRuntime {
           workspace: "📁 Workspace — Read, write, list, manage files in your workspace",
           web: "🌍 Web — Search the internet, fetch web pages",
           bot: "🤖 Bot — Model switching",
-          marketplace: "🛒 Marketplace — Search and compare prices across Fragment, Getgems, Tonnel, Portals, Market.app, MRKT",
+          marketplace:
+            "🛒 Marketplace — Search and compare prices across Fragment, Getgems, Tonnel, Portals, Market.app, MRKT",
           alpha: "📡 Alpha Radar — Monitor channels, detect alpha mentions and signals",
           whale: "🐋 Whale Watcher — Track large wallet transactions",
           portfolio: "📊 Portfolio — Token holdings, price check, portfolio comparison",

@@ -82,16 +82,21 @@ export const giftAlertSetTool: Tool = {
     "• 'Watch for Onyx Black backdrop gifts under 100 TON'",
   category: "action",
   parameters: Type.Object({
-    collection: Type.Optional(Type.String({ description: "Collection to watch (e.g. 'Plush Pepe')" })),
-    min_tier: Type.Optional(Type.String({ description: "Minimum tier: Legendary, Epic, Rare, Uncommon" })),
+    collection: Type.Optional(
+      Type.String({ description: "Collection to watch (e.g. 'Plush Pepe')" })
+    ),
+    min_tier: Type.Optional(
+      Type.String({ description: "Minimum tier: Legendary, Epic, Rare, Uncommon" })
+    ),
     max_price: Type.Optional(Type.Number({ description: "Max price threshold", minimum: 0 })),
-    currency: Type.Optional(Type.String({ description: "Currency: TON, Stars, USDT (default: TON)" })),
+    currency: Type.Optional(
+      Type.String({ description: "Currency: TON, Stars, USDT (default: TON)" })
+    ),
     alert_type: Type.Optional(
-      Type.Union([
-        Type.Literal("new_listing"),
-        Type.Literal("price_drop"),
-        Type.Literal("rare_find"),
-      ], { description: "Alert type (default: new_listing)" })
+      Type.Union(
+        [Type.Literal("new_listing"), Type.Literal("price_drop"), Type.Literal("rare_find")],
+        { description: "Alert type (default: new_listing)" }
+      )
     ),
     model: Type.Optional(Type.String({ description: "Specific model to watch for" })),
     backdrop: Type.Optional(Type.String({ description: "Specific backdrop to watch for" })),
@@ -120,10 +125,20 @@ export const giftAlertSetExecutor: ToolExecutor<AlertSetParams> = async (
     // Validate collection
     if (collection) {
       const suggestions = searchCollections(collection);
-      if (suggestions.length === 0 || !suggestions.some((s) => s.name.toLowerCase() === collection.toLowerCase())) {
+      if (
+        suggestions.length === 0 ||
+        !suggestions.some((s) => s.name.toLowerCase() === collection.toLowerCase())
+      ) {
         return {
           success: false,
-          error: `Collection "${collection}" not found.${suggestions.length > 0 ? ` Did you mean: ${suggestions.slice(0, 3).map((s) => s.name).join(", ")}?` : ""}`,
+          error: `Collection "${collection}" not found.${
+            suggestions.length > 0
+              ? ` Did you mean: ${suggestions
+                  .slice(0, 3)
+                  .map((s) => s.name)
+                  .join(", ")}?`
+              : ""
+          }`,
         };
       }
     }
@@ -153,12 +168,9 @@ export const giftAlertSetExecutor: ToolExecutor<AlertSetParams> = async (
          AND COALESCE(min_tier, '') = COALESCE(?, '')
          AND alert_type = ?`
       )
-      .get(
-        context.senderId,
-        collection || "",
-        min_tier || "",
-        alert_type
-      ) as { id: string } | undefined;
+      .get(context.senderId, collection || "", min_tier || "", alert_type) as
+      | { id: string }
+      | undefined;
 
     if (existing) {
       return {
@@ -229,7 +241,9 @@ export const giftAlertListExecutor: ToolExecutor = async (
     ensureGiftAlertTables(context);
 
     const alerts = context.db
-      .prepare(`SELECT * FROM gift_alerts WHERE user_id = ? AND active = 1 ORDER BY created_at DESC`)
+      .prepare(
+        `SELECT * FROM gift_alerts WHERE user_id = ? AND active = 1 ORDER BY created_at DESC`
+      )
       .all(context.senderId) as GiftAlertRow[];
 
     return {
@@ -258,7 +272,10 @@ export const giftAlertListExecutor: ToolExecutor = async (
       },
     };
   } catch (err: unknown) {
-    return { success: false, error: `List failed: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      success: false,
+      error: `List failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 };
 
@@ -292,9 +309,7 @@ export const giftAlertRemoveExecutor: ToolExecutor<AlertRemoveParams> = async (
       return { success: false, error: "Alert not found or not yours." };
     }
 
-    context.db
-      .prepare(`UPDATE gift_alerts SET active = 0 WHERE id = ?`)
-      .run(params.alert_id);
+    context.db.prepare(`UPDATE gift_alerts SET active = 0 WHERE id = ?`).run(params.alert_id);
 
     return {
       success: true,
@@ -305,7 +320,10 @@ export const giftAlertRemoveExecutor: ToolExecutor<AlertRemoveParams> = async (
       },
     };
   } catch (err: unknown) {
-    return { success: false, error: `Remove failed: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      success: false,
+      error: `Remove failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 };
 
@@ -352,7 +370,8 @@ export function checkAlertsForListing(
 
   for (const alert of alerts) {
     // Collection filter
-    if (alert.collection && alert.collection.toLowerCase() !== listing.collection.toLowerCase()) continue;
+    if (alert.collection && alert.collection.toLowerCase() !== listing.collection.toLowerCase())
+      continue;
 
     // Model filter
     if (alert.model && alert.model.toLowerCase() !== listing.model.toLowerCase()) continue;
@@ -396,7 +415,9 @@ export function checkAlertsForListing(
 
     // Update trigger count
     ctx.db
-      .prepare(`UPDATE gift_alerts SET triggered_count = triggered_count + 1, last_triggered_at = datetime('now') WHERE id = ?`)
+      .prepare(
+        `UPDATE gift_alerts SET triggered_count = triggered_count + 1, last_triggered_at = datetime('now') WHERE id = ?`
+      )
       .run(alert.id);
   }
 

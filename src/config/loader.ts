@@ -112,11 +112,17 @@ export function loadConfig(configPath: string = DEFAULT_CONFIG_PATH): Config {
   if (process.env.TELECLAW_XAI_API_KEY || process.env.XAI_API_KEY) {
     config.xai_api_key = process.env.TELECLAW_XAI_API_KEY || process.env.XAI_API_KEY;
   }
-  if (process.env.TELECLAW_KIMI_API_KEY || process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY) {
-    config.kimi_api_key = process.env.TELECLAW_KIMI_API_KEY || process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY;
+  if (
+    process.env.TELECLAW_KIMI_API_KEY ||
+    process.env.KIMI_API_KEY ||
+    process.env.MOONSHOT_API_KEY
+  ) {
+    config.kimi_api_key =
+      process.env.TELECLAW_KIMI_API_KEY || process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY;
   }
   if (process.env.TELECLAW_PERPLEXITY_API_KEY || process.env.PERPLEXITY_API_KEY) {
-    config.perplexity_api_key = process.env.TELECLAW_PERPLEXITY_API_KEY || process.env.PERPLEXITY_API_KEY;
+    config.perplexity_api_key =
+      process.env.TELECLAW_PERPLEXITY_API_KEY || process.env.PERPLEXITY_API_KEY;
   }
   if (process.env.TELECLAW_TONAPI_KEY) {
     config.tonapi_key = process.env.TELECLAW_TONAPI_KEY;

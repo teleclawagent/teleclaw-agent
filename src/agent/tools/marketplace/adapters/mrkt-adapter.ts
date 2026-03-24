@@ -5,12 +5,7 @@
  * Method: REST API (Telegram-native marketplace)
  */
 
-import type {
-  MarketplaceAdapter,
-  MarketplaceListing,
-  SearchParams,
-  AssetKind,
-} from "../types.js";
+import type { MarketplaceAdapter, MarketplaceListing, SearchParams, AssetKind } from "../types.js";
 import { createLogger } from "../../../../utils/logger.js";
 
 const log = createLogger("Marketplace:MRKT");
@@ -45,7 +40,7 @@ export const mrktAdapter: MarketplaceAdapter = {
       if (params.limit) url.searchParams.set("limit", params.limit.toString());
 
       const res = await fetch(url.toString(), {
-        headers: { "Accept": "application/json" },
+        headers: { Accept: "application/json" },
       });
 
       if (!res.ok) {
@@ -53,27 +48,29 @@ export const mrktAdapter: MarketplaceAdapter = {
         return [];
       }
 
-      const data = await res.json() as { results?: MRKTGift[] };
+      const data = (await res.json()) as { results?: MRKTGift[] };
       if (!data?.results) return [];
 
-      return data.results.map((g): MarketplaceListing => ({
-        marketplace: "mrkt",
-        assetKind: "gift",
-        externalId: g.id,
-        url: `https://mrkt.tg/gift/${g.id}`,
-        collection: g.collection,
-        giftNum: g.number,
-        model: g.model,
-        backdrop: g.backdrop,
-        symbol: g.symbol,
-        rarityTier: g.rarity_tier,
-        priceTon: g.currency === "TON" || !g.currency ? (g.price ?? null) : null,
-        priceStars: g.currency === "Stars" ? (g.price ?? null) : null,
-        originalCurrency: g.currency || "TON",
-        originalPrice: g.price ?? null,
-        listingType: "fixed",
-        onChain: false,
-      }));
+      return data.results.map(
+        (g): MarketplaceListing => ({
+          marketplace: "mrkt",
+          assetKind: "gift",
+          externalId: g.id,
+          url: `https://mrkt.tg/gift/${g.id}`,
+          collection: g.collection,
+          giftNum: g.number,
+          model: g.model,
+          backdrop: g.backdrop,
+          symbol: g.symbol,
+          rarityTier: g.rarity_tier,
+          priceTon: g.currency === "TON" || !g.currency ? (g.price ?? null) : null,
+          priceStars: g.currency === "Stars" ? (g.price ?? null) : null,
+          originalCurrency: g.currency || "TON",
+          originalPrice: g.price ?? null,
+          listingType: "fixed",
+          onChain: false,
+        })
+      );
     } catch (err) {
       log.error({ err }, "MRKT search failed");
       return [];
@@ -85,7 +82,7 @@ export const mrktAdapter: MarketplaceAdapter = {
       const res = await fetch(`${BASE_URL}/api/gifts/${encodeURIComponent(identifier)}`);
       if (!res.ok) return null;
 
-      const g = await res.json() as MRKTGift;
+      const g = (await res.json()) as MRKTGift;
       return {
         marketplace: "mrkt",
         assetKind: "gift",

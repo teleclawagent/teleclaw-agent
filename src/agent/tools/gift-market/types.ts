@@ -31,11 +31,14 @@ export interface FloorPriceEntry {
     listingCount: number;
   }>;
   /** Per-marketplace breakdown */
-  byMarketplace: Record<string, {
-    floorTon: number | null;
-    listingCount: number;
-    url?: string;
-  }>;
+  byMarketplace: Record<
+    string,
+    {
+      floorTon: number | null;
+      listingCount: number;
+      url?: string;
+    }
+  >;
   totalListings: number;
   fetchedAt: string;
 }

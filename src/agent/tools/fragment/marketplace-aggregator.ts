@@ -142,9 +142,10 @@ async function fetchTonnel(
         symbol: g.pattern?.replace(/\s*\([\d.]+%\)\s*$/, ""),
         symbolRarity: parseRarityFromLabel(g.pattern),
         priceTon: g.price,
-        slug: g.gift_name && g.gift_num
-          ? `${g.gift_name.toLowerCase().replace(/\s+/g, "")}-${g.gift_num}`
-          : undefined,
+        slug:
+          g.gift_name && g.gift_num
+            ? `${g.gift_name.toLowerCase().replace(/\s+/g, "")}-${g.gift_num}`
+            : undefined,
         url: `https://market.tonnel.network/?gift=${encodeURIComponent(g.gift_name)}`,
         listedAt: g.export_at,
         sellerId: g.owner_id?.toString(),
@@ -183,8 +184,7 @@ async function fetchPortals(
     const collUrl = `${PORTALS_COLLECTIONS_API}?search=${encodeURIComponent(giftName)}&limit=1`;
     const collRes = await fetch(collUrl, {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
       },
       signal: AbortSignal.timeout(10000),
     });
@@ -193,7 +193,7 @@ async function fetchPortals(
       return { listings: [], error: `Portals HTTP ${collRes.status}` };
     }
 
-    const collData = await collRes.json() as { collections?: PortalsCollection[] };
+    const collData = (await collRes.json()) as { collections?: PortalsCollection[] };
     const collection = collData.collections?.[0];
 
     if (!collection) {
@@ -207,24 +207,26 @@ async function fetchPortals(
     try {
       const searchRes = await fetch(searchUrl, {
         headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
         },
         signal: AbortSignal.timeout(10000),
       });
 
       if (searchRes.ok) {
-        const searchData = await searchRes.json() as PortalsGift[];
+        const searchData = (await searchRes.json()) as PortalsGift[];
         listings = (Array.isArray(searchData) ? searchData : []).map((g) => ({
           marketplace: "portals" as const,
           giftName: g.name,
           giftNum: g.tg_id,
           model: g.attributes?.find((a: PortalsAttribute) => a.type === "model")?.value,
-          modelRarity: g.attributes?.find((a: PortalsAttribute) => a.type === "model")?.rarity_per_mille,
+          modelRarity: g.attributes?.find((a: PortalsAttribute) => a.type === "model")
+            ?.rarity_per_mille,
           backdrop: g.attributes?.find((a: PortalsAttribute) => a.type === "backdrop")?.value,
-          backdropRarity: g.attributes?.find((a: PortalsAttribute) => a.type === "backdrop")?.rarity_per_mille,
+          backdropRarity: g.attributes?.find((a: PortalsAttribute) => a.type === "backdrop")
+            ?.rarity_per_mille,
           symbol: g.attributes?.find((a: PortalsAttribute) => a.type === "symbol")?.value,
-          symbolRarity: g.attributes?.find((a: PortalsAttribute) => a.type === "symbol")?.rarity_per_mille,
+          symbolRarity: g.attributes?.find((a: PortalsAttribute) => a.type === "symbol")
+            ?.rarity_per_mille,
           priceTon: g.price ? parseFloat(g.price) : undefined,
           url: `https://t.me/portals/portals`,
           listedAt: g.listed_at,
@@ -279,8 +281,7 @@ async function fetchFragment(
 
     const res = await fetch(url, {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
       },
       signal: AbortSignal.timeout(10000),
     });

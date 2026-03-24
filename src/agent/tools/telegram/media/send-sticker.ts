@@ -13,8 +13,7 @@ interface SendStickerParams {
 
 export const telegramSendStickerTool: Tool = {
   name: "telegram_send_sticker",
-  description:
-    "Send a sticker to a Telegram chat. Provide a sticker file_id, URL, or file path.",
+  description: "Send a sticker to a Telegram chat. Provide a sticker file_id, URL, or file path.",
   parameters: Type.Object({
     chatId: Type.String({ description: "The chat ID" }),
     sticker: Type.String({ description: "Sticker file_id, URL, or file path" }),

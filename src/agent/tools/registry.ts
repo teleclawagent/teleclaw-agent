@@ -35,7 +35,6 @@ export class ToolRegistry {
   private toolIndex: ToolIndex | null = null;
   private onToolsChangedCallbacks: Array<(removed: string[], added: PiAiTool[]) => void> = [];
 
-
   register<TParams = unknown>(
     tool: Tool,
     executor: ToolExecutor<TParams>,
@@ -51,8 +50,6 @@ export class ToolRegistry {
     this.toolModules.set(tool.name, tool.name.split("_")[0]);
     this.toolArrayCache = null;
   }
-
-
 
   setPermissions(mp: ModulePermissions): void {
     this.permissions = mp;
@@ -207,7 +204,6 @@ export class ToolRegistry {
         const effectiveScope = this.getEffectiveScope(rt.tool.name);
         if (effectiveScope === excluded) return false;
         if (effectiveScope === "admin-only" && !isAdmin) return false;
-
 
         if (isGroup && chatId && this.permissions) {
           const module = this.toolModules.get(rt.tool.name);

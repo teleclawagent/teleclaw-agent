@@ -12,22 +12,22 @@ export type AssetKind = "username" | "number" | "gift";
 // ─── Marketplace IDs ─────────────────────────────────────────────────
 
 export type MarketplaceId =
-  | "fragment"     // fragment.com — usernames, numbers, gifts (on-chain & off-chain)
-  | "marketapp"    // market.app — usernames, numbers, gifts (rebranded Whales Market)
-  | "getgems"      // getgems.io — usernames, numbers, gifts (on-chain & off-chain)
-  | "tonnel"       // tonnel.network — off-chain gifts only
-  | "portals"      // portals.to — off-chain gifts only
-  | "mrkt";        // mrkt.tg — gifts only
+  | "fragment" // fragment.com — usernames, numbers, gifts (on-chain & off-chain)
+  | "marketapp" // market.app — usernames, numbers, gifts (rebranded Whales Market)
+  | "getgems" // getgems.io — usernames, numbers, gifts (on-chain & off-chain)
+  | "tonnel" // tonnel.network — off-chain gifts only
+  | "portals" // portals.to — off-chain gifts only
+  | "mrkt"; // mrkt.tg — gifts only
 
 // ─── Which marketplaces support which assets ─────────────────────────
 
 export const MARKETPLACE_SUPPORT: Record<MarketplaceId, AssetKind[]> = {
-  fragment:  ["username", "number", "gift"],
+  fragment: ["username", "number", "gift"],
   marketapp: ["username", "number", "gift"],
-  getgems:   ["username", "number", "gift"],
-  tonnel:    ["gift"],
-  portals:   ["gift"],
-  mrkt:      ["gift"],
+  getgems: ["username", "number", "gift"],
+  tonnel: ["gift"],
+  portals: ["gift"],
+  mrkt: ["gift"],
 };
 
 /** Get all marketplaces that support a given asset type */

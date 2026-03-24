@@ -48,10 +48,9 @@ function decrypt(encoded: string): string {
   const [ivH, tagH, ctH] = parts;
   const decipher = createDecipheriv(ALGO, key, Buffer.from(ivH, "hex"));
   decipher.setAuthTag(Buffer.from(tagH, "hex"));
-  return Buffer.concat([
-    decipher.update(Buffer.from(ctH, "hex")),
-    decipher.final(),
-  ]).toString("utf8");
+  return Buffer.concat([decipher.update(Buffer.from(ctH, "hex")), decipher.final()]).toString(
+    "utf8"
+  );
 }
 
 // ── Schema ──────────────────────────────────────────────────────────────────
@@ -73,9 +72,7 @@ export function ensureUserSettingsTable(db: Database.Database): void {
 }
 
 function _migrateToEncrypted(db: Database.Database): void {
-  const cols = (
-    db.pragma("table_info(user_settings)") as { name: string }[]
-  ).map((r) => r.name);
+  const cols = (db.pragma("table_info(user_settings)") as { name: string }[]).map((r) => r.name);
 
   if (!cols.includes("api_key")) return;
 
@@ -91,9 +88,7 @@ function _migrateToEncrypted(db: Database.Database): void {
 
     try {
       const enc = encrypt(row.api_key);
-      db.prepare(
-        "UPDATE user_settings SET api_key = ? WHERE user_id = ?"
-      ).run(enc, row.user_id);
+      db.prepare("UPDATE user_settings SET api_key = ? WHERE user_id = ?").run(enc, row.user_id);
       log.info({ userId: row.user_id }, "API key şifrelendi");
     } catch (e) {
       log.warn({ userId: row.user_id, err: e }, "API key şifreleme başarısız");
@@ -106,7 +101,7 @@ function _migrateToEncrypted(db: Database.Database): void {
 export interface UserSettings {
   userId: number;
   provider: string | null;
-  apiKey: string | null;   // read sırasında decrypt edilmiş
+  apiKey: string | null; // read sırasında decrypt edilmiş
   model: string | null;
   createdAt: string;
   updatedAt: string;
@@ -123,15 +118,12 @@ interface UserSettingsRow {
 
 // ── Read ────────────────────────────────────────────────────────────────────
 
-export function getUserSettings(
-  db: Database.Database,
-  userId: number
-): UserSettings | null {
+export function getUserSettings(db: Database.Database, userId: number): UserSettings | null {
   ensureUserSettingsTable(db);
 
-  const row = db
-    .prepare("SELECT * FROM user_settings WHERE user_id = ?")
-    .get(userId) as UserSettingsRow | undefined;
+  const row = db.prepare("SELECT * FROM user_settings WHERE user_id = ?").get(userId) as
+    | UserSettingsRow
+    | undefined;
 
   if (!row) return null;
   if (!row.provider && !row.api_key && !row.model) return null;
@@ -181,11 +173,7 @@ export function setUserProvider(
   log.info({ userId, provider }, "Kullanıcı provider güncellendi (key şifrelendi)");
 }
 
-export function setUserModel(
-  db: Database.Database,
-  userId: number,
-  model: string
-): void {
+export function setUserModel(db: Database.Database, userId: number, model: string): void {
   ensureUserSettingsTable(db);
 
   db.prepare(
@@ -220,7 +208,7 @@ export function getEffectiveAgentConfig(
   return {
     ...globalConfig,
     ...(userSettings.provider ? { provider: userSettings.provider } : {}),
-    ...(userSettings.apiKey   ? { api_key: userSettings.apiKey }   : {}),
-    ...(userSettings.model    ? { model: userSettings.model }       : {}),
+    ...(userSettings.apiKey ? { api_key: userSettings.apiKey } : {}),
+    ...(userSettings.model ? { model: userSettings.model } : {}),
   };
 }

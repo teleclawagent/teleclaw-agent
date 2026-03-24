@@ -56,17 +56,19 @@ export const tradingModeSetTool: Tool = {
     "Switch anytime. Your funds stay where they are.",
   category: "action",
   parameters: Type.Object({
-    mode: Type.Union([
-      Type.Literal("safe"),
-      Type.Literal("auto"),
-    ], { description: "Trading mode: safe (deeplink approval) or auto (custody wallet)" }),
+    mode: Type.Union([Type.Literal("safe"), Type.Literal("auto")], {
+      description: "Trading mode: safe (deeplink approval) or auto (custody wallet)",
+    }),
     asset_type: Type.Optional(
-      Type.Union([
-        Type.Literal("token"),
-        Type.Literal("gift"),
-        Type.Literal("username"),
-        Type.Literal("number"),
-      ], { description: "Apply to specific asset type only. Omit to set as default for all." })
+      Type.Union(
+        [
+          Type.Literal("token"),
+          Type.Literal("gift"),
+          Type.Literal("username"),
+          Type.Literal("number"),
+        ],
+        { description: "Apply to specific asset type only. Omit to set as default for all." }
+      )
     ),
   }),
 };
@@ -146,13 +148,15 @@ export const tradingModeViewExecutor: ToolExecutor = async (
 
     const row = context.db
       .prepare(`SELECT * FROM trading_mode WHERE user_id = ?`)
-      .get(context.senderId) as {
-      default_mode: string;
-      token_mode: string | null;
-      gift_mode: string | null;
-      username_mode: string | null;
-      number_mode: string | null;
-    } | undefined;
+      .get(context.senderId) as
+      | {
+          default_mode: string;
+          token_mode: string | null;
+          gift_mode: string | null;
+          username_mode: string | null;
+          number_mode: string | null;
+        }
+      | undefined;
 
     if (!row) {
       return {
@@ -160,7 +164,8 @@ export const tradingModeViewExecutor: ToolExecutor = async (
         data: {
           default_mode: "safe",
           overrides: {},
-          message: "No trading mode set yet. Default is 🟢 Safe Mode. Use trading_mode_set to change.",
+          message:
+            "No trading mode set yet. Default is 🟢 Safe Mode. Use trading_mode_set to change.",
         },
       };
     }

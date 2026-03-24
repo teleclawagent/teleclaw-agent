@@ -1,6 +1,6 @@
 /**
  * GitHub Copilot Device Login Flow
- * 
+ *
  * Uses GitHub's device flow OAuth to authenticate with Copilot.
  * User visits github.com/login/device and enters a code.
  * After auth, we get an access token for Copilot API access.
@@ -108,7 +108,9 @@ export async function pollForAccessToken(params: {
 
 // ── Copilot Token Exchange ─────────────────────────────────────────
 
-async function getCopilotToken(githubToken: string): Promise<{ token: string; expires_at: number }> {
+async function getCopilotToken(
+  githubToken: string
+): Promise<{ token: string; expires_at: number }> {
   const res = await fetch(COPILOT_TOKEN_URL, {
     headers: {
       Authorization: `token ${githubToken}`,
@@ -117,7 +119,9 @@ async function getCopilotToken(githubToken: string): Promise<{ token: string; ex
   });
 
   if (!res.ok) {
-    throw new Error(`Copilot token exchange failed: HTTP ${res.status}. Is Copilot enabled on your GitHub account?`);
+    throw new Error(
+      `Copilot token exchange failed: HTTP ${res.status}. Is Copilot enabled on your GitHub account?`
+    );
   }
 
   const json = (await res.json()) as { token: string; expires_at: number };
@@ -157,10 +161,15 @@ export function isCopilotConfigured(): boolean {
  */
 export async function getCopilotApiKey(): Promise<string> {
   const creds = loadCopilotCredentials();
-  if (!creds) throw new Error("Copilot not configured. Run 'teleclaw setup' and choose GitHub Copilot.");
+  if (!creds)
+    throw new Error("Copilot not configured. Run 'teleclaw setup' and choose GitHub Copilot.");
 
   // Check if we have a cached copilot token that's still valid
-  if (creds.copilot_token && creds.copilot_expires_at && Date.now() < (creds.copilot_expires_at * 1000 - 60000)) {
+  if (
+    creds.copilot_token &&
+    creds.copilot_expires_at &&
+    Date.now() < creds.copilot_expires_at * 1000 - 60000
+  ) {
     return creds.copilot_token;
   }
 

@@ -36,10 +36,7 @@ export const fragmentMarketExecutor: ToolExecutor<Record<string, never>> = async
     const trendingList =
       stats.trending.length > 0
         ? stats.trending
-            .map(
-              (t, i) =>
-                `  ${i + 1}. ${t.username} — ${t.price ?? "?"} (${t.bids ?? 0} bids)`
-            )
+            .map((t, i) => `  ${i + 1}. ${t.username} — ${t.price ?? "?"} (${t.bids ?? 0} bids)`)
             .join("\n")
         : "  No trending auctions right now";
 
@@ -92,8 +89,7 @@ export const fragmentCategoryTool: Tool = {
   category: "data-bearing",
   parameters: Type.Object({
     category: Type.String({
-      description:
-        "Category to analyze: short, medium, long, numeric, crypto, emoji, premium",
+      description: "Category to analyze: short, medium, long, numeric, crypto, emoji, premium",
       enum: ["short", "medium", "long", "numeric", "crypto", "emoji", "premium"],
     }),
     limit: Type.Optional(
@@ -183,9 +179,7 @@ export const fragmentCategoryExecutor: ToolExecutor<CategoryParams> = async (
         ? Math.round(allPrices.reduce((a, b) => a + b, 0) / allPrices.length)
         : 0;
     const median =
-      allPrices.length > 0
-        ? Math.round(allPrices[Math.floor(allPrices.length / 2)])
-        : 0;
+      allPrices.length > 0 ? Math.round(allPrices[Math.floor(allPrices.length / 2)]) : 0;
 
     const topListings = [...catSales, ...catAuctions]
       .sort((a, b) => (a.priceRaw ?? Infinity) - (b.priceRaw ?? Infinity))
@@ -194,10 +188,7 @@ export const fragmentCategoryExecutor: ToolExecutor<CategoryParams> = async (
     const listingsText =
       topListings.length > 0
         ? topListings
-            .map(
-              (l, i) =>
-                `  ${i + 1}. ${l.username} — ${l.price ?? "?"} (${l.status})`
-            )
+            .map((l, i) => `  ${i + 1}. ${l.username} — ${l.price ?? "?"} (${l.status})`)
             .join("\n")
         : "  No listings found in this category";
 
@@ -211,9 +202,7 @@ export const fragmentCategoryExecutor: ToolExecutor<CategoryParams> = async (
         avgPrice: avg,
         medianPrice: median,
         priceRange:
-          allPrices.length > 0
-            ? { min: allPrices[0], max: allPrices[allPrices.length - 1] }
-            : null,
+          allPrices.length > 0 ? { min: allPrices[0], max: allPrices[allPrices.length - 1] } : null,
         listings: topListings,
         message:
           `📊 Category: ${category.toUpperCase()}\n\n` +
@@ -265,10 +254,7 @@ export const fragmentWhalesExecutor: ToolExecutor<WhaleParams> = async (
     const soldHistory = await fetchSoldHistory(100);
 
     // Group by buyer wallet
-    const buyerMap = new Map<
-      string,
-      { count: number; totalSpent: number; usernames: string[] }
-    >();
+    const buyerMap = new Map<string, { count: number; totalSpent: number; usernames: string[] }>();
 
     for (const sale of soldHistory) {
       const buyer = sale.buyer || "unknown";
@@ -295,9 +281,7 @@ export const fragmentWhalesExecutor: ToolExecutor<WhaleParams> = async (
       .slice(0, limit);
 
     // Biggest single sales
-    const biggestSales = [...soldHistory]
-      .sort((a, b) => b.soldPrice - a.soldPrice)
-      .slice(0, limit);
+    const biggestSales = [...soldHistory].sort((a, b) => b.soldPrice - a.soldPrice).slice(0, limit);
 
     const whaleText =
       whales.length > 0
@@ -311,9 +295,7 @@ export const fragmentWhalesExecutor: ToolExecutor<WhaleParams> = async (
 
     const bigSalesText = biggestSales
       .slice(0, 5)
-      .map(
-        (s, i) => `  ${i + 1}. ${s.username} — ${s.soldPrice} TON`
-      )
+      .map((s, i) => `  ${i + 1}. ${s.username} — ${s.soldPrice} TON`)
       .join("\n");
 
     return {
@@ -353,8 +335,7 @@ export const fragmentSearchTool: Tool = {
   category: "data-bearing",
   parameters: Type.Object({
     query: Type.String({
-      description:
-        "Search keyword (e.g. 'crypto', 'ton', '4-letter') or username pattern",
+      description: "Search keyword (e.g. 'crypto', 'ton', '4-letter') or username pattern",
     }),
     status: Type.Optional(
       Type.String({
@@ -383,12 +364,7 @@ export const fragmentSearchExecutor: ToolExecutor<SearchParams> = async (
   _context
 ): Promise<ToolResult> => {
   try {
-    const {
-      query,
-      status = "sale",
-      sort = "recent",
-      limit = 20,
-    } = params;
+    const { query, status = "sale", sort = "recent", limit = 20 } = params;
 
     const statusTyped = status as "auction" | "sale" | "sold";
     const listings = await fetchUsernames(statusTyped, sort, 100);
@@ -400,17 +376,11 @@ export const fragmentSearchExecutor: ToolExecutor<SearchParams> = async (
     // Special queries
     if (/^\d+-letter$/.test(queryLower)) {
       const len = parseInt(queryLower);
-      filtered = listings.filter(
-        (l) => l.username.replace(/^@/, "").length === len
-      );
+      filtered = listings.filter((l) => l.username.replace(/^@/, "").length === len);
     } else if (queryLower === "numeric") {
-      filtered = listings.filter((l) =>
-        /^\d+$/.test(l.username.replace(/^@/, ""))
-      );
+      filtered = listings.filter((l) => /^\d+$/.test(l.username.replace(/^@/, "")));
     } else {
-      filtered = listings.filter((l) =>
-        l.username.toLowerCase().includes(queryLower)
-      );
+      filtered = listings.filter((l) => l.username.toLowerCase().includes(queryLower));
     }
 
     const limited = filtered.slice(0, limit);

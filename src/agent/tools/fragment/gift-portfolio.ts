@@ -7,11 +7,7 @@
 
 import { Type } from "@sinclair/typebox";
 import type { Tool, ToolExecutor, ToolResult, ToolContext } from "../types.js";
-import {
-  getCollection,
-  calculateRarityScore,
-  searchCollections,
-} from "./gifts-service.js";
+import { getCollection, calculateRarityScore, searchCollections } from "./gifts-service.js";
 import { createLogger } from "../../../utils/logger.js";
 
 const log = createLogger("GiftPortfolio");
@@ -113,7 +109,9 @@ export const giftPortfolioAddTool: Tool = {
     backdrop: Type.String({ description: "Backdrop name" }),
     symbol: Type.String({ description: "Symbol name" }),
     buy_price: Type.Optional(Type.Number({ description: "Price paid", minimum: 0 })),
-    buy_currency: Type.Optional(Type.String({ description: "Currency: TON, Stars, USDT (default: TON)" })),
+    buy_currency: Type.Optional(
+      Type.String({ description: "Currency: TON, Stars, USDT (default: TON)" })
+    ),
     buy_date: Type.Optional(Type.String({ description: "When you bought it (YYYY-MM-DD)" })),
     notes: Type.Optional(Type.String({ description: "Any notes" })),
   }),
@@ -131,11 +129,23 @@ export const giftPortfolioAddExecutor: ToolExecutor<PortfolioAddParams> = async 
       const suggestions = searchCollections(params.collection);
       return {
         success: false,
-        error: `Collection "${params.collection}" not found.${suggestions.length > 0 ? ` Did you mean: ${suggestions.slice(0, 3).map((s) => s.name).join(", ")}?` : ""}`,
+        error: `Collection "${params.collection}" not found.${
+          suggestions.length > 0
+            ? ` Did you mean: ${suggestions
+                .slice(0, 3)
+                .map((s) => s.name)
+                .join(", ")}?`
+            : ""
+        }`,
       };
     }
 
-    const rarity = calculateRarityScore(params.collection, params.model, params.backdrop, params.symbol);
+    const rarity = calculateRarityScore(
+      params.collection,
+      params.model,
+      params.backdrop,
+      params.symbol
+    );
     if (!rarity) {
       return {
         success: false,
@@ -170,7 +180,11 @@ export const giftPortfolioAddExecutor: ToolExecutor<PortfolioAddParams> = async 
         params.notes ?? null
       );
 
-    const premium = estimateGiftPremium(rarity.modelRarity, rarity.backdropRarity, rarity.symbolRarity);
+    const premium = estimateGiftPremium(
+      rarity.modelRarity,
+      rarity.backdropRarity,
+      rarity.symbolRarity
+    );
 
     return {
       success: true,
@@ -182,7 +196,9 @@ export const giftPortfolioAddExecutor: ToolExecutor<PortfolioAddParams> = async 
         backdrop: { name: params.backdrop, rarity: `${rarity.backdropRarity / 10}%` },
         symbol: { name: params.symbol, rarity: `${rarity.symbolRarity / 10}%` },
         tier: rarity.rarityTier,
-        buyPrice: params.buy_price ? `${params.buy_price} ${params.buy_currency ?? "TON"}` : "Not set",
+        buyPrice: params.buy_price
+          ? `${params.buy_price} ${params.buy_currency ?? "TON"}`
+          : "Not set",
         estimatedPremium: `${premium.premiumPct}% over floor`,
         valuationTier: premium.tier,
       },
@@ -223,9 +239,7 @@ export const giftPortfolioRemoveExecutor: ToolExecutor<PortfolioRemoveParams> = 
       return { success: false, error: "Portfolio entry not found or not yours." };
     }
 
-    context.db
-      .prepare(`DELETE FROM gift_portfolio WHERE id = ?`)
-      .run(params.portfolio_id);
+    context.db.prepare(`DELETE FROM gift_portfolio WHERE id = ?`).run(params.portfolio_id);
 
     return {
       success: true,
@@ -236,7 +250,10 @@ export const giftPortfolioRemoveExecutor: ToolExecutor<PortfolioRemoveParams> = 
       },
     };
   } catch (err: unknown) {
-    return { success: false, error: `Remove failed: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      success: false,
+      error: `Remove failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 };
 
@@ -267,7 +284,8 @@ export const giftPortfolioViewExecutor: ToolExecutor = async (
         success: true,
         data: {
           total: 0,
-          message: "Your gift portfolio is empty. Use gift_portfolio_add to start tracking your collection.",
+          message:
+            "Your gift portfolio is empty. Use gift_portfolio_add to start tracking your collection.",
         },
       };
     }
@@ -289,10 +307,18 @@ export const giftPortfolioViewExecutor: ToolExecutor = async (
       tierCounts[e.rarity_tier ?? "Unknown"] = (tierCounts[e.rarity_tier ?? "Unknown"] || 0) + 1;
 
       if (premium.premiumPct > bestPremium.premium) {
-        bestPremium = { id: e.id, collection: `${e.collection} ${e.model}`, premium: premium.premiumPct };
+        bestPremium = {
+          id: e.id,
+          collection: `${e.collection} ${e.model}`,
+          premium: premium.premiumPct,
+        };
       }
       if (premium.premiumPct < worstPremium.premium) {
-        worstPremium = { id: e.id, collection: `${e.collection} ${e.model}`, premium: premium.premiumPct };
+        worstPremium = {
+          id: e.id,
+          collection: `${e.collection} ${e.model}`,
+          premium: premium.premiumPct,
+        };
       }
 
       return {
@@ -316,12 +342,14 @@ export const giftPortfolioViewExecutor: ToolExecutor = async (
         total: entries.length,
         totalInvested: totalInvested > 0 ? `${totalInvested} TON` : "Not tracked",
         tierBreakdown: tierCounts,
-        bestPerformer: bestPremium.premium > 0
-          ? { gift: bestPremium.collection, premium: `${bestPremium.premium}% over floor` }
-          : null,
-        worstPerformer: worstPremium.premium < Infinity
-          ? { gift: worstPremium.collection, premium: `${worstPremium.premium}% over floor` }
-          : null,
+        bestPerformer:
+          bestPremium.premium > 0
+            ? { gift: bestPremium.collection, premium: `${bestPremium.premium}% over floor` }
+            : null,
+        worstPerformer:
+          worstPremium.premium < Infinity
+            ? { gift: worstPremium.collection, premium: `${worstPremium.premium}% over floor` }
+            : null,
         gifts,
       },
     };

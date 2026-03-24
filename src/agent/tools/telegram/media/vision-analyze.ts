@@ -157,7 +157,7 @@ export const visionAnalyzeExecutor: ToolExecutor<VisionAnalyzeParams> = async (
       log.info(`📷 Downloading image from message ${messageId}...`);
 
       // Get underlying GramJS client
-      const gramJsClient = context.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
+      const gramJsClient = context.bridge.getClient().getClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
 
       // Get the message
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- chatId/messageId guaranteed in this branch

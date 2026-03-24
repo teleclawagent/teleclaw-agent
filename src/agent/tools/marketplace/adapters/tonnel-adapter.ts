@@ -6,12 +6,7 @@
  * Method: REST API
  */
 
-import type {
-  MarketplaceAdapter,
-  MarketplaceListing,
-  SearchParams,
-  AssetKind,
-} from "../types.js";
+import type { MarketplaceAdapter, MarketplaceListing, SearchParams, AssetKind } from "../types.js";
 import { createLogger } from "../../../../utils/logger.js";
 
 const log = createLogger("Marketplace:Tonnel");
@@ -53,7 +48,7 @@ export const tonnelAdapter: MarketplaceAdapter = {
       if (params.sortBy === "price") url.searchParams.set("sort", "price_asc");
 
       const res = await fetch(url.toString(), {
-        headers: { "Accept": "application/json" },
+        headers: { Accept: "application/json" },
       });
 
       if (!res.ok) {
@@ -61,28 +56,30 @@ export const tonnelAdapter: MarketplaceAdapter = {
         return [];
       }
 
-      const data = await res.json() as { gifts?: TonnelGift[] };
+      const data = (await res.json()) as { gifts?: TonnelGift[] };
       if (!data?.gifts) return [];
 
-      return data.gifts.map((g): MarketplaceListing => ({
-        marketplace: "tonnel",
-        assetKind: "gift",
-        externalId: g.id,
-        url: g.url || `https://tonnel.network/gift/${g.id}`,
-        collection: g.collection,
-        giftNum: g.gift_number,
-        model: g.model,
-        backdrop: g.backdrop,
-        symbol: g.symbol,
-        rarityTier: g.rarity_tier,
-        priceTon: g.currency === "TON" || !g.currency ? (g.price ?? null) : null,
-        priceStars: g.currency === "Stars" ? (g.price ?? null) : null,
-        originalCurrency: g.currency || "TON",
-        originalPrice: g.price ?? null,
-        listingType: "fixed",
-        seller: g.seller,
-        onChain: g.on_chain ?? false,
-      }));
+      return data.gifts.map(
+        (g): MarketplaceListing => ({
+          marketplace: "tonnel",
+          assetKind: "gift",
+          externalId: g.id,
+          url: g.url || `https://tonnel.network/gift/${g.id}`,
+          collection: g.collection,
+          giftNum: g.gift_number,
+          model: g.model,
+          backdrop: g.backdrop,
+          symbol: g.symbol,
+          rarityTier: g.rarity_tier,
+          priceTon: g.currency === "TON" || !g.currency ? (g.price ?? null) : null,
+          priceStars: g.currency === "Stars" ? (g.price ?? null) : null,
+          originalCurrency: g.currency || "TON",
+          originalPrice: g.price ?? null,
+          listingType: "fixed",
+          seller: g.seller,
+          onChain: g.on_chain ?? false,
+        })
+      );
     } catch (err) {
       log.error({ err }, "Tonnel search failed");
       return [];
@@ -92,11 +89,11 @@ export const tonnelAdapter: MarketplaceAdapter = {
   async getListing(_assetKind: AssetKind, identifier: string): Promise<MarketplaceListing | null> {
     try {
       const res = await fetch(`${BASE_URL}/v1/gifts/${encodeURIComponent(identifier)}`, {
-        headers: { "Accept": "application/json" },
+        headers: { Accept: "application/json" },
       });
       if (!res.ok) return null;
 
-      const g = await res.json() as TonnelGift;
+      const g = (await res.json()) as TonnelGift;
       return {
         marketplace: "tonnel",
         assetKind: "gift",

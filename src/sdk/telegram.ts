@@ -101,10 +101,7 @@ export function createTelegramSDK(bridge: TelegramTransport, log: PluginLogger):
         }
 
         // Bot mode — sendDice not available via transport yet
-        throw new PluginSDKError(
-          "sendDice is not available in bot mode SDK",
-          "NOT_SUPPORTED"
-        );
+        throw new PluginSDKError("sendDice is not available in bot mode SDK", "NOT_SUPPORTED");
       } catch (err) {
         if (err instanceof PluginSDKError) throw err;
         throw new PluginSDKError(

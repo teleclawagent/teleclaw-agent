@@ -52,9 +52,7 @@ async function fetchPortfolio(address: string): Promise<{
   // 3. Get all jetton balances with prices
   const tokens: TokenHolding[] = [];
   try {
-    const response = await tonapiFetch(
-      `/accounts/${address}/jettons?currencies=usd`
-    );
+    const response = await tonapiFetch(`/accounts/${address}/jettons?currencies=usd`);
 
     if (response.ok) {
       const data = await response.json();
@@ -83,9 +81,7 @@ async function fetchPortfolio(address: string): Promise<{
         const valueUsd = priceUsd ? balanceFloat * priceUsd : null;
 
         // 24h change from price data
-        const change24h = price?.diff_24h?.USD
-          ? parseFloat(price.diff_24h.USD)
-          : null;
+        const change24h = price?.diff_24h?.USD ? parseFloat(price.diff_24h.USD) : null;
 
         tokens.push({
           symbol: jetton.symbol || "???",
@@ -250,9 +246,7 @@ const priceCheckExecutor: ToolExecutor<{ token: string }> = async (
     }
 
     // Jetton price via TonAPI
-    const response = await tonapiFetch(
-      `/rates?tokens=${params.token}&currencies=usd`
-    );
+    const response = await tonapiFetch(`/rates?tokens=${params.token}&currencies=usd`);
 
     if (!response.ok) {
       return { success: false, error: `Could not fetch price for ${params.token}` };

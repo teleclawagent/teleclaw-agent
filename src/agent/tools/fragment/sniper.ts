@@ -217,9 +217,7 @@ export const fragmentCheckExecutor: ToolExecutor<CheckParams> = async (
       };
     }
 
-    const lines = [
-      `@${result.username.replace(/^@/, "")} — ${result.status.toUpperCase()}`,
-    ];
+    const lines = [`@${result.username.replace(/^@/, "")} — ${result.status.toUpperCase()}`];
     if (result.price) lines.push(`Price: ${result.price}`);
     if (result.bids !== undefined) lines.push(`Bids: ${result.bids}`);
     if (result.endsAt) lines.push(`Ends: ${result.endsAt}`);
@@ -230,10 +228,14 @@ export const fragmentCheckExecutor: ToolExecutor<CheckParams> = async (
       lines.push("");
       lines.push("📍 Available on:");
       for (const listing of result.marketplaceListings) {
-        const marketLabel = listing.marketplace === "getgems" ? "GetGems"
-          : listing.marketplace === "marketapp" ? "MarketApp"
-          : listing.marketplace === "fragment" ? "Fragment"
-          : listing.marketplace;
+        const marketLabel =
+          listing.marketplace === "getgems"
+            ? "GetGems"
+            : listing.marketplace === "marketapp"
+              ? "MarketApp"
+              : listing.marketplace === "fragment"
+                ? "Fragment"
+                : listing.marketplace;
         const typeLabel = listing.saleType === "fixed_price" ? "Buy Now" : "Auction";
         lines.push(`  • ${marketLabel}: ${listing.price} TON (${typeLabel}) → ${listing.url}`);
       }

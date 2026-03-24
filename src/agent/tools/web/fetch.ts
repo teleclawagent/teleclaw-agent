@@ -46,7 +46,10 @@ function htmlToText(html: string): string {
   // Remove HTML comments
   text = text.replace(/<!--[\s\S]*?-->/g, "");
   // Replace br/hr/p/div/li/tr/h tags with newlines
-  text = text.replace(/<\/?(p|div|br|hr|li|tr|h[1-6]|blockquote|section|article|header|footer|nav|main|aside)[^>]*\/?>/gi, "\n");
+  text = text.replace(
+    /<\/?(p|div|br|hr|li|tr|h[1-6]|blockquote|section|article|header|footer|nav|main|aside)[^>]*\/?>/gi,
+    "\n"
+  );
   // Strip remaining tags
   text = text.replace(/<[^>]+>/g, "");
   // Decode common entities

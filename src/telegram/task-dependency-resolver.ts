@@ -173,7 +173,7 @@ export class TaskDependencyResolver {
       log.info(`🚀 Triggering dependent task: ${task.description}`);
 
       // Get "me" entity for Saved Messages
-      const gramJsClient = this.bridge.getClient().getClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
+      const gramJsClient = this.bridge.getClient().getClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy compat;
       const me = await gramJsClient.getMe();
 
       // Send task message immediately (no scheduling)

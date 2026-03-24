@@ -34,7 +34,8 @@ export const numberSniperTool: Tool = {
     ),
     min_discount: Type.Optional(
       Type.Number({
-        description: "Minimum discount % to consider a deal (default: 30 = 30% below estimated value)",
+        description:
+          "Minimum discount % to consider a deal (default: 30 = 30% below estimated value)",
         minimum: 5,
         maximum: 90,
       })
@@ -214,7 +215,9 @@ export const numberCheckExecutor: ToolExecutor<CheckParams> = async (
     if (result.owner) lines.push(`👤 Owner: ${result.owner}`);
     if (rarity) {
       lines.push(`📊 Rarity: ${rarity.tier} — ${rarity.label} (${rarity.score}/100)`);
-      lines.push(`💎 Est: ${rarity.estimatedFloor.min.toLocaleString()}-${rarity.estimatedFloor.max.toLocaleString()} TON`);
+      lines.push(
+        `💎 Est: ${rarity.estimatedFloor.min.toLocaleString()}-${rarity.estimatedFloor.max.toLocaleString()} TON`
+      );
       lines.push(`🏷️ ${rarity.tags.join(", ")}`);
     }
     lines.push(`🔗 ${result.url}`);
@@ -223,7 +226,9 @@ export const numberCheckExecutor: ToolExecutor<CheckParams> = async (
       success: true,
       data: {
         ...result,
-        rarity: rarity ? { tier: rarity.tier, score: rarity.score, label: rarity.label, tags: rarity.tags } : null,
+        rarity: rarity
+          ? { tier: rarity.tier, score: rarity.score, label: rarity.label, tags: rarity.tags }
+          : null,
         message: lines.join("\n"),
       },
     };

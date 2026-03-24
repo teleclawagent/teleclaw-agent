@@ -24,10 +24,10 @@ const log = createLogger("Tools");
 // ── Hangi dosyalar yazılabilir ─────────────────────────────────────────────
 
 const EDITABLE_FILES = {
-  soul:     WORKSPACE_PATHS.SOUL,       // SOUL.md     — karakter, kişilik
-  strategy: WORKSPACE_PATHS.STRATEGY,   // STRATEGY.md — ticaret/iş stratejisi
-  memory:   WORKSPACE_PATHS.MEMORY,     // MEMORY.md   — kalıcı hafıza
-  security: WORKSPACE_PATHS.SECURITY,   // SECURITY.md — güvenlik kuralları
+  soul: WORKSPACE_PATHS.SOUL, // SOUL.md     — karakter, kişilik
+  strategy: WORKSPACE_PATHS.STRATEGY, // STRATEGY.md — ticaret/iş stratejisi
+  memory: WORKSPACE_PATHS.MEMORY, // MEMORY.md   — kalıcı hafıza
+  security: WORKSPACE_PATHS.SECURITY, // SECURITY.md — güvenlik kuralları
 } as const;
 
 type EditableFile = keyof typeof EDITABLE_FILES;
@@ -133,15 +133,12 @@ const soulEditTool: Tool = {
     content: Type.String({
       description: "The content to write. For append/prepend, just the new section to add.",
     }),
-    mode: Type.Union(
-      [Type.Literal("overwrite"), Type.Literal("append"), Type.Literal("prepend")],
-      {
-        description:
-          "overwrite = replace entire file, append = add to end, prepend = add to beginning. " +
-          "Default: append (safest).",
-        default: "append",
-      }
-    ),
+    mode: Type.Union([Type.Literal("overwrite"), Type.Literal("append"), Type.Literal("prepend")], {
+      description:
+        "overwrite = replace entire file, append = add to end, prepend = add to beginning. " +
+        "Default: append (safest).",
+      default: "append",
+    }),
   }),
 };
 
@@ -183,7 +180,10 @@ const soulEditExecutor: ToolExecutor<SoulEditParams> = async (
     clearPromptCache();
 
     const fileName = file.toUpperCase() + ".md";
-    log.info({ file, mode, bytes: Buffer.byteLength(finalContent, "utf-8") }, "soul_edit: file updated");
+    log.info(
+      { file, mode, bytes: Buffer.byteLength(finalContent, "utf-8") },
+      "soul_edit: file updated"
+    );
 
     return {
       success: true,
@@ -207,6 +207,6 @@ const soulEditExecutor: ToolExecutor<SoulEditParams> = async (
 // ── Export ─────────────────────────────────────────────────────────────────
 
 export const tools: ToolEntry[] = [
-  { tool: soulReadTool,  executor: soulReadExecutor,  scope: "dm-only" },
-  { tool: soulEditTool,  executor: soulEditExecutor,  scope: "dm-only" },
+  { tool: soulReadTool, executor: soulReadExecutor, scope: "dm-only" },
+  { tool: soulEditTool, executor: soulEditExecutor, scope: "dm-only" },
 ];

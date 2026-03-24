@@ -68,7 +68,12 @@ const setPinExecutor: ToolExecutor<{ pin: string; current_pin?: string }> = asyn
       try {
         verifyPin(context.db, context.senderId, params.current_pin);
       } catch (error) {
-        auditLog(context.db, context.senderId, "pin_change_failed", "Wrong current PIN during PIN change attempt");
+        auditLog(
+          context.db,
+          context.senderId,
+          "pin_change_failed",
+          "Wrong current PIN during PIN change attempt"
+        );
         return { success: false, error: getErrorMessage(error) };
       }
     }
@@ -249,7 +254,12 @@ const whitelistAddExecutor: ToolExecutor<{ address: string; pin: string; label?:
     try {
       verifyPin(context.db, context.senderId, params.pin);
     } catch (error) {
-      auditLog(context.db, context.senderId, "whitelist_add_pin_failed", `Failed PIN for whitelist add: ${params.address}`);
+      auditLog(
+        context.db,
+        context.senderId,
+        "whitelist_add_pin_failed",
+        `Failed PIN for whitelist add: ${params.address}`
+      );
       return { success: false, error: getErrorMessage(error) };
     }
 
@@ -390,8 +400,7 @@ const setRuleTool: Tool = {
     }),
     condition_value: Type.Optional(
       Type.Number({
-        description:
-          "Price threshold in USD (for price_above/below/take_profit/stop_loss)",
+        description: "Price threshold in USD (for price_above/below/take_profit/stop_loss)",
       })
     ),
     target_asset: Type.Optional(
@@ -573,7 +582,9 @@ const confirmTradeTool: Tool = {
       description: "Whether to confirm (execute) or cancel the trade",
     }),
     pin: Type.Optional(
-      Type.String({ description: "Your security PIN (required for confirm, not needed for cancel)" })
+      Type.String({
+        description: "Your security PIN (required for confirm, not needed for cancel)",
+      })
     ),
   }),
 };
@@ -609,7 +620,10 @@ const confirmTradeExecutor: ToolExecutor<{
     // Check expiry
     if (execution.expires_at && execution.expires_at < Math.floor(Date.now() / 1000)) {
       updateExecutionStatus(context.db, execId, "expired");
-      return { success: false, error: "This trade has expired. Rules will trigger again if conditions are still met." };
+      return {
+        success: false,
+        error: "This trade has expired. Rules will trigger again if conditions are still met.",
+      };
     }
 
     if (params.action === "cancel") {
@@ -629,7 +643,12 @@ const confirmTradeExecutor: ToolExecutor<{
     try {
       verifyPin(context.db, context.senderId, params.pin);
     } catch (error) {
-      auditLog(context.db, context.senderId, "trade_confirm_pin_failed", `Failed PIN for ${execId.slice(0, 8)}`);
+      auditLog(
+        context.db,
+        context.senderId,
+        "trade_confirm_pin_failed",
+        `Failed PIN for ${execId.slice(0, 8)}`
+      );
       return { success: false, error: getErrorMessage(error) };
     }
 
@@ -645,11 +664,18 @@ const confirmTradeExecutor: ToolExecutor<{
 
     if (swapResult.success) {
       updateExecutionStatus(context.db, execId, "executed", JSON.stringify(swapResult.data));
-      auditLog(context.db, context.senderId, "trade_executed", `Executed ${execId.slice(0, 8)}: ${execution.action}`);
+      auditLog(
+        context.db,
+        context.senderId,
+        "trade_executed",
+        `Executed ${execId.slice(0, 8)}: ${execution.action}`
+      );
       return {
         success: true,
         data: {
-          ...(typeof swapResult.data === "object" && swapResult.data !== null ? swapResult.data : {}),
+          ...(typeof swapResult.data === "object" && swapResult.data !== null
+            ? swapResult.data
+            : {}),
           message: `✅ Trade executed!\n\n${execution.action}\n\nCheck your wallet balance in ~30 seconds.`,
         },
       };
@@ -666,10 +692,15 @@ const confirmTradeExecutor: ToolExecutor<{
 
 const tradeHistoryTool: Tool = {
   name: "agentic_wallet_history",
-  description: "View executed trade history for the user's agentic wallet. Each trade has a cryptographic signature for verification.",
+  description:
+    "View executed trade history for the user's agentic wallet. Each trade has a cryptographic signature for verification.",
   parameters: Type.Object({
     limit: Type.Optional(
-      Type.Number({ description: "Number of trades to show (default 20)", minimum: 1, maximum: 100 })
+      Type.Number({
+        description: "Number of trades to show (default 20)",
+        minimum: 1,
+        maximum: 100,
+      })
     ),
   }),
 };
@@ -749,5 +780,9 @@ export const tools: ToolEntry[] = [
   { tool: confirmTradeTool, executor: confirmTradeExecutor, scope: "dm-only" },
   { tool: tradeHistoryTool, executor: tradeHistoryExecutor, scope: "dm-only" },
   // 🔐 Wallet Verification (token gate)
-  { tool: verifyWalletTool, executor: verifyWalletExecutor as unknown as ToolExecutor<Record<string, unknown>>, scope: "dm-only" },
+  {
+    tool: verifyWalletTool,
+    executor: verifyWalletExecutor as unknown as ToolExecutor<Record<string, unknown>>,
+    scope: "dm-only",
+  },
 ];

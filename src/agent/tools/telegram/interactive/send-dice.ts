@@ -14,7 +14,7 @@ interface SendDiceParams {
 export const telegramSendDiceTool: Tool = {
   name: "telegram_send_dice",
   description:
-    'Send a random dice animation. Supported emojis: 🎲 (1-6), 🎯 (1-6), 🏀 (1-5), ⚽ (1-5), 🎳 (1-6), 🎰 (1-64). Default: 🎲',
+    "Send a random dice animation. Supported emojis: 🎲 (1-6), 🎯 (1-6), 🏀 (1-5), ⚽ (1-5), 🎳 (1-6), 🎰 (1-64). Default: 🎲",
   parameters: Type.Object({
     chatId: Type.String({ description: "The chat ID" }),
     emoji: Type.Optional(

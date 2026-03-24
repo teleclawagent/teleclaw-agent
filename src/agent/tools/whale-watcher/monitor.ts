@@ -38,14 +38,9 @@ interface ParsedTransaction {
 /**
  * Fetch recent transactions for a wallet via TonAPI.
  */
-async function fetchTransactions(
-  address: string,
-  limit = 10
-): Promise<ParsedTransaction[]> {
+async function fetchTransactions(address: string, limit = 10): Promise<ParsedTransaction[]> {
   try {
-    const response = await tonapiFetch(
-      `/accounts/${address}/events?limit=${limit}`
-    );
+    const response = await tonapiFetch(`/accounts/${address}/events?limit=${limit}`);
 
     if (!response.ok) return [];
 
@@ -113,10 +108,7 @@ async function fetchTransactions(
 /**
  * Build alert message for a whale transaction.
  */
-function buildWhaleAlert(
-  wallet: WatchedWallet,
-  tx: ParsedTransaction
-): string {
+function buildWhaleAlert(wallet: WatchedWallet, tx: ParsedTransaction): string {
   const direction = tx.type === "in" ? "⬅️ Received" : "➡️ Sent";
   const emoji = tx.type === "in" ? "🟢" : "🔴";
   const name = wallet.label || `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`;
@@ -156,17 +148,14 @@ async function checkWallet(
   if (newTxs.length === 0) return;
 
   // Update last_seen_lt to the highest lt
-  const maxLt = newTxs.reduce(
-    (max, tx) => {
-      try {
-        const lt = BigInt(tx.lt);
-        return lt > max ? lt : max;
-      } catch {
-        return max;
-      }
-    },
-    lastLt
-  );
+  const maxLt = newTxs.reduce((max, tx) => {
+    try {
+      const lt = BigInt(tx.lt);
+      return lt > max ? lt : max;
+    } catch {
+      return max;
+    }
+  }, lastLt);
 
   db.prepare("UPDATE whale_watched_wallets SET last_seen_lt = ? WHERE id = ?").run(
     maxLt.toString(),
@@ -181,8 +170,7 @@ async function checkWallet(
 
     // For TON: alert if >= MIN_TON_ALERT
     // For jettons: alert all (any jetton transfer from a whale is interesting)
-    const isSignificant =
-      tx.asset !== "TON" || tx.amountFloat >= MIN_TON_ALERT;
+    const isSignificant = tx.asset !== "TON" || tx.amountFloat >= MIN_TON_ALERT;
 
     if (!isSignificant) continue;
 
@@ -230,10 +218,7 @@ async function checkWallet(
 /**
  * Main monitoring tick — check all watched wallets.
  */
-async function monitorTick(
-  db: Database.Database,
-  bridge: TelegramTransport
-): Promise<void> {
+async function monitorTick(db: Database.Database, bridge: TelegramTransport): Promise<void> {
   if (isRunning) return;
   isRunning = true;
 
@@ -247,9 +232,7 @@ async function monitorTick(
     // Batch check — max 5 at a time to avoid rate limits
     for (let i = 0; i < wallets.length; i += 5) {
       const batch = wallets.slice(i, i + 5);
-      await Promise.allSettled(
-        batch.map((w) => checkWallet(db, bridge, w))
-      );
+      await Promise.allSettled(batch.map((w) => checkWallet(db, bridge, w)));
 
       // Small delay between batches
       if (i + 5 < wallets.length) {

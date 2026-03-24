@@ -65,7 +65,9 @@ export const portfolioAddExecutor: ToolExecutor<AddParams> = async (
     ensurePortfolioTable(context);
     const input = params.username.trim();
     // Detect if it's a number (+888...) or username
-    const isNumber = /^\+?888[\s\d\-()]+$/.test(input.replace(/[+\s\-()]/g, "").startsWith("888") ? input : "");
+    const isNumber = /^\+?888[\s\d\-()]+$/.test(
+      input.replace(/[+\s\-()]/g, "").startsWith("888") ? input : ""
+    );
     const clean = isNumber
       ? `+${input.replace(/[+\s\-()]/g, "")}` // normalize to +888XXXXXXXX
       : `@${input.replace(/^@/, "").toLowerCase()}`;
@@ -117,15 +119,15 @@ export const portfolioRemoveExecutor: ToolExecutor<RemoveParams> = async (
   try {
     ensurePortfolioTable(context);
     const input = params.username.trim();
-    const isNumber = /^\+?888[\s\d\-()]+$/.test(input.replace(/[+\s\-()]/g, "").startsWith("888") ? input : "");
+    const isNumber = /^\+?888[\s\d\-()]+$/.test(
+      input.replace(/[+\s\-()]/g, "").startsWith("888") ? input : ""
+    );
     const clean = isNumber
       ? `+${input.replace(/[+\s\-()]/g, "")}`
       : `@${input.replace(/^@/, "").toLowerCase()}`;
 
     const result = context.db
-      .prepare(
-        `DELETE FROM fragment_portfolio WHERE user_id = ? AND username = ?`
-      )
+      .prepare(`DELETE FROM fragment_portfolio WHERE user_id = ? AND username = ?`)
       .run(context.senderId, clean);
 
     if (result.changes === 0) {
@@ -173,17 +175,14 @@ export const portfolioViewExecutor: ToolExecutor<ViewParams> = async (
     const { sort = "profit" } = params;
 
     const entries = context.db
-      .prepare(
-        `SELECT * FROM fragment_portfolio WHERE user_id = ? ORDER BY buy_date DESC`
-      )
+      .prepare(`SELECT * FROM fragment_portfolio WHERE user_id = ? ORDER BY buy_date DESC`)
       .all(context.senderId) as PortfolioEntry[];
 
     if (entries.length === 0) {
       return {
         success: true,
         data: {
-          message:
-            "Your portfolio is empty. Use fragment_portfolio_add to track your usernames.",
+          message: "Your portfolio is empty. Use fragment_portfolio_add to track your usernames.",
         },
       };
     }
@@ -203,7 +202,11 @@ export const portfolioViewExecutor: ToolExecutor<ViewParams> = async (
         const rarityMid = rarity ? (rarity.estimatedFloor.min + rarity.estimatedFloor.max) / 2 : 0;
         currentValue = numStatus?.priceRaw ?? rarityMid;
         if (rarity) {
-          estimatedRange = { low: rarity.estimatedFloor.min, mid: rarityMid, high: rarity.estimatedFloor.max };
+          estimatedRange = {
+            low: rarity.estimatedFloor.min,
+            mid: rarityMid,
+            high: rarity.estimatedFloor.max,
+          };
         }
         fragmentStatus = numStatus?.status ?? "unknown";
       } else {
@@ -244,15 +247,13 @@ export const portfolioViewExecutor: ToolExecutor<ViewParams> = async (
     // Sort
     if (sort === "profit") valuations.sort((a, b) => b.pnlPct - a.pnlPct);
     else if (sort === "loss") valuations.sort((a, b) => a.pnlPct - b.pnlPct);
-    else if (sort === "value")
-      valuations.sort((a, b) => b.currentValue - a.currentValue);
+    else if (sort === "value") valuations.sort((a, b) => b.currentValue - a.currentValue);
     else valuations.sort((a, b) => a.username.localeCompare(b.username));
 
     const totalInvested = valuations.reduce((s, v) => s + v.buyPrice, 0);
     const totalCurrent = valuations.reduce((s, v) => s + v.currentValue, 0);
     const totalPnl = totalCurrent - totalInvested;
-    const totalPnlPct =
-      totalInvested > 0 ? Math.round((totalPnl / totalInvested) * 100) : 0;
+    const totalPnlPct = totalInvested > 0 ? Math.round((totalPnl / totalInvested) * 100) : 0;
 
     const itemText = valuations
       .map(

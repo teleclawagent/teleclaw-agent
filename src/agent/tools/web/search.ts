@@ -60,7 +60,11 @@ function setCache(key: string, data: SearchResponse): void {
 
 // ── Provider Detection ─────────────────────────────────────────────────
 
-function getApiKey(config: Config | undefined, configKey: string, ...envKeys: string[]): string | undefined {
+function getApiKey(
+  config: Config | undefined,
+  configKey: string,
+  ...envKeys: string[]
+): string | undefined {
   // Check config first
   const configVal = (config as Record<string, unknown>)?.[configKey];
   if (typeof configVal === "string" && configVal.length > 0) return configVal;
@@ -143,11 +147,7 @@ async function searchBrave(
   }));
 }
 
-async function searchGemini(
-  apiKey: string,
-  query: string,
-  count: number
-): Promise<SearchResult[]> {
+async function searchGemini(apiKey: string, query: string, count: number): Promise<SearchResult[]> {
   const resp = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
     {
@@ -193,9 +193,7 @@ async function searchGemini(
 
   return chunks.slice(0, count).map((chunk, i) => {
     // Find matching support text for this chunk
-    const supportText = supports.find((s) =>
-      s.groundingChunkIndices?.includes(i)
-    )?.segment?.text;
+    const supportText = supports.find((s) => s.groundingChunkIndices?.includes(i))?.segment?.text;
 
     return {
       title: chunk.web?.title ?? "Search Result",
@@ -205,11 +203,7 @@ async function searchGemini(
   });
 }
 
-async function searchGrok(
-  apiKey: string,
-  query: string,
-  count: number
-): Promise<SearchResult[]> {
+async function searchGrok(apiKey: string, query: string, count: number): Promise<SearchResult[]> {
   const resp = await fetch("https://api.x.ai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -265,11 +259,7 @@ async function searchGrok(
   return [];
 }
 
-async function searchKimi(
-  apiKey: string,
-  query: string,
-  count: number
-): Promise<SearchResult[]> {
+async function searchKimi(apiKey: string, query: string, count: number): Promise<SearchResult[]> {
   const resp = await fetch("https://api.moonshot.cn/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -402,12 +392,7 @@ export const webSearchTool: Tool = {
     ),
     freshness: Type.Optional(
       Type.Union(
-        [
-          Type.Literal("day"),
-          Type.Literal("week"),
-          Type.Literal("month"),
-          Type.Literal("year"),
-        ],
+        [Type.Literal("day"), Type.Literal("week"), Type.Literal("month"), Type.Literal("year")],
         { description: "Filter by recency: day, week, month, or year" }
       )
     ),
@@ -445,7 +430,11 @@ export const webSearchExecutor: ToolExecutor<WebSearchParams> = async (
 
     switch (provider.name) {
       case "brave":
-        results = await searchBrave(provider.key, query, maxResults, { country, language, freshness });
+        results = await searchBrave(provider.key, query, maxResults, {
+          country,
+          language,
+          freshness,
+        });
         break;
       case "gemini":
         results = await searchGemini(provider.key, query, maxResults);

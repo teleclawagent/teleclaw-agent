@@ -1,4 +1,11 @@
-import { randomUUID, createCipheriv, createDecipheriv, createHmac, scryptSync, randomBytes } from "crypto";
+import {
+  randomUUID,
+  createCipheriv,
+  createDecipheriv,
+  createHmac,
+  scryptSync,
+  randomBytes,
+} from "crypto";
 import { mnemonicNew, mnemonicToPrivateKey } from "@ton/crypto";
 import { WalletContractV5R1, fromNano, internal, toNano } from "@ton/ton";
 import { Address, SendMode } from "@ton/core";
@@ -147,10 +154,24 @@ export async function createUserWallet(
 export function getUserWallet(
   db: Database.Database,
   userId: number
-): { id: string; address: string; label: string | null; max_trade_amount: number; daily_limit: number; created_at: number } | null {
+): {
+  id: string;
+  address: string;
+  label: string | null;
+  max_trade_amount: number;
+  daily_limit: number;
+  created_at: number;
+} | null {
   const row = db
-    .prepare("SELECT id, address, label, max_trade_amount, daily_limit, created_at FROM agentic_wallets WHERE user_id = ?")
-    .get(userId) as Pick<WalletRow, "id" | "address" | "label" | "max_trade_amount" | "daily_limit" | "created_at"> | undefined;
+    .prepare(
+      "SELECT id, address, label, max_trade_amount, daily_limit, created_at FROM agentic_wallets WHERE user_id = ?"
+    )
+    .get(userId) as
+    | Pick<
+        WalletRow,
+        "id" | "address" | "label" | "max_trade_amount" | "daily_limit" | "created_at"
+      >
+    | undefined;
 
   return row || null;
 }

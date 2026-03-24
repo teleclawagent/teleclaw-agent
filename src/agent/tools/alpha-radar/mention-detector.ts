@@ -26,26 +26,71 @@ interface DetectedMention {
 // e.g. "al" removed (matches "also"), "sat" removed (matches "Saturday")
 
 const BULLISH_KEYWORDS = [
-  "buy now", "going long", "moon", "pump it", "bullish", "breakout",
-  "new ath", "100x", "10x gem", "undervalued", "accumulate", "dip buy",
-  "good entry", "load up", "send it", "strong buy",
-  "alım fırsatı", "yükseliş", "dipten al", "fırsat",
-  "🚀", "📈", "💎",
+  "buy now",
+  "going long",
+  "moon",
+  "pump it",
+  "bullish",
+  "breakout",
+  "new ath",
+  "100x",
+  "10x gem",
+  "undervalued",
+  "accumulate",
+  "dip buy",
+  "good entry",
+  "load up",
+  "send it",
+  "strong buy",
+  "alım fırsatı",
+  "yükseliş",
+  "dipten al",
+  "fırsat",
+  "🚀",
+  "📈",
+  "💎",
 ];
 
 const BEARISH_KEYWORDS = [
-  "sell now", "going short", "dump", "bearish", "crash",
-  "rug pull", "scam alert", "exit now", "overvalued", "dead project",
-  "rekt", "stay away", "avoid", "hack", "exploit",
-  "düşüş", "satış", "kaçın", "tehlike",
-  "🔴", "📉",
+  "sell now",
+  "going short",
+  "dump",
+  "bearish",
+  "crash",
+  "rug pull",
+  "scam alert",
+  "exit now",
+  "overvalued",
+  "dead project",
+  "rekt",
+  "stay away",
+  "avoid",
+  "hack",
+  "exploit",
+  "düşüş",
+  "satış",
+  "kaçın",
+  "tehlike",
+  "🔴",
+  "📉",
 ];
 
 const NEWS_KEYWORDS = [
-  "announced", "partnership", "new listing", "just launched", "update",
-  "upgrade", "airdrop", "snapshot", "migration", "audit complete",
-  "integration", "mainnet",
-  "duyuru", "açıklama", "güncelleme",
+  "announced",
+  "partnership",
+  "new listing",
+  "just launched",
+  "update",
+  "upgrade",
+  "airdrop",
+  "snapshot",
+  "migration",
+  "audit complete",
+  "integration",
+  "mainnet",
+  "duyuru",
+  "açıklama",
+  "güncelleme",
 ];
 
 /**
@@ -100,9 +145,7 @@ export function getTokensForChannel(
   channelChatId: string
 ): Array<{ userId: number; tokens: TrackedToken[] }> {
   const channelUsers = db
-    .prepare(
-      "SELECT DISTINCT user_id FROM radar_channels WHERE chat_id = ? AND active = 1"
-    )
+    .prepare("SELECT DISTINCT user_id FROM radar_channels WHERE chat_id = ? AND active = 1")
     .all(channelChatId) as Array<{ user_id: number }>;
 
   if (channelUsers.length === 0) return [];

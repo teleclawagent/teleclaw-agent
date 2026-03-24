@@ -6,12 +6,7 @@
  * Method: REST API
  */
 
-import type {
-  MarketplaceAdapter,
-  MarketplaceListing,
-  SearchParams,
-  AssetKind,
-} from "../types.js";
+import type { MarketplaceAdapter, MarketplaceListing, SearchParams, AssetKind } from "../types.js";
 import { createLogger } from "../../../../utils/logger.js";
 
 const log = createLogger("Marketplace:Portals");
@@ -45,7 +40,7 @@ export const portalsAdapter: MarketplaceAdapter = {
       if (params.limit) url.searchParams.set("limit", params.limit.toString());
 
       const res = await fetch(url.toString(), {
-        headers: { "Accept": "application/json" },
+        headers: { Accept: "application/json" },
       });
 
       if (!res.ok) {
@@ -53,27 +48,29 @@ export const portalsAdapter: MarketplaceAdapter = {
         return [];
       }
 
-      const data = await res.json() as { data?: PortalsGift[] };
+      const data = (await res.json()) as { data?: PortalsGift[] };
       if (!data?.data) return [];
 
-      return data.data.map((g): MarketplaceListing => ({
-        marketplace: "portals",
-        assetKind: "gift",
-        externalId: g.id,
-        url: `https://portals.to/gift/${g.id}`,
-        collection: g.collection_name,
-        giftNum: g.number,
-        model: g.model_name,
-        backdrop: g.backdrop_name,
-        symbol: g.symbol_name,
-        rarityTier: g.rarity,
-        priceTon: g.price_ton ?? null,
-        originalCurrency: "TON",
-        originalPrice: g.price_ton ?? null,
-        listingType: "fixed",
-        seller: g.seller_address,
-        onChain: true,
-      }));
+      return data.data.map(
+        (g): MarketplaceListing => ({
+          marketplace: "portals",
+          assetKind: "gift",
+          externalId: g.id,
+          url: `https://portals.to/gift/${g.id}`,
+          collection: g.collection_name,
+          giftNum: g.number,
+          model: g.model_name,
+          backdrop: g.backdrop_name,
+          symbol: g.symbol_name,
+          rarityTier: g.rarity,
+          priceTon: g.price_ton ?? null,
+          originalCurrency: "TON",
+          originalPrice: g.price_ton ?? null,
+          listingType: "fixed",
+          seller: g.seller_address,
+          onChain: true,
+        })
+      );
     } catch (err) {
       log.error({ err }, "Portals search failed");
       return [];
@@ -85,7 +82,7 @@ export const portalsAdapter: MarketplaceAdapter = {
       const res = await fetch(`${BASE_URL}/api/v1/gifts/${encodeURIComponent(identifier)}`);
       if (!res.ok) return null;
 
-      const g = await res.json() as PortalsGift;
+      const g = (await res.json()) as PortalsGift;
       return {
         marketplace: "portals",
         assetKind: "gift",
