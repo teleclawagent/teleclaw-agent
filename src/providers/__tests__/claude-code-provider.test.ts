@@ -11,7 +11,7 @@ describe("claude-code provider registration", () => {
   it("is registered with correct metadata", () => {
     const meta = getProviderMetadata("claude-code");
     expect(meta.id).toBe("claude-code");
-    expect(meta.displayName).toBe("Claude Code (Auto)");
+    expect(meta.displayName).toBe("Anthropic (Claude)");
     expect(meta.piAiProvider).toBe("anthropic");
     expect(meta.toolLimit).toBeNull();
     expect(meta.defaultModel).toBe("claude-opus-4-6");
@@ -19,10 +19,11 @@ describe("claude-code provider registration", () => {
     expect(meta.keyPrefix).toBe("sk-ant-");
   });
 
-  it("appears in getSupportedProviders()", () => {
+  it("is hidden from getSupportedProviders() (internal provider)", () => {
     const providers = getSupportedProviders();
     const ids = providers.map((p) => p.id);
-    expect(ids).toContain("claude-code");
+    // claude-code is an internal provider, not shown in setup UI
+    expect(ids).not.toContain("claude-code");
   });
 
   it("has identical API config to anthropic except display", () => {

@@ -16,15 +16,13 @@ import type { Config } from "../schema.js";
 const TEST_DIR = join(tmpdir(), "teleclaw-config-test");
 const TEST_CONFIG_PATH = join(TEST_DIR, "test-config.yaml");
 
-// Minimal valid config
+// Minimal valid config (bot-only — no api_id/api_hash/phone)
 const MINIMAL_CONFIG = `
 agent:
   api_key: sk-ant-api03-test123
   provider: anthropic
 telegram:
-  api_id: 12345
-  api_hash: abcdef1234567890
-  phone: "+1234567890"
+  bot_token: "1234567890:ABCDEF"
 `;
 
 // Full config with all optional fields
@@ -50,9 +48,8 @@ agent:
     idle_expiry_minutes: 720
 
 telegram:
-  api_id: 99999
-  api_hash: "test_hash_9999"
-  phone: "+9999999999"
+  bot_token: "1234567890:ABCDEF"
+  bot_username: "testbot"
   session_name: "custom_session"
   session_path: "~/custom_path"
   dm_policy: allowlist
@@ -70,8 +67,6 @@ telegram:
   owner_username: "testuser"
   owner_id: 666
   debounce_ms: 2000
-  bot_token: "1234567890:ABCDEF"
-  bot_username: "testbot"
 
 storage:
   sessions_file: "~/custom_sessions.json"
@@ -111,8 +106,7 @@ tonapi_key: "tonapi_test_key_456"
 const INVALID_MISSING_FIELDS = `
 agent:
   provider: anthropic
-telegram:
-  api_id: 12345
+telegram: {}
 `;
 
 // Config with invalid types
@@ -121,9 +115,7 @@ agent:
   api_key: sk-ant-test
   provider: anthropic
 telegram:
-  api_id: "not_a_number"
-  api_hash: abcdef
-  phone: "+1234567890"
+  max_message_length: "not_a_number"
 `;
 
 // Config with invalid provider
@@ -131,10 +123,7 @@ const INVALID_PROVIDER = `
 agent:
   api_key: sk-ant-test
   provider: invalid_provider
-telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
+telegram: {}
 `;
 
 // Config with deprecated market field
@@ -142,10 +131,7 @@ const DEPRECATED_MARKET = `
 agent:
   api_key: sk-ant-test
   provider: anthropic
-telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
+telegram: {}
 market:
   enabled: true
   deprecated_field: "should be ignored"
@@ -156,10 +142,7 @@ const OPENAI_CONFIG = `
 agent:
   api_key: sk-proj-test123
   provider: openai
-telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
+telegram: {}
 `;
 
 // ─── Test Utilities ────────────────────────────────────────────────────────────
@@ -201,18 +184,12 @@ describe("Config Loader", () => {
   beforeEach(() => {
     // Save original env vars
     originalEnv.TELECLAW_API_KEY = process.env.TELECLAW_API_KEY;
-    originalEnv.TELECLAW_TG_API_ID = process.env.TELECLAW_TG_API_ID;
-    originalEnv.TELECLAW_TG_API_HASH = process.env.TELECLAW_TG_API_HASH;
-    originalEnv.TELECLAW_TG_PHONE = process.env.TELECLAW_TG_PHONE;
     originalEnv.TELECLAW_WEBUI_ENABLED = process.env.TELECLAW_WEBUI_ENABLED;
     originalEnv.TELECLAW_WEBUI_PORT = process.env.TELECLAW_WEBUI_PORT;
     originalEnv.TELECLAW_WEBUI_HOST = process.env.TELECLAW_WEBUI_HOST;
 
     // Clear env vars before each test
     delete process.env.TELECLAW_API_KEY;
-    delete process.env.TELECLAW_TG_API_ID;
-    delete process.env.TELECLAW_TG_API_HASH;
-    delete process.env.TELECLAW_TG_PHONE;
     delete process.env.TELECLAW_WEBUI_ENABLED;
     delete process.env.TELECLAW_WEBUI_PORT;
     delete process.env.TELECLAW_WEBUI_HOST;
@@ -266,9 +243,7 @@ describe("Config Loader", () => {
 
       expect(config.agent.api_key).toBe("sk-ant-api03-test123");
       expect(config.agent.provider).toBe("anthropic");
-      expect(config.telegram.api_id).toBe(12345);
-      expect(config.telegram.api_hash).toBe("abcdef1234567890");
-      expect(config.telegram.phone).toBe("+1234567890");
+      expect(config.telegram.bot_token).toBe("1234567890:ABCDEF");
     });
 
     it("should load full config with all optional fields", () => {
@@ -327,7 +302,8 @@ describe("Config Loader", () => {
     });
 
     it("should throw error on missing required fields", () => {
-      writeTestConfig(INVALID_MISSING_FIELDS);
+      // With bot-only mode, most fields have defaults — empty config still fails on YAML level
+      writeTestConfig("not_a_valid_config: true\nrandom: stuff");
       expect(() => loadConfig(TEST_CONFIG_PATH)).toThrow(/Invalid config/);
     });
 
@@ -400,10 +376,7 @@ agent:
   api_key: sk-proj-test
   provider: openai
   model: gpt-4o-mini
-telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
+telegram: {}
 `;
       writeTestConfig(configWithModel);
       const config = loadConfig(TEST_CONFIG_PATH);
@@ -421,39 +394,6 @@ telegram:
 
       const config = loadConfig(TEST_CONFIG_PATH);
       expect(config.agent.api_key).toBe("sk-ant-override-key");
-    });
-
-    it("should override telegram api_id with TELECLAW_TG_API_ID", () => {
-      writeTestConfig(MINIMAL_CONFIG);
-      process.env.TELECLAW_TG_API_ID = "99999";
-
-      const config = loadConfig(TEST_CONFIG_PATH);
-      expect(config.telegram.api_id).toBe(99999);
-    });
-
-    it("should throw error on invalid TELECLAW_TG_API_ID format", () => {
-      writeTestConfig(MINIMAL_CONFIG);
-      process.env.TELECLAW_TG_API_ID = "not_a_number";
-
-      expect(() => loadConfig(TEST_CONFIG_PATH)).toThrow(
-        /Invalid TELECLAW_TG_API_ID.*not a valid integer/
-      );
-    });
-
-    it("should override telegram api_hash with TELECLAW_TG_API_HASH", () => {
-      writeTestConfig(MINIMAL_CONFIG);
-      process.env.TELECLAW_TG_API_HASH = "override_hash";
-
-      const config = loadConfig(TEST_CONFIG_PATH);
-      expect(config.telegram.api_hash).toBe("override_hash");
-    });
-
-    it("should override telegram phone with TELECLAW_TG_PHONE", () => {
-      writeTestConfig(MINIMAL_CONFIG);
-      process.env.TELECLAW_TG_PHONE = "+9999999999";
-
-      const config = loadConfig(TEST_CONFIG_PATH);
-      expect(config.telegram.phone).toBe("+9999999999");
     });
 
     it("should override webui enabled with TELECLAW_WEBUI_ENABLED=true", () => {
@@ -499,13 +439,11 @@ telegram:
     it("should handle multiple env var overrides simultaneously", () => {
       writeTestConfig(MINIMAL_CONFIG);
       process.env.TELECLAW_API_KEY = "sk-multi-override";
-      process.env.TELECLAW_TG_API_ID = "77777";
       process.env.TELECLAW_WEBUI_ENABLED = "true";
       process.env.TELECLAW_WEBUI_PORT = "8080";
 
       const config = loadConfig(TEST_CONFIG_PATH);
       expect(config.agent.api_key).toBe("sk-multi-override");
-      expect(config.telegram.api_id).toBe(77777);
       expect(config.webui.enabled).toBe(true);
       expect(config.webui.port).toBe(8080);
     });
@@ -535,9 +473,6 @@ agent:
   api_key: sk-ant-test
   provider: anthropic
 telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
   session_path: "~/custom/session"
 storage:
   sessions_file: "~/custom/sessions.json"
@@ -568,10 +503,7 @@ storage:
 agent:
   api_key: sk-ant-test
   provider: anthropic
-telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
+telegram: {}
 unknown_field: "should be ignored"
 another_unknown:
   nested: "value"
@@ -603,9 +535,6 @@ agent:
   provider: anthropic
   system_prompt: null
 telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
   agent_channel: null
 `;
       writeTestConfig(nullConfig);
@@ -623,9 +552,6 @@ agent:
   temperature: 0
   max_agentic_iterations: 0
 telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
   debounce_ms: 0
 `;
       writeTestConfig(zeroConfig);
@@ -644,10 +570,7 @@ telegram:
 agent:
   api_key: sk-test-${provider}
   provider: ${provider}
-telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
+telegram: {}
 `;
         writeTestConfig(providerConfig);
         expect(() => loadConfig(TEST_CONFIG_PATH)).not.toThrow();
@@ -661,10 +584,7 @@ agent:
   provider: anthropic
   session_reset_policy:
     daily_reset_hour: 24
-telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
+telegram: {}
 `;
       writeTestConfig(invalidHour);
       expect(() => loadConfig(TEST_CONFIG_PATH)).toThrow(/Invalid config/);
@@ -676,9 +596,6 @@ agent:
   api_key: sk-ant-test
   provider: anthropic
 telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
   allow_from: []
   admin_ids: []
 `;
@@ -813,9 +730,6 @@ agent:
   api_key: sk-ant-test
   provider: anthropic
 telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
   dm_policy: open
   group_policy: allowlist
 `;
@@ -832,9 +746,7 @@ agent:
   api_key: sk-ant-test
   provider: anthropic
 telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
+  bot_token: "12345678:test"
 plugins:
   my_plugin:
     nested:
@@ -864,9 +776,6 @@ agent:
   api_key: sk-proj-partial
   provider: openai
 telegram:
-  api_id: 12345
-  api_hash: abcdef
-  phone: "+1234567890"
   session_path: ~/custom
 `;
       writeTestConfig(partialConfig);

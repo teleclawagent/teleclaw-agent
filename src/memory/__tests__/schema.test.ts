@@ -1081,7 +1081,7 @@ describe("Memory Schema", () => {
     });
 
     it("CURRENT_SCHEMA_VERSION is set to expected value", () => {
-      expect(CURRENT_SCHEMA_VERSION).toBe("1.15.0");
+      expect(CURRENT_SCHEMA_VERSION).toBe("1.16.0");
     });
   });
 
@@ -1153,6 +1153,17 @@ describe("Memory Schema", () => {
 
     it("runMigrations from version 1.12.0 adds token usage columns to sessions", () => {
       ensureSchema(db);
+      // Create tool_config table (normally created by migration 1.10.0)
+      // so that later migrations (1.16.0) that reference it don't fail
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS tool_config (
+          tool_name TEXT PRIMARY KEY,
+          enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0, 1)),
+          scope TEXT NOT NULL DEFAULT 'all' CHECK(scope IN ('all', 'dm-only', 'group-only', 'disabled', 'admin-only')),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_by INTEGER
+        );
+      `);
       setSchemaVersion(db, "1.12.0");
 
       runMigrations(db);
@@ -1319,11 +1330,11 @@ describe("Memory Schema", () => {
       ).toThrow();
     });
 
-    it("tool_config.scope CHECK constraint accepts valid scope values", () => {
+    it("tool_config.scope accepts any text value after migration 1.16.0", () => {
       ensureSchema(db);
       runMigrations(db);
 
-      const validScopes = ["always", "dm-only", "group-only", "admin-only"];
+      const validScopes = ["always", "dm-only", "group-only", "admin-only", "custom-scope"];
 
       for (const scope of validScopes) {
         db.prepare(`INSERT INTO tool_config (tool_name, scope) VALUES (?, ?)`).run(
@@ -1332,13 +1343,12 @@ describe("Memory Schema", () => {
         );
       }
 
+      // After 1.16.0 scope constraint is relaxed — any text is accepted
       expect(() =>
         db
-          .prepare(
-            `INSERT INTO tool_config (tool_name, scope) VALUES ('tool-invalid', 'invalid-scope')`
-          )
+          .prepare(`INSERT INTO tool_config (tool_name, scope) VALUES ('tool-free', 'any-value')`)
           .run()
-      ).toThrow();
+      ).not.toThrow();
     });
 
     it("tool_config.enabled defaults to 1", () => {

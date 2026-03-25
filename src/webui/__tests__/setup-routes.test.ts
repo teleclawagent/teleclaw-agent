@@ -370,7 +370,9 @@ describe("Setup API Routes", () => {
           }),
       });
 
-      const res = await post(app, "/validate/bot-token", { token: "123456:ABC-DEF" });
+      const res = await post(app, "/validate/bot-token", {
+        token: "12345678:ABCDEFghijklmnopqrstuvwxyz012345",
+      });
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.data.valid).toBe(true);
@@ -395,7 +397,9 @@ describe("Setup API Routes", () => {
         json: () => Promise.resolve({ ok: false }),
       });
 
-      const res = await post(app, "/validate/bot-token", { token: "123:bad" });
+      const res = await post(app, "/validate/bot-token", {
+        token: "12345678:ABCDEFghijklmnopqrstuvwxyz012345",
+      });
       const data = await res.json();
       expect(data.data.valid).toBe(false);
       expect(data.data.error).toContain("invalid");
@@ -404,7 +408,9 @@ describe("Setup API Routes", () => {
     it("handles network error gracefully", async () => {
       (fetchWithTimeout as Mock).mockRejectedValue(new Error("ECONNREFUSED"));
 
-      const res = await post(app, "/validate/bot-token", { token: "123:token" });
+      const res = await post(app, "/validate/bot-token", {
+        token: "12345678:ABCDEFghijklmnopqrstuvwxyz012345",
+      });
       const data = await res.json();
       expect(data.data.valid).toBe(false);
       expect(data.data.networkError).toBe(true);
@@ -551,306 +557,6 @@ describe("Setup API Routes", () => {
       const data = await res.json();
       expect(data.success).toBe(false);
       expect(data.error).toContain("Invalid mnemonic");
-    });
-  });
-
-  // ── POST /telegram/send-code ────────────────────────────────────────────
-
-  describe("POST /telegram/send-code", () => {
-    it("sends code successfully", async () => {
-      mockAuthManager.sendCode.mockResolvedValue({
-        authSessionId: "sess-123",
-        codeViaApp: true,
-        expiresAt: Date.now() + 300000,
-      });
-
-      const res = await post(app, "/telegram/send-code", {
-        apiId: 12345,
-        apiHash: "abcdef",
-        phone: "+1234567890",
-      });
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.success).toBe(true);
-      expect(data.data.authSessionId).toBe("sess-123");
-      expect(data.data.codeViaApp).toBe(true);
-    });
-
-    it("returns 400 when missing required fields", async () => {
-      const res = await post(app, "/telegram/send-code", { apiId: 12345 });
-      expect(res.status).toBe(400);
-      const data = await res.json();
-      expect(data.success).toBe(false);
-      expect(data.error).toContain("Missing");
-    });
-
-    it("returns 429 on rate limit (FloodWait)", async () => {
-      mockAuthManager.sendCode.mockRejectedValue({ seconds: 30, message: "FLOOD" });
-
-      const res = await post(app, "/telegram/send-code", {
-        apiId: 12345,
-        apiHash: "abcdef",
-        phone: "+1234567890",
-      });
-      expect(res.status).toBe(429);
-      const data = await res.json();
-      expect(data.error).toContain("30 seconds");
-    });
-
-    it("returns 500 on generic error", async () => {
-      mockAuthManager.sendCode.mockRejectedValue({
-        errorMessage: "PHONE_NUMBER_INVALID",
-        message: "Phone invalid",
-      });
-
-      const res = await post(app, "/telegram/send-code", {
-        apiId: 12345,
-        apiHash: "abcdef",
-        phone: "+invalid",
-      });
-      expect(res.status).toBe(500);
-      const data = await res.json();
-      expect(data.error).toBe("PHONE_NUMBER_INVALID");
-    });
-
-    it("returns codeDelivery: fragment with fragmentUrl for +888 numbers", async () => {
-      mockAuthManager.sendCode.mockResolvedValue({
-        authSessionId: "sess-frag-1",
-        codeDelivery: "fragment",
-        fragmentUrl: "https://fragment.com/number/88812345678",
-        codeLength: 5,
-        expiresAt: Date.now() + 300000,
-      });
-
-      const res = await post(app, "/telegram/send-code", {
-        apiId: 12345,
-        apiHash: "abcdef",
-        phone: "+88812345678",
-      });
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.success).toBe(true);
-      expect(data.data.codeDelivery).toBe("fragment");
-      expect(data.data.fragmentUrl).toBe("https://fragment.com/number/88812345678");
-      expect(data.data.authSessionId).toBe("sess-frag-1");
-    });
-
-    it("returns codeDelivery: app for Telegram app delivery", async () => {
-      mockAuthManager.sendCode.mockResolvedValue({
-        authSessionId: "sess-app-1",
-        codeDelivery: "app",
-        codeLength: 5,
-        expiresAt: Date.now() + 300000,
-      });
-
-      const res = await post(app, "/telegram/send-code", {
-        apiId: 12345,
-        apiHash: "abcdef",
-        phone: "+1234567890",
-      });
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.data.codeDelivery).toBe("app");
-      expect(data.data.fragmentUrl).toBeUndefined();
-    });
-  });
-
-  // ── POST /telegram/verify-code ──────────────────────────────────────────
-
-  describe("POST /telegram/verify-code", () => {
-    it("verifies code successfully", async () => {
-      mockAuthManager.verifyCode.mockResolvedValue({
-        status: "authenticated",
-        user: { id: 111, firstName: "Test" },
-      });
-
-      const res = await post(app, "/telegram/verify-code", {
-        authSessionId: "sess-123",
-        code: "12345",
-      });
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.data.status).toBe("authenticated");
-      expect(data.data.user.firstName).toBe("Test");
-    });
-
-    it("returns 2fa_required when password needed", async () => {
-      mockAuthManager.verifyCode.mockResolvedValue({
-        status: "2fa_required",
-        passwordHint: "pets name",
-      });
-
-      const res = await post(app, "/telegram/verify-code", {
-        authSessionId: "sess-123",
-        code: "12345",
-      });
-      const data = await res.json();
-      expect(data.data.status).toBe("2fa_required");
-      expect(data.data.passwordHint).toBe("pets name");
-    });
-
-    it("returns 400 when missing fields", async () => {
-      const res = await post(app, "/telegram/verify-code", { authSessionId: "sess-123" });
-      expect(res.status).toBe(400);
-      const data = await res.json();
-      expect(data.error).toContain("Missing");
-    });
-
-    it("returns 429 on rate limit", async () => {
-      mockAuthManager.verifyCode.mockRejectedValue({ seconds: 60 });
-
-      const res = await post(app, "/telegram/verify-code", {
-        authSessionId: "sess-123",
-        code: "12345",
-      });
-      expect(res.status).toBe(429);
-    });
-  });
-
-  // ── POST /telegram/verify-password ──────────────────────────────────────
-
-  describe("POST /telegram/verify-password", () => {
-    it("verifies password successfully", async () => {
-      mockAuthManager.verifyPassword.mockResolvedValue({
-        status: "authenticated",
-        user: { id: 222, firstName: "User", username: "user222" },
-      });
-
-      const res = await post(app, "/telegram/verify-password", {
-        authSessionId: "sess-123",
-        password: "secret",
-      });
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.data.status).toBe("authenticated");
-      expect(data.data.user.username).toBe("user222");
-    });
-
-    it("returns 400 when missing fields", async () => {
-      const res = await post(app, "/telegram/verify-password", {
-        authSessionId: "sess-123",
-      });
-      expect(res.status).toBe(400);
-      const data = await res.json();
-      expect(data.error).toContain("Missing");
-    });
-
-    it("returns 429 on rate limit", async () => {
-      mockAuthManager.verifyPassword.mockRejectedValue({ seconds: 120 });
-
-      const res = await post(app, "/telegram/verify-password", {
-        authSessionId: "sess-123",
-        password: "wrong",
-      });
-      expect(res.status).toBe(429);
-      const data = await res.json();
-      expect(data.error).toContain("120 seconds");
-    });
-
-    it("returns 500 on generic error", async () => {
-      mockAuthManager.verifyPassword.mockRejectedValue(new Error("Network error"));
-
-      const res = await post(app, "/telegram/verify-password", {
-        authSessionId: "sess-123",
-        password: "test",
-      });
-      expect(res.status).toBe(500);
-      const data = await res.json();
-      expect(data.error).toBe("Network error");
-    });
-  });
-
-  // ── POST /telegram/resend-code ──────────────────────────────────────────
-
-  describe("POST /telegram/resend-code", () => {
-    it("resends code successfully", async () => {
-      mockAuthManager.resendCode.mockResolvedValue({ codeViaApp: false });
-
-      const res = await post(app, "/telegram/resend-code", {
-        authSessionId: "sess-123",
-      });
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.success).toBe(true);
-      expect(data.data.codeViaApp).toBe(false);
-    });
-
-    it("returns 400 when session expired or invalid", async () => {
-      mockAuthManager.resendCode.mockResolvedValue(null);
-
-      const res = await post(app, "/telegram/resend-code", {
-        authSessionId: "expired-id",
-      });
-      expect(res.status).toBe(400);
-      const data = await res.json();
-      expect(data.error).toContain("expired");
-    });
-
-    it("returns 400 when missing authSessionId", async () => {
-      const res = await post(app, "/telegram/resend-code", {});
-      expect(res.status).toBe(400);
-      const data = await res.json();
-      expect(data.error).toContain("Missing");
-    });
-
-    it("returns 429 on rate limit", async () => {
-      mockAuthManager.resendCode.mockRejectedValue({ seconds: 45 });
-
-      const res = await post(app, "/telegram/resend-code", {
-        authSessionId: "sess-123",
-      });
-      expect(res.status).toBe(429);
-    });
-
-    it("returns codeDelivery: fragment with fragmentUrl on resend", async () => {
-      mockAuthManager.resendCode.mockResolvedValue({
-        codeDelivery: "fragment",
-        fragmentUrl: "https://fragment.com/number/88812345678",
-        codeLength: 5,
-      });
-
-      const res = await post(app, "/telegram/resend-code", {
-        authSessionId: "sess-frag-1",
-      });
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.success).toBe(true);
-      expect(data.data.codeDelivery).toBe("fragment");
-      expect(data.data.fragmentUrl).toBe("https://fragment.com/number/88812345678");
-    });
-  });
-
-  // ── DELETE /telegram/session ────────────────────────────────────────────
-
-  describe("DELETE /telegram/session", () => {
-    it("cancels session successfully", async () => {
-      mockAuthManager.cancelSession.mockResolvedValue(undefined);
-
-      const res = await del(app, "/telegram/session", { authSessionId: "sess-123" });
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.success).toBe(true);
-      expect(mockAuthManager.cancelSession).toHaveBeenCalledWith("sess-123");
-    });
-
-    it("handles missing body gracefully (empty authSessionId)", async () => {
-      mockAuthManager.cancelSession.mockResolvedValue(undefined);
-
-      const res = await del(app, "/telegram/session");
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.success).toBe(true);
-      expect(mockAuthManager.cancelSession).toHaveBeenCalledWith("");
-    });
-
-    it("returns 500 on cancelSession error", async () => {
-      mockAuthManager.cancelSession.mockRejectedValue(new Error("disconnect failed"));
-
-      const res = await del(app, "/telegram/session", { authSessionId: "sess-123" });
-      expect(res.status).toBe(500);
-      const data = await res.json();
-      expect(data.success).toBe(false);
-      expect(data.error).toBe("disconnect failed");
     });
   });
 
