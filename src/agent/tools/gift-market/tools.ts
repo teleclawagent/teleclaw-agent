@@ -39,13 +39,24 @@ async function floorPricesExecutor(
   try {
     if (params.collection) {
       const slug = params.collection.toLowerCase().replace(/[^a-z0-9]/g, "");
+      // Single-source: fetch listings sorted by price, derive floor from cheapest
+      const listings = await fetchListings(slug, 1);
       const data = await fetchFloorPrice(slug);
-      if (!data) return fail(`Collection "${params.collection}" not found on Fragment`);
+      if (!data && listings.length === 0)
+        return fail(`Collection "${params.collection}" not found on Fragment`);
       const tonPrice = await getTonPriceUsd();
+      // Use the cheapest actual listing as the true floor (single-source truth)
+      const trueFloor = listings.length > 0 ? listings[0].priceTon : (data?.floorTon ?? null);
       return ok({
-        ...data,
-        floorUsd: data.floorTon ? Math.round(data.floorTon * tonPrice * 100) / 100 : null,
+        collection: data?.collection || params.collection,
+        slug,
+        floorTon: trueFloor,
+        floorUsd: trueFloor ? Math.round(trueFloor * tonPrice * 100) / 100 : null,
+        listingCount: data?.listingCount ?? listings.length,
+        highestTon: data?.highestTon ?? null,
+        fetchedAt: new Date().toISOString(),
         tonPriceUsd: tonPrice,
+        source: "fragment (listing-derived floor)",
       });
     }
 

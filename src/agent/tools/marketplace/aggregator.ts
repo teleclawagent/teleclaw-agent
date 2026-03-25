@@ -191,10 +191,11 @@ export async function aggregatedSearch(params: SearchParams): Promise<Aggregated
   // Apply overall limit
   const limited = deduped.slice(0, params.limit ?? 30);
 
-  // Find best deal
+  // Single-source floor: derive from sorted listings[0], NOT from a separate endpoint.
+  // This guarantees floor and cheapest listing always agree.
   const bestDeal = limited.find((l) => l.priceTon !== null) ?? null;
 
-  // Price range
+  // Price range — all from the same sorted list
   const priced = limited.filter((l) => l.priceTon !== null);
   const lowest = priced.length > 0 ? priced[0].priceTon : null;
   const highest = priced.length > 0 ? priced[priced.length - 1].priceTon : null;

@@ -4,12 +4,17 @@
  * Supports: usernames, anonymous numbers, gifts (both on-chain & off-chain)
  * Fragment is Telegram's official marketplace — supports both upgraded (on-chain NFT)
  * and non-upgraded (off-chain) gifts, plus username and number trading.
- * Method: HTML scraping via cheerio (no official API)
- * Rate limit: 2s between requests, 5min cache
+ * Method: HTML scraping (no official API)
+ * Rate limit: 2s between requests, 3min cache
  */
 
 import type { MarketplaceAdapter, MarketplaceListing, SearchParams, AssetKind } from "../types.js";
 import type { FragmentUsername, FragmentNumber } from "../../fragment/fragment-service.js";
+import {
+  fetchListings as fetchGiftListings,
+  resolveSlug,
+  type FragmentListing,
+} from "../../gift-market/fragment-scraper.js";
 import { createLogger } from "../../../../utils/logger.js";
 
 const log = createLogger("Marketplace:Fragment");
@@ -28,6 +33,24 @@ async function getFragmentService() {
     }
   }
   return fragmentService;
+}
+
+/** Convert a FragmentListing (from scraper) to a unified MarketplaceListing */
+function giftToListing(g: FragmentListing, collection?: string): MarketplaceListing {
+  return {
+    marketplace: "fragment",
+    assetKind: "gift",
+    externalId: g.slug,
+    url: g.url,
+    identifier: g.slug,
+    collection: collection || g.slug.replace(/-\d+$/, ""),
+    giftNum: g.giftNum,
+    priceTon: g.priceTon,
+    originalCurrency: "TON",
+    originalPrice: g.priceTon,
+    listingType: "fixed",
+    onChain: false, // Fragment lists both on-chain and off-chain; scraper doesn't distinguish
+  };
 }
 
 function usernameToListing(u: FragmentUsername): MarketplaceListing {
@@ -106,54 +129,45 @@ export const fragmentAdapter: MarketplaceAdapter = {
         return filtered.slice(0, params.limit ?? 20).map(numberToListing);
       }
 
-      // Gifts — Fragment gift listings via fragment-scraper
-      if (params.collection) {
-        try {
-          const { fetchListings, fetchFloorPrice } = await import(
-            "../../gift-market/fragment-scraper.js"
-          );
-          const slug = params.collection.toLowerCase().replace(/[^a-z0-9]/g, "");
-          // Fetch more than needed — scraper regex can miss items, overfetch then trim
-          const fetchLimit = Math.max((params.limit ?? 20) * 2, 30);
-          const [listings, floor] = await Promise.all([
-            fetchListings(slug, fetchLimit),
-            fetchFloorPrice(slug),
-          ]);
-
-          if (listings.length === 0) {
-            log.debug({ slug }, "Fragment scraper returned 0 listings — page may have changed");
-            return [];
-          }
-
-          // Client-side sort to ensure cheapest first (scraper may not preserve order)
-          listings.sort((a, b) => a.priceTon - b.priceTon);
-
-          return listings
-            .filter((l) => !params.maxPrice || l.priceTon <= params.maxPrice)
-            .slice(0, params.limit ?? 20)
-            .map(
-              (l): MarketplaceListing => ({
-                marketplace: "fragment",
-                assetKind: "gift",
-                externalId: `fragment-${slug}-${l.giftNum}`,
-                url: l.url,
-                identifier: floor?.collection || params.collection || l.slug,
-                collection: floor?.collection || params.collection,
-                giftNum: l.giftNum,
-                priceTon: l.priceTon,
-                originalCurrency: "TON",
-                originalPrice: l.priceTon,
-                floorPriceTon: floor?.floorTon ?? undefined,
-                onSaleCount: floor?.listingCount,
-                listingType: "fixed",
-                onChain: true,
-              })
-            );
-        } catch (err) {
-          log.warn({ err, collection: params.collection }, "Fragment gift scraping failed");
+      // Gifts — use Fragment scraper (covers on-chain + off-chain)
+      if (params.assetKind === "gift") {
+        const collectionName = params.collection || params.query;
+        if (!collectionName) {
+          log.debug("No collection name provided for gift search");
           return [];
         }
+
+        const slug = await resolveSlug(collectionName);
+        if (!slug) {
+          log.debug({ collectionName }, "Could not resolve Fragment slug");
+          return [];
+        }
+
+        // Overfetch then trim — scraper regex can miss items
+        const limit = params.limit ?? 20;
+        const fetchLimit = Math.max(limit * 2, 30);
+        const listings = await fetchGiftListings(slug, fetchLimit);
+
+        // Client-side sort to ensure cheapest first
+        listings.sort((a, b) => a.priceTon - b.priceTon);
+
+        let results = listings.map((l) => giftToListing(l, collectionName));
+
+        // Apply price filters
+        if (params.maxPrice) {
+          results = results.filter(
+            (r) => r.priceTon != null && r.priceTon <= (params.maxPrice as number)
+          );
+        }
+        if (params.minPrice) {
+          results = results.filter(
+            (r) => r.priceTon != null && r.priceTon >= (params.minPrice as number)
+          );
+        }
+
+        return results.slice(0, limit);
       }
+
       return [];
     } catch (err) {
       log.error({ err }, "Fragment search failed");
@@ -178,6 +192,13 @@ export const fragmentAdapter: MarketplaceAdapter = {
         return numberToListing(result);
       }
 
+      // Gift by slug identifier
+      if (assetKind === "gift") {
+        const listings = await fetchGiftListings(identifier, 1);
+        if (listings.length === 0) return null;
+        return giftToListing(listings[0]);
+      }
+
       return null;
     } catch (err) {
       log.error({ err, assetKind, identifier }, "Fragment getListing failed");
@@ -187,8 +208,9 @@ export const fragmentAdapter: MarketplaceAdapter = {
 
   async isAvailable(): Promise<boolean> {
     try {
-      const svc = await getFragmentService();
-      return svc !== null;
+      // Fragment is always available (HTML scraping, no auth needed for gifts)
+      // Even if fragment-service isn't loaded, gift scraping works independently
+      return true;
     } catch {
       return false;
     }

@@ -94,6 +94,10 @@ interface GiftOnSale {
   rarity?: string;
   index?: number;
   item_num?: number;
+  /** Whether the gift has been upgraded to an on-chain NFT */
+  is_nft?: boolean;
+  on_chain?: boolean;
+  type?: string; // "nft" | "offchain" etc.
   attributes?: { trait_type?: string; value?: string }[];
 }
 
@@ -386,7 +390,7 @@ async function searchGifts(params: SearchParams): Promise<MarketplaceListing[]> 
         originalPrice: g._priceTon ?? null,
         listingType: "fixed",
         seller: g.seller_address || g.owner,
-        onChain: true,
+        onChain: g.is_nft === true || g.on_chain === true || g.type === "nft",
         floorPriceTon: collectionInfo?.floor,
         onSaleCount: collectionInfo?.onSaleAll,
         ownerCount: collectionInfo?.owners,
