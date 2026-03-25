@@ -88,6 +88,13 @@ export interface MarketplaceListing {
   /** Whether it's on-chain or off-chain */
   onChain: boolean;
 
+  /** Collection floor price in TON (from aggregated data) */
+  floorPriceTon?: number;
+  /** Total items on sale in the collection */
+  onSaleCount?: number;
+  /** Total unique owners */
+  ownerCount?: number;
+
   /** Raw data from the marketplace (for debugging) */
   raw?: unknown;
 }

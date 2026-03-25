@@ -213,13 +213,119 @@ export const marketAppAdapter: MarketplaceAdapter = {
   },
 };
 
+// ── Gift collection cache (from /v1/collections/gifts/) ─────────────
+
+interface GiftCollectionInfo {
+  name: string;
+  address: string;
+  items?: number;
+  floor?: number; // in TON
+  rentFloor?: number;
+  volume7d?: number;
+  volume30d?: number;
+  owners?: number;
+  onSaleAll?: number;
+  onSaleOnchain?: number;
+}
+
+let _giftCollectionsCache: GiftCollectionInfo[] | null = null;
+let _giftCollectionsCacheAt = 0;
+const GIFT_COLLECTIONS_TTL_MS = 5 * 60 * 1000; // 5 min
+
+async function getGiftCollections(): Promise<GiftCollectionInfo[]> {
+  const now = Date.now();
+  if (_giftCollectionsCache && now - _giftCollectionsCacheAt < GIFT_COLLECTIONS_TTL_MS) {
+    return _giftCollectionsCache;
+  }
+
+  const res = await fetch(`${BASE_URL}/v1/collections/gifts/`, {
+    headers: authHeaders(),
+    signal: AbortSignal.timeout(10000),
+  });
+
+  if (!res.ok) {
+    log.warn({ status: res.status }, "Failed to fetch gift collections");
+    return _giftCollectionsCache ?? [];
+  }
+
+  const raw = (await res.json()) as Array<{
+    name?: string;
+    address?: string;
+    extra_data?: {
+      items?: number;
+      floor?: string | number;
+      rent_floor?: string | number;
+      volume7d?: string | number;
+      volume30d?: string | number;
+      owners?: number;
+      on_sale_all?: number;
+      on_sale_onchain?: number;
+    };
+  }>;
+
+  _giftCollectionsCache = raw
+    .filter((c) => c.address && c.name)
+    .map((c) => ({
+      name: c.name ?? "",
+      address: c.address ?? "",
+      items: c.extra_data?.items,
+      floor: nanoToTon(c.extra_data?.floor) ?? undefined,
+      rentFloor: nanoToTon(c.extra_data?.rent_floor) ?? undefined,
+      volume7d: nanoToTon(c.extra_data?.volume7d) ?? undefined,
+      volume30d: nanoToTon(c.extra_data?.volume30d) ?? undefined,
+      owners: c.extra_data?.owners,
+      onSaleAll: c.extra_data?.on_sale_all,
+      onSaleOnchain: c.extra_data?.on_sale_onchain,
+    }));
+  _giftCollectionsCacheAt = now;
+  log.debug(`Cached ${_giftCollectionsCache.length} gift collections`);
+  return _giftCollectionsCache;
+}
+
+/** Find a gift collection by name (fuzzy) */
+function findGiftCollection(
+  collections: GiftCollectionInfo[],
+  query: string
+): GiftCollectionInfo | undefined {
+  const q = query.toLowerCase();
+  // Exact match first
+  const exact = collections.find((c) => c.name.toLowerCase() === q);
+  if (exact) return exact;
+  // Includes match
+  return collections.find((c) => c.name.toLowerCase().includes(q));
+}
+
 // ── Gift search ─────────────────────────────────────────────────────
 
 async function searchGifts(params: SearchParams): Promise<MarketplaceListing[]> {
+  // Resolve collection address from gift collections endpoint
+  const collections = await getGiftCollections();
+  const query = params.collection?.toLowerCase() || params.query?.toLowerCase();
+
+  let collectionAddr: string | undefined;
+  let collectionInfo: GiftCollectionInfo | undefined;
+
+  if (query) {
+    collectionInfo = findGiftCollection(collections, query);
+    collectionAddr = collectionInfo?.address;
+  }
+
   const url = new URL("/v1/gifts/onsale/", BASE_URL);
-  if (params.collection) url.searchParams.set("collection_name", params.collection);
-  if (params.limit) url.searchParams.set("limit", String(Math.min(params.limit, 100)));
-  if (params.sortBy === "price") url.searchParams.set("sort_by", "price");
+  if (collectionAddr) {
+    url.searchParams.set("collection_address", collectionAddr);
+  } else if (params.collection) {
+    // Fallback: try collection_name directly
+    url.searchParams.set("collection_name", params.collection);
+  }
+  // sort_by: min_bid_asc (default), min_bid_desc, recently_touch
+  url.searchParams.set("sort_by", params.sortBy === "price" ? "min_bid_asc" : "min_bid_asc");
+  // Filter by model/backdrop/symbol if provided
+  if (params.model) url.searchParams.set("model", params.model);
+  if (params.backdrop) url.searchParams.set("backdrop", params.backdrop);
+  if (params.symbol) url.searchParams.set("symbol", params.symbol);
+  // Price filters (in TON, not nanotons)
+  if (params.minPrice) url.searchParams.set("min_price", String(params.minPrice));
+  if (params.maxPrice) url.searchParams.set("max_price", String(params.maxPrice));
 
   const res = await fetch(url.toString(), {
     headers: authHeaders(),
@@ -268,7 +374,7 @@ async function searchGifts(params: SearchParams): Promise<MarketplaceListing[]> 
         externalId: g.address || `gift-${g._num}`,
         url: `https://marketapp.ws/gift/${g.address || g._num}`,
         identifier: g.name,
-        collection: g.collection_name,
+        collection: collectionInfo?.name || g.collection_name,
         giftNum: g._num,
         model: g._model,
         backdrop: g._backdrop,
@@ -281,6 +387,9 @@ async function searchGifts(params: SearchParams): Promise<MarketplaceListing[]> 
         listingType: "fixed",
         seller: g.seller_address || g.owner,
         onChain: true,
+        floorPriceTon: collectionInfo?.floor,
+        onSaleCount: collectionInfo?.onSaleAll,
+        ownerCount: collectionInfo?.owners,
       })
     );
 }
