@@ -304,14 +304,29 @@ async function searchNfts(params: SearchParams): Promise<MarketplaceListing[]> {
   if (!collections?.length) return [];
 
   // Find matching collection
+  // For numbers, auto-resolve to "Anonymous Telegram Numbers" collection
+  // For usernames, auto-resolve to "Telegram Usernames"
   const query = params.query?.toLowerCase() || params.collection?.toLowerCase();
-  const matchedCol = query
-    ? collections.find(
-        (c) => c.name?.toLowerCase().includes(query) || c.slug?.toLowerCase().includes(query)
-      )
-    : null;
+  let matchedCol: CollectionItem | undefined;
 
-  if (!matchedCol?.address) return [];
+  if (params.assetKind === "number") {
+    matchedCol = collections.find((c) => c.name?.toLowerCase().includes("anonymous telegram"));
+  } else if (params.assetKind === "username") {
+    matchedCol = collections.find((c) => c.name?.toLowerCase().includes("telegram usernames"));
+  }
+
+  // If not auto-resolved, try query/collection match
+  if (!matchedCol && query) {
+    matchedCol = collections.find(
+      (c) => c.name?.toLowerCase().includes(query) || c.slug?.toLowerCase().includes(query)
+    );
+  }
+
+  if (!matchedCol?.address) {
+    log.debug(`No collection matched for kind=${params.assetKind}, query=${query}`);
+    return [];
+  }
+  log.debug(`Matched collection: ${matchedCol.name} (${matchedCol.address})`);
 
   // Get NFTs in that collection
   const nftsUrl = new URL(`/v1/nfts/collections/${matchedCol.address}/`, BASE_URL);
