@@ -295,6 +295,10 @@ export class TeleclawApp {
    * Called by lifecycle.start() — do NOT call directly.
    */
   private async startAgent(): Promise<void> {
+    // Ensure user_settings table exists (required by provider-wizard, marketapp-wizard, handlers)
+    const { ensureUserSettingsTable } = await import("./session/user-settings.js");
+    ensureUserSettingsTable(getDatabase().getDb());
+
     // Load modules
     const moduleNames = this.modules
       .filter((m) => m.tools(this.config).length > 0)
