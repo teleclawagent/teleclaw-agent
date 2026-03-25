@@ -302,23 +302,22 @@ function findGiftCollection(
 // ── Gift search ─────────────────────────────────────────────────────
 
 async function searchGifts(params: SearchParams): Promise<MarketplaceListing[]> {
-  // Resolve collection address from gift collections endpoint
+  // Resolve collection info from gift collections endpoint
   const collections = await getGiftCollections();
   const query = params.collection?.toLowerCase() || params.query?.toLowerCase();
 
-  let collectionAddr: string | undefined;
   let collectionInfo: GiftCollectionInfo | undefined;
 
   if (query) {
     collectionInfo = findGiftCollection(collections, query);
-    collectionAddr = collectionInfo?.address;
   }
 
+  // CRITICAL: Query by collection_name (not collection_address) to get BOTH on-chain AND off-chain gifts.
+  // Using collection_address only returns on-chain NFTs, missing cheaper off-chain items.
   const url = new URL("/v1/gifts/onsale/", BASE_URL);
-  if (collectionAddr) {
-    url.searchParams.set("collection_address", collectionAddr);
+  if (collectionInfo?.name) {
+    url.searchParams.set("collection_name", collectionInfo.name);
   } else if (params.collection) {
-    // Fallback: try collection_name directly
     url.searchParams.set("collection_name", params.collection);
   }
   // sort_by: min_bid_asc (default), min_bid_desc, recently_touch
@@ -331,6 +330,8 @@ async function searchGifts(params: SearchParams): Promise<MarketplaceListing[]> 
   if (params.minPrice) url.searchParams.set("min_price", String(params.minPrice));
   if (params.maxPrice) url.searchParams.set("max_price", String(params.maxPrice));
 
+  log.info(`Marketapp search URL: ${url.toString()}`);
+
   const res = await fetch(url.toString(), {
     headers: authHeaders(),
     signal: AbortSignal.timeout(15000),
@@ -340,15 +341,62 @@ async function searchGifts(params: SearchParams): Promise<MarketplaceListing[]> 
     const errBody = await res.text().catch(() => "");
     log.warn(
       { status: res.status, body: errBody.slice(0, 200) },
-      "Marketapp gifts/onsale returned error"
+      "Marketapp gifts/onsale returned error — trying collection_address fallback"
     );
+
+    // Fallback: try with collection_address for on-chain only
+    if (collectionInfo?.address) {
+      const fallbackUrl = new URL("/v1/gifts/onsale/", BASE_URL);
+      fallbackUrl.searchParams.set("collection_address", collectionInfo.address);
+      fallbackUrl.searchParams.set("sort_by", "min_bid_asc");
+      const fallbackRes = await fetch(fallbackUrl.toString(), {
+        headers: authHeaders(),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (fallbackRes.ok) {
+        const fallbackData = (await fallbackRes.json()) as GiftsOnSaleResponse;
+        if (fallbackData?.items?.length) {
+          log.info(`Fallback to collection_address returned ${fallbackData.items.length} items`);
+          return processGiftItems(fallbackData.items, params, collectionInfo);
+        }
+      }
+    }
     return [];
   }
 
   const data = (await res.json()) as GiftsOnSaleResponse;
-  if (!data?.items?.length) return [];
+  if (!data?.items?.length) {
+    // If collection_name returned nothing, try collection_address as fallback
+    if (collectionInfo?.address) {
+      log.debug("collection_name returned 0 items, trying collection_address fallback");
+      const fallbackUrl = new URL("/v1/gifts/onsale/", BASE_URL);
+      fallbackUrl.searchParams.set("collection_address", collectionInfo.address);
+      fallbackUrl.searchParams.set("sort_by", "min_bid_asc");
+      const fallbackRes = await fetch(fallbackUrl.toString(), {
+        headers: authHeaders(),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (fallbackRes.ok) {
+        const fallbackData = (await fallbackRes.json()) as GiftsOnSaleResponse;
+        if (fallbackData?.items?.length) {
+          return processGiftItems(fallbackData.items, params, collectionInfo);
+        }
+      }
+    }
+    return [];
+  }
 
-  return data.items
+  log.info(`Marketapp gifts/onsale returned ${data.items.length} items for "${query}"`);
+  return processGiftItems(data.items, params, collectionInfo);
+}
+
+/** Shared processing for gift items from any endpoint */
+function processGiftItems(
+  items: GiftOnSale[],
+  params: SearchParams,
+  collectionInfo?: GiftCollectionInfo
+): MarketplaceListing[] {
+  return items
     .map((g) => {
       const priceTon = extractPrice(g);
       const currency = g.currency || "TON";
