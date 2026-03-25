@@ -615,7 +615,7 @@ async function runInteractiveOnboarding(
           "Open a SECOND terminal/PowerShell and follow these steps:\n\n" +
           "   Step 1: npm install -g @openai/codex\n" +
           "           (wait for install to complete)\n\n" +
-          "   Step 2: codex --login\n" +
+          "   Step 2: codex login\n" +
           "           (browser opens → sign in with your ChatGPT account)\n" +
           "           (wait for 'Successfully logged in' message)\n\n" +
           "Come back HERE and press Enter when done.\n\n" +

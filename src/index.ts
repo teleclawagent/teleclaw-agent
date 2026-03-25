@@ -28,6 +28,7 @@ import type { SDKDependencies } from "./sdk/index.js";
 import { getProviderMetadata, type SupportedProvider } from "./config/providers.js";
 // Config helpers available in config/configurable-keys.js if needed
 import { loadModules } from "./agent/tools/module-loader.js";
+import { ensureUserSettingsTable } from "./session/user-settings.js";
 import { ModulePermissions } from "./agent/tools/module-permissions.js";
 import { SHUTDOWN_TIMEOUT_MS } from "./constants/timeouts.js";
 import type { PluginModule, PluginContext } from "./agent/tools/types.js";
@@ -137,6 +138,7 @@ export class TeleclawApp {
     });
 
     const db = getDatabase().getDb();
+    ensureUserSettingsTable(db);
 
     this.userHookEvaluator = new UserHookEvaluator(db);
     this.agent.setUserHookEvaluator(this.userHookEvaluator);
@@ -295,10 +297,6 @@ export class TeleclawApp {
    * Called by lifecycle.start() — do NOT call directly.
    */
   private async startAgent(): Promise<void> {
-    // Ensure user_settings table exists (required by provider-wizard, marketapp-wizard, handlers)
-    const { ensureUserSettingsTable } = await import("./session/user-settings.js");
-    ensureUserSettingsTable(getDatabase().getDb());
-
     // Load modules
     const moduleNames = this.modules
       .filter((m) => m.tools(this.config).length > 0)
