@@ -118,22 +118,6 @@ export class MemoryDatabase {
     return this.db.transaction(fn)();
   }
 
-  async asyncTransaction<T>(fn: () => Promise<T>): Promise<T> {
-    const beginTrans = this.db.prepare("BEGIN");
-    const commitTrans = this.db.prepare("COMMIT");
-    const rollbackTrans = this.db.prepare("ROLLBACK");
-
-    beginTrans.run();
-    try {
-      const result = await fn();
-      commitTrans.run();
-      return result;
-    } catch (error) {
-      rollbackTrans.run();
-      throw error;
-    }
-  }
-
   getStats(): {
     knowledge: number;
     sessions: number;

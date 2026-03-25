@@ -126,7 +126,7 @@ export class WebUIServer {
     });
 
     // Auth for all /api/* routes
-    // Accepts: HttpOnly cookie > Bearer header > ?token= query param (fallback)
+    // Accepts: HttpOnly cookie > Bearer header
     this.app.use("/api/*", async (c, next) => {
       // 1. Check HttpOnly session cookie (primary — browser)
       const cookieToken = getCookie(c, COOKIE_NAME);
@@ -141,12 +141,6 @@ export class WebUIServer {
         if (match && safeCompare(match[1], this.authToken)) {
           return next();
         }
-      }
-
-      // 3. Check ?token= query param (fallback — backward compat)
-      const queryToken = c.req.query("token");
-      if (queryToken && safeCompare(queryToken, this.authToken)) {
-        return next();
       }
 
       return c.json({ success: false, error: "Unauthorized" }, 401);
@@ -399,7 +393,8 @@ export class WebUIServer {
             const url = `http://${info.address}:${info.port}`;
 
             log.info(`WebUI server running`);
-            log.info(`URL: ${url}/auth/exchange?token=${this.authToken}`);
+            log.info(`URL: ${url}`);
+            log.info(`Login: ${url}/auth/exchange?token=<YOUR_TOKEN>`);
             log.info(`Token: ${maskToken(this.authToken)} (use Bearer header for API access)`);
             resolve();
           }

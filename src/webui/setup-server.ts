@@ -62,9 +62,13 @@ export class SetupServer {
   private server: ReturnType<typeof serve> | null = null;
   private launchResolve: ((token: string) => void) | null = null;
   private launchPromise: Promise<string>;
+  private readonly launchNonce: string;
 
   constructor(private port: number = 7777) {
     this.app = new Hono();
+    // One-time nonce to protect launch endpoint from blind local requests.
+    // Served to the setup UI and required via header for /api/setup/launch.
+    this.launchNonce = randomBytes(16).toString("hex");
     this.launchPromise = new Promise<string>((resolve) => {
       this.launchResolve = resolve;
     });
@@ -120,6 +124,11 @@ export class SetupServer {
     // Health check
     this.app.get("/health", (c) => c.json({ status: "ok" }));
 
+    // Launch nonce — setup UI fetches it and uses it for /api/setup/launch
+    this.app.get("/api/setup/launch-nonce", (c) =>
+      c.json({ success: true, data: { nonce: this.launchNonce } })
+    );
+
     // Mount setup routes
     this.app.route("/api/setup", createSetupRoutes());
 
@@ -132,6 +141,11 @@ export class SetupServer {
     // Launch endpoint — generates auth token and resolves the launch promise
     this.app.post("/api/setup/launch", async (c) => {
       try {
+        const nonce = c.req.header("x-teleclaw-launch-nonce");
+        if (!nonce || nonce !== this.launchNonce) {
+          return c.json({ success: false, error: "Unauthorized" }, 401);
+        }
+
         // Generate auth token
         const token = randomBytes(32).toString("hex");
 
