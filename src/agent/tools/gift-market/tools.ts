@@ -397,7 +397,7 @@ export const tools: ToolEntry[] = [
     tool: {
       name: "gift_floor_prices",
       description:
-        "🏷️ Get current floor prices for gift collections from Fragment. Pass a collection name for one, or omit for top collections.",
+        "🏷️ Get current on-chain/NFT floor prices for gift collections from Fragment. Pass a collection name for one, or omit for top collections. Note: off-chain/non-NFT gifts are not included.",
       parameters: floorPricesParams,
     },
     executor: floorPricesExecutor,

@@ -36,15 +36,14 @@ const marketSearchTool: Tool = {
     "🏪 Search across ALL marketplaces at once for usernames, numbers, or gifts.\n" +
     "USE THIS TOOL whenever a user asks about prices, floor prices, or where to buy/sell.\n" +
     "NEVER quote prices from memory — always call this tool for live data.\n\n" +
+    "IMPORTANT — GIFT LISTINGS ARE ON-CHAIN/NFT ONLY:\n" +
+    "Market.app API only exposes on-chain (NFT) gift listings at the item level.\n" +
+    "Off-chain / non-NFT gifts are NOT included in search results.\n" +
+    "If a user asks about off-chain gifts, explain this limitation.\n\n" +
     "MARKETPLACES CHECKED:\n" +
-    "• Market.app (primary) — aggregates listings from Fragment, Getgems, Portals + its own\n" +
-    "• When Market.app token is configured, it's the single source (avoids duplicates)\n" +
-    "• Without Market.app token, falls back to individual adapters\n\n" +
-    "MARKETPLACE INFO (use this when explaining to users):\n" +
-    "• Fragment — Telegram's official marketplace, on-chain & off-chain\n" +
-    "• Getgems — Major NFT marketplace, on-chain & off-chain\n" +
-    "• Portals — Off-chain gifts only\n" +
-    "• Market.app — Meta-aggregator: shows Fragment + Getgems + Portals listings\n\n" +
+    "• Market.app (primary) — on-chain/NFT gift listings via API\n" +
+    "• Fragment — Telegram's official marketplace (on-chain gifts via scraper)\n" +
+    "• Getgems — Major NFT marketplace\n\n" +
     "Results are normalized and sorted by price. Shows which marketplace has the best deal.\n\n" +
     "EXAMPLES:\n" +
     "• Search usernames: asset_type='username', query='crypto'\n" +

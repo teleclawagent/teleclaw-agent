@@ -314,11 +314,14 @@ async function searchGifts(params: SearchParams): Promise<MarketplaceListing[]> 
     collectionAddr = collectionInfo?.address;
   }
 
+  // NOTE: Market.app API only returns ON-CHAIN (NFT) gifts when filtering by collection_address.
+  // Off-chain / non-NFT gifts are NOT available through the listing-level API (confirmed by Market.app founder).
+  // Floor from /v1/collections/gifts/ includes off-chain, but we intentionally do NOT use it here
+  // to avoid floor vs cheapest-listing mismatches.
   const url = new URL("/v1/gifts/onsale/", BASE_URL);
   if (collectionAddr) {
     url.searchParams.set("collection_address", collectionAddr);
   } else if (params.collection) {
-    // Fallback: try collection_name directly
     url.searchParams.set("collection_name", params.collection);
   }
   // sort_by: min_bid_asc (default), min_bid_desc, recently_touch
@@ -390,9 +393,11 @@ async function searchGifts(params: SearchParams): Promise<MarketplaceListing[]> 
         originalPrice: g._priceTon ?? null,
         listingType: "fixed",
         seller: g.seller_address || g.owner,
-        onChain: g.is_nft === true || g.on_chain === true || g.type === "nft",
-        floorPriceTon: collectionInfo?.floor,
-        onSaleCount: collectionInfo?.onSaleAll,
+        // Market.app listing API only returns on-chain NFTs (confirmed by founder)
+        onChain: true,
+        // Do NOT use collectionInfo.floor here — it includes off-chain items
+        // which creates a mismatch vs the on-chain-only listings we can actually show
+        onSaleCount: collectionInfo?.onSaleOnchain ?? collectionInfo?.onSaleAll,
         ownerCount: collectionInfo?.owners,
       })
     );
