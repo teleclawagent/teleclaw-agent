@@ -54,9 +54,16 @@ interface NftItem {
   address?: string;
   name?: string;
   index?: number;
+  item_num?: number;
   collection_address?: string;
   collection?: { name?: string };
+  owner?: string;
   owner_address?: string;
+  real_owner?: string;
+  /** Nanoton bid (API returns string-like big numbers) */
+  min_bid?: string | number;
+  max_bid?: string | number;
+  currency?: string;
   sale?: {
     price?: number;
     currency?: string;
@@ -65,20 +72,29 @@ interface NftItem {
   status?: string;
   attributes?: { trait_type?: string; value?: string }[];
   previews?: { url?: string }[];
+  listed_at?: number;
 }
 
 interface GiftOnSale {
   address?: string;
   name?: string;
   collection_name?: string;
+  collection_address?: string;
   price?: number;
+  /** Nanoton bid — API v1 returns this instead of price */
+  min_bid?: string | number;
+  max_bid?: string | number;
   currency?: string;
   seller_address?: string;
+  owner?: string;
+  real_owner?: string;
   model?: string;
   backdrop?: string;
   symbol?: string;
   rarity?: string;
   index?: number;
+  item_num?: number;
+  attributes?: { trait_type?: string; value?: string }[];
 }
 
 interface GiftsOnSaleResponse {
@@ -89,6 +105,29 @@ interface GiftsOnSaleResponse {
 interface NftsResponse {
   items?: NftItem[];
   total?: number;
+}
+
+/** Convert nanoton string/number to TON (divide by 1e9) */
+function nanoToTon(nano?: string | number): number | null {
+  if (nano == null) return null;
+  const val = typeof nano === "string" ? Number(nano) : nano;
+  if (isNaN(val) || val <= 0) return null;
+  return val / 1e9;
+}
+
+/** Extract price from gift/nft item — prefers min_bid (nanotons), falls back to price */
+function extractPrice(item: { min_bid?: string | number; price?: number }): number | null {
+  if (item.min_bid != null) return nanoToTon(item.min_bid);
+  return item.price ?? null;
+}
+
+/** Extract model/backdrop/symbol from attributes array */
+function attrValue(
+  attrs?: { trait_type?: string; value?: string }[],
+  trait?: string
+): string | undefined {
+  if (!attrs || !trait) return undefined;
+  return attrs.find((a) => a.trait_type?.toLowerCase() === trait.toLowerCase())?.value;
 }
 
 // ── Adapter ─────────────────────────────────────────────────────────
@@ -109,7 +148,12 @@ export const marketAppAdapter: MarketplaceAdapter = {
         `Marketapp search: kind=${params.assetKind}, hasToken=${!!_apiToken}, tokenLen=${_apiToken?.length ?? 0}`
       );
       if (params.assetKind === "gift") {
-        return await searchGifts(params);
+        // Try gifts/onsale first, then fall back to NFT collections endpoint
+        const giftResults = await searchGifts(params);
+        if (giftResults.length > 0) return giftResults;
+        // Gift collections (like Plush Pepe) are under /nfts/collections/
+        log.debug("No gifts from onsale endpoint, trying NFT collections fallback");
+        return await searchNfts({ ...params, assetKind: "gift" });
       }
       // For usernames/numbers, use NFT collections endpoint
       return await searchNfts(params);
@@ -195,30 +239,47 @@ async function searchGifts(params: SearchParams): Promise<MarketplaceListing[]> 
   if (!data?.items?.length) return [];
 
   return data.items
+    .map((g) => {
+      const priceTon = extractPrice(g);
+      const currency = g.currency || "TON";
+      const model = g.model || attrValue(g.attributes, "Model");
+      const backdrop = g.backdrop || attrValue(g.attributes, "Backdrop");
+      const symbol = g.symbol || attrValue(g.attributes, "Symbol");
+      const num = g.item_num ?? g.index;
+      return {
+        ...g,
+        _priceTon: priceTon,
+        _currency: currency,
+        _model: model,
+        _backdrop: backdrop,
+        _symbol: symbol,
+        _num: num,
+      };
+    })
     .filter((g) => {
-      if (params.maxPrice && g.price && g.price > params.maxPrice) return false;
-      if (params.minPrice && g.price && g.price < params.minPrice) return false;
+      if (params.maxPrice && g._priceTon && g._priceTon > params.maxPrice) return false;
+      if (params.minPrice && g._priceTon && g._priceTon < params.minPrice) return false;
       return true;
     })
     .map(
       (g): MarketplaceListing => ({
         marketplace: "marketapp",
         assetKind: "gift",
-        externalId: g.address || `gift-${g.index}`,
-        url: `https://marketapp.ws/gift/${g.address || g.index}`,
+        externalId: g.address || `gift-${g._num}`,
+        url: `https://marketapp.ws/gift/${g.address || g._num}`,
         identifier: g.name,
         collection: g.collection_name,
-        giftNum: g.index,
-        model: g.model,
-        backdrop: g.backdrop,
-        symbol: g.symbol,
+        giftNum: g._num,
+        model: g._model,
+        backdrop: g._backdrop,
+        symbol: g._symbol,
         rarityTier: g.rarity,
-        priceTon: g.currency === "TON" || !g.currency ? (g.price ?? null) : null,
-        priceStars: g.currency === "Stars" ? (g.price ?? null) : null,
-        originalCurrency: g.currency || "TON",
-        originalPrice: g.price ?? null,
+        priceTon: g._currency === "TON" || !g._currency ? (g._priceTon ?? null) : null,
+        priceStars: g._currency === "Stars" ? (g._priceTon ?? null) : null,
+        originalCurrency: g._currency,
+        originalPrice: g._priceTon ?? null,
         listingType: "fixed",
-        seller: g.seller_address,
+        seller: g.seller_address || g.owner,
         onChain: true,
       })
     );
@@ -268,27 +329,37 @@ async function searchNfts(params: SearchParams): Promise<MarketplaceListing[]> {
   if (!nftsData?.items?.length) return [];
 
   return nftsData.items
-    .filter((n) => n.sale?.price != null)
+    .map((n) => {
+      // Price can be in sale.price OR min_bid (nanotons)
+      const priceTon = extractPrice(n) ?? n.sale?.price ?? null;
+      const currency = n.currency || n.sale?.currency || "TON";
+      const num = n.item_num ?? n.index;
+      return { ...n, _priceTon: priceTon, _currency: currency, _num: num };
+    })
+    .filter((n) => n._priceTon != null)
     .filter((n) => {
-      if (params.maxPrice && n.sale?.price && n.sale.price > params.maxPrice) return false;
-      if (params.minPrice && n.sale?.price && n.sale.price < params.minPrice) return false;
+      if (params.maxPrice && n._priceTon && n._priceTon > params.maxPrice) return false;
+      if (params.minPrice && n._priceTon && n._priceTon < params.minPrice) return false;
       return true;
     })
     .map(
       (n): MarketplaceListing => ({
         marketplace: "marketapp",
         assetKind: params.assetKind,
-        externalId: n.address || `nft-${n.index}`,
+        externalId: n.address || `nft-${n._num}`,
         url: `https://marketapp.ws/nft/${n.address}`,
         identifier: n.name,
         collection: matchedCol.name,
-        giftNum: n.index,
-        priceTon: n.sale?.currency === "TON" || !n.sale?.currency ? (n.sale?.price ?? null) : null,
-        priceStars: n.sale?.currency === "Stars" ? (n.sale?.price ?? null) : null,
-        originalCurrency: n.sale?.currency || "TON",
-        originalPrice: n.sale?.price ?? null,
+        giftNum: n._num,
+        model: attrValue(n.attributes, "Model"),
+        backdrop: attrValue(n.attributes, "Backdrop"),
+        symbol: attrValue(n.attributes, "Symbol"),
+        priceTon: n._currency === "TON" || !n._currency ? (n._priceTon ?? null) : null,
+        priceStars: n._currency === "Stars" ? (n._priceTon ?? null) : null,
+        originalCurrency: n._currency,
+        originalPrice: n._priceTon ?? null,
         listingType: "fixed",
-        seller: n.owner_address,
+        seller: n.owner_address || n.owner,
         onChain: true,
       })
     );
