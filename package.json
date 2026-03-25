@@ -24,12 +24,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/gioooton/teleclaw-agent.git"
+    "url": "https://github.com/teleclawagent/teleclaw-agent.git"
   },
   "bugs": {
-    "url": "https://github.com/gioooton/teleclaw-agent/issues"
+    "url": "https://github.com/teleclawagent/teleclaw-agent/issues"
   },
-  "homepage": "https://github.com/gioooton/teleclaw-agent",
+  "homepage": "https://github.com/teleclawagent/teleclaw-agent",
   "type": "module",
   "main": "dist/index.js",
   "bin": {

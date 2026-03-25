@@ -104,10 +104,10 @@ For Docker or other environments without an interactive terminal, run the setup 
 
 ```bash
 # Docker
-docker run -it --rm -v teleclaw-data:/data ghcr.io/gioooton/teleclaw-agent setup
+docker run -it --rm -v teleclaw-data:/data ghcr.io/teleclawagent/teleclaw-agent setup
 
 # Then start normally
-docker run -d -v teleclaw-data:/data ghcr.io/gioooton/teleclaw-agent
+docker run -d -v teleclaw-data:/data ghcr.io/teleclawagent/teleclaw-agent
 ```
 
 ---

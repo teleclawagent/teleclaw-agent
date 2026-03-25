@@ -27,7 +27,7 @@ const SKILL_INDEX_TEMPLATE = (name: string, toolName: string) => `/**
  * This skill adds the "${toolName}" tool to your Teleclaw agent.
  * Edit this file to customize the tool's behavior.
  *
- * Docs: https://github.com/gioooton/teleclaw-agent/wiki/Skills
+ * Docs: https://github.com/teleclawagent/teleclaw-agent/wiki/Skills
  */
 
 export const manifest = {

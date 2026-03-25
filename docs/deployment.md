@@ -70,7 +70,7 @@ docker run -d \
   --restart unless-stopped \
   -v teleclaw-data:/data \
   -p 7777:7777 \
-  ghcr.io/gioooton/teleclaw-agent
+  ghcr.io/teleclawagent/teleclaw-agent
 ```
 
 ### Image Details
@@ -93,7 +93,7 @@ Since the first run requires interactive authentication with Telegram, run setup
 # Run setup interactively
 docker run -it --rm \
   -v teleclaw-data:/data \
-  ghcr.io/gioooton/teleclaw-agent setup
+  ghcr.io/teleclawagent/teleclaw-agent setup
 
 # Then start the agent
 docker run -d \
@@ -101,7 +101,7 @@ docker run -d \
   --restart unless-stopped \
   -v teleclaw-data:/data \
   -p 7777:7777 \
-  ghcr.io/gioooton/teleclaw-agent
+  ghcr.io/teleclawagent/teleclaw-agent
 ```
 
 ### Passing Configuration via Environment
@@ -119,7 +119,7 @@ docker run -d \
   -e TELECLAW_WEBUI_ENABLED="true" \
   -v teleclaw-data:/data \
   -p 7777:7777 \
-  ghcr.io/gioooton/teleclaw-agent
+  ghcr.io/teleclawagent/teleclaw-agent
 ```
 
 Note: A `config.yaml` must still exist in the data volume with at minimum the non-overridden fields. Run `setup` first to create it.
@@ -135,7 +135,7 @@ version: "3.8"
 
 services:
   teleclaw:
-    image: ghcr.io/gioooton/teleclaw-agent:latest
+    image: ghcr.io/teleclawagent/teleclaw-agent:latest
     container_name: teleclaw
     restart: unless-stopped
     ports:
@@ -192,7 +192,7 @@ For development or when you need to customize the agent.
 
 ```bash
 # Clone the repository
-git clone https://github.com/gioooton/teleclaw-agent.git
+git clone https://github.com/teleclawagent/teleclaw-agent.git
 cd teleclaw-agent
 
 # Install dependencies (includes SDK workspace)
@@ -424,14 +424,14 @@ npm install -g teleclaw@0.5.2
 ### Docker
 
 ```bash
-docker pull ghcr.io/gioooton/teleclaw-agent:latest
+docker pull ghcr.io/teleclawagent/teleclaw-agent:latest
 docker stop teleclaw && docker rm teleclaw
 docker run -d \
   --name teleclaw \
   --restart unless-stopped \
   -v teleclaw-data:/data \
   -p 7777:7777 \
-  ghcr.io/gioooton/teleclaw-agent
+  ghcr.io/teleclawagent/teleclaw-agent
 ```
 
 Or with Docker Compose:
@@ -458,7 +458,7 @@ For production stability, pin to a specific version tag:
 
 ```bash
 # Docker
-ghcr.io/gioooton/teleclaw-agent:v0.5.2
+ghcr.io/teleclawagent/teleclaw-agent:v0.5.2
 
 # npm
 npm install -g teleclaw@0.5.2

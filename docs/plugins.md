@@ -812,7 +812,7 @@ This allows rapid iteration: edit your plugin file, save, and the changes take e
 
 ## Official Example Plugins
 
-The [teleclaw-plugins](https://github.com/gioooton/teleclaw-plugins) repository contains maintained example plugins you can use as reference or install directly:
+The [teleclaw-plugins](https://github.com/teleclawagent/teleclaw-plugins) repository contains maintained example plugins you can use as reference or install directly:
 
 - **Casino** -- Slot machine and dice games with persistent balances
 - More community plugins coming soon

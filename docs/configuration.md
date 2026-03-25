@@ -418,7 +418,7 @@ docker run -d \
   -e TELECLAW_TG_PHONE="+1234567890" \
   -e TELECLAW_WEBUI_ENABLED="true" \
   -v teleclaw-data:/data \
-  ghcr.io/gioooton/teleclaw-agent
+  ghcr.io/teleclawagent/teleclaw-agent
 ```
 
 ---

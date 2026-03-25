@@ -24,17 +24,17 @@ npm install -g teleclaw@latest
 
 **One-liner:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gioooton/teleclaw-agent/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/teleclawagent/teleclaw-agent/main/install.sh | bash
 ```
 
 **Docker:**
 ```bash
-docker run -it -v ~/.teleclaw:/data ghcr.io/gioooton/teleclaw:latest setup
+docker run -it -v ~/.teleclaw:/data ghcr.io/teleclawagent/teleclaw:latest setup
 ```
 
 **From source:**
 ```bash
-git clone https://github.com/gioooton/teleclaw-agent.git
+git clone https://github.com/teleclawagent/teleclaw-agent.git
 cd teleclaw-agent
 npm install && npm run build
 ```
@@ -290,7 +290,7 @@ Verifies config, Telegram session, wallet, and database.
 ### From Source
 
 ```bash
-git clone https://github.com/gioooton/teleclaw-agent.git
+git clone https://github.com/teleclawagent/teleclaw-agent.git
 cd teleclaw-agent
 npm install
 npm run build
@@ -362,7 +362,7 @@ src/
 
 ## Support
 
-- **GitHub Issues**: [github.com/gioooton/teleclaw-agent/issues](https://github.com/gioooton/teleclaw-agent/issues)
+- **GitHub Issues**: [github.com/teleclawagent/teleclaw-agent/issues](https://github.com/teleclawagent/teleclaw-agent/issues)
 - **Group Chat**: [@ResistanceForum](https://t.me/ResistanceForum)
 
 ---

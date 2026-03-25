@@ -3,7 +3,7 @@
 **Plugin SDK for Teleclaw Agent** — TypeScript types and utilities for building plugins that interact with Telegram and the TON blockchain.
 
 [![npm](https://img.shields.io/npm/v/@teleclaw-agent/sdk?style=flat-square)](https://www.npmjs.com/package/@teleclaw-agent/sdk)
-[![license](https://img.shields.io/npm/l/@teleclaw-agent/sdk?style=flat-square)](https://github.com/gioooton/teleclaw-agent/blob/main/LICENSE)
+[![license](https://img.shields.io/npm/l/@teleclaw-agent/sdk?style=flat-square)](https://github.com/teleclawagent/teleclaw-agent/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue?style=flat-square)](https://www.typescriptlang.org/)
 
 ---
@@ -1317,12 +1317,12 @@ Always check `telegram.isAvailable()` before calling Telegram methods in `start(
 
 ## License
 
-MIT -- see [LICENSE](https://github.com/gioooton/teleclaw-agent/blob/main/LICENSE).
+MIT -- see [LICENSE](https://github.com/teleclawagent/teleclaw-agent/blob/main/LICENSE).
 
 Copyright 2025-2026 Digital Resistance.
 
 ## Links
 
-- [Repository](https://github.com/gioooton/teleclaw-agent)
-- [Issues](https://github.com/gioooton/teleclaw-agent/issues)
-- [Teleclaw Agent](https://github.com/gioooton/teleclaw-agent) -- the main project
+- [Repository](https://github.com/teleclawagent/teleclaw-agent)
+- [Issues](https://github.com/teleclawagent/teleclaw-agent/issues)
+- [Teleclaw Agent](https://github.com/teleclawagent/teleclaw-agent) -- the main project

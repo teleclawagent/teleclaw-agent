@@ -15,9 +15,9 @@ import { createLogger } from "../../utils/logger.js";
 const log = createLogger("WebUI");
 
 const REGISTRY_URL =
-  "https://raw.githubusercontent.com/gioooton/teleclaw-plugins/main/registry.json";
-const PLUGIN_BASE_URL = "https://raw.githubusercontent.com/gioooton/teleclaw-plugins/main";
-const GITHUB_API_BASE = "https://api.github.com/repos/gioooton/teleclaw-plugins/contents";
+  "https://raw.githubusercontent.com/teleclawagent/teleclaw-plugins/main/registry.json";
+const PLUGIN_BASE_URL = "https://raw.githubusercontent.com/teleclawagent/teleclaw-plugins/main";
+const GITHUB_API_BASE = "https://api.github.com/repos/teleclawagent/teleclaw-plugins/contents";
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const PLUGINS_DIR = WORKSPACE_PATHS.PLUGINS_DIR;
 

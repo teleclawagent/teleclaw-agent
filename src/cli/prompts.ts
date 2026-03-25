@@ -132,7 +132,7 @@ export function wizardFrame(currentStep: number, steps: StepDef[]): string {
 
   const subtitle = "Autonomous AI agent on Telegram with native TON blockchain integration";
   out.push(frameRow(DIM(centerIn(subtitle, W))));
-  out.push(frameRow(DIM(centerIn("github.com/gioooton/teleclaw-agent", W))));
+  out.push(frameRow(DIM(centerIn("github.com/teleclawagent/teleclaw-agent", W))));
 
   out.push(`  ${TON("+" + "-".repeat(W) + "+")}`);
   out.push(emptyRow());
@@ -228,7 +228,7 @@ export function finalSummaryBox(steps: StepDef[], connected: boolean): string {
         `   to shape your agent's behavior`,
         "",
         `${TON("4.")} Read the docs`,
-        `   ${TON.underline("https://github.com/gioooton/teleclaw-agent")}`,
+        `   ${TON.underline("https://github.com/teleclawagent/teleclaw-agent")}`,
       ]
     : [
         `${TON("1.")} Start the agent`,
