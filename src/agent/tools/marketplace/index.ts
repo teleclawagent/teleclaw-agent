@@ -37,16 +37,14 @@ const marketSearchTool: Tool = {
     "USE THIS TOOL whenever a user asks about prices, floor prices, or where to buy/sell.\n" +
     "NEVER quote prices from memory — always call this tool for live data.\n\n" +
     "MARKETPLACES CHECKED:\n" +
-    "• Usernames & Numbers: Fragment, Market.app, Getgems (3 sources)\n" +
-    "• On-chain gifts: Fragment, Getgems\n" +
-    "• Off-chain gifts: Fragment, Getgems, Tonnel, Portals, Market.app, MRKT\n\n" +
+    "• Market.app (primary) — aggregates listings from Fragment, Getgems, Portals + its own\n" +
+    "• When Market.app token is configured, it's the single source (avoids duplicates)\n" +
+    "• Without Market.app token, falls back to individual adapters\n\n" +
     "MARKETPLACE INFO (use this when explaining to users):\n" +
     "• Fragment — Telegram's official marketplace, on-chain & off-chain\n" +
     "• Getgems — Major NFT marketplace, on-chain & off-chain\n" +
-    "• Tonnel — Off-chain gifts only\n" +
     "• Portals — Off-chain gifts only\n" +
-    "• Market.app — Usernames, numbers, gifts\n" +
-    "• MRKT — Gifts only\n\n" +
+    "• Market.app — Meta-aggregator: shows Fragment + Getgems + Portals listings\n\n" +
     "Results are normalized and sorted by price. Shows which marketplace has the best deal.\n\n" +
     "EXAMPLES:\n" +
     "• Search usernames: asset_type='username', query='crypto'\n" +

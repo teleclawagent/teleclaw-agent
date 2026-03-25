@@ -19,7 +19,7 @@ import type {
 import { getMarketplacesForAsset } from "./types.js";
 import { fragmentAdapter } from "./adapters/fragment-adapter.js";
 import { getgemsAdapter } from "./adapters/getgems-adapter.js";
-import { marketAppAdapter, setMarketappToken } from "./adapters/marketapp-adapter.js";
+import { marketAppAdapter, setMarketappToken, hasMarketappToken } from "./adapters/marketapp-adapter.js";
 import { tonnelAdapter } from "./adapters/tonnel-adapter.js";
 import { portalsAdapter } from "./adapters/portals-adapter.js";
 import { mrktAdapter } from "./adapters/mrkt-adapter.js";
@@ -131,6 +131,17 @@ export async function aggregatedSearch(params: SearchParams): Promise<Aggregated
     if (adapters.length === 0) {
       log.warn({ marketplace: params.marketplace }, "Requested marketplace not found or doesn't support this asset type");
     }
+  } else if (hasMarketappToken()) {
+    // Market.app is a meta-aggregator: it already shows listings from Fragment,
+    // Getgems, and Portals with source attribution. Querying those separately
+    // would produce duplicates. Use Market.app as the single source when available.
+    //
+    // For gifts: Market.app aggregates Fragment + Getgems + Portals
+    // For usernames/numbers: Market.app aggregates Fragment + Getgems
+    //
+    // Only fall back to individual adapters if Market.app has no token.
+    log.debug("Market.app token available — using as primary source (aggregates Fragment/Getgems/Portals)");
+    adapters = adapters.filter((a) => a.id === "marketapp");
   }
 
   const checked: MarketplaceId[] = [];
