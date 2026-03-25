@@ -19,7 +19,11 @@ import type {
 import { getMarketplacesForAsset } from "./types.js";
 import { fragmentAdapter } from "./adapters/fragment-adapter.js";
 import { getgemsAdapter } from "./adapters/getgems-adapter.js";
-import { marketAppAdapter, setMarketappToken, hasMarketappToken } from "./adapters/marketapp-adapter.js";
+import {
+  marketAppAdapter,
+  setMarketappToken,
+  hasMarketappToken,
+} from "./adapters/marketapp-adapter.js";
 import { tonnelAdapter } from "./adapters/tonnel-adapter.js";
 import { portalsAdapter } from "./adapters/portals-adapter.js";
 import { mrktAdapter } from "./adapters/mrkt-adapter.js";
@@ -124,23 +128,29 @@ function deduplicateListings(listings: MarketplaceListing[]): MarketplaceListing
 export async function aggregatedSearch(params: SearchParams): Promise<AggregatedResult> {
   let adapters = getAdaptersForAsset(params.assetKind);
 
+  // Usernames & numbers: Fragment is the only reliable source.
+  // Market.app returns irrelevant results (cheapest listings ignoring query),
+  // Getgems search is also unreliable for these asset types.
+  if (!params.marketplace && (params.assetKind === "username" || params.assetKind === "number")) {
+    log.debug(`${params.assetKind} search — Fragment only (other sources unreliable)`);
+    adapters = adapters.filter((a) => a.id === "fragment");
+  }
+
   // If a specific marketplace is requested, filter to only that adapter
   if (params.marketplace) {
     const target = params.marketplace.toLowerCase();
     adapters = adapters.filter((a) => a.id === target);
     if (adapters.length === 0) {
-      log.warn({ marketplace: params.marketplace }, "Requested marketplace not found or doesn't support this asset type");
+      log.warn(
+        { marketplace: params.marketplace },
+        "Requested marketplace not found or doesn't support this asset type"
+      );
     }
-  } else if (hasMarketappToken()) {
-    // Market.app is a meta-aggregator: it already shows listings from Fragment,
-    // Getgems, and Portals with source attribution. Querying those separately
-    // would produce duplicates. Use Market.app as the single source when available.
-    //
-    // For gifts: Market.app aggregates Fragment + Getgems + Portals
-    // For usernames/numbers: Market.app aggregates Fragment + Getgems
-    //
-    // Only fall back to individual adapters if Market.app has no token.
-    log.debug("Market.app token available — using as primary source (aggregates Fragment/Getgems/Portals)");
+  } else if (hasMarketappToken() && params.assetKind === "gift") {
+    // Market.app is a meta-aggregator for gifts: it already shows listings from
+    // Fragment, Getgems, and Portals with source attribution. Use it as single
+    // source for gifts to avoid duplicates.
+    log.debug("Market.app token available — using as primary source for gifts");
     adapters = adapters.filter((a) => a.id === "marketapp");
   }
 
