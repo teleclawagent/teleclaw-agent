@@ -118,7 +118,17 @@ function deduplicateListings(listings: MarketplaceListing[]): MarketplaceListing
  * Runs queries in parallel with individual timeouts.
  */
 export async function aggregatedSearch(params: SearchParams): Promise<AggregatedResult> {
-  const adapters = getAdaptersForAsset(params.assetKind);
+  let adapters = getAdaptersForAsset(params.assetKind);
+
+  // If a specific marketplace is requested, filter to only that adapter
+  if (params.marketplace) {
+    const target = params.marketplace.toLowerCase();
+    adapters = adapters.filter((a) => a.id === target);
+    if (adapters.length === 0) {
+      log.warn({ marketplace: params.marketplace }, "Requested marketplace not found or doesn't support this asset type");
+    }
+  }
+
   const checked: MarketplaceId[] = [];
   const failed: MarketplaceId[] = [];
   const allListings: MarketplaceListing[] = [];

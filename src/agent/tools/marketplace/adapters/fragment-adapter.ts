@@ -108,35 +108,51 @@ export const fragmentAdapter: MarketplaceAdapter = {
 
       // Gifts — Fragment gift listings via fragment-scraper
       if (params.collection) {
-        const { fetchListings, fetchFloorPrice } = await import(
-          "../../gift-market/fragment-scraper.js"
-        );
-        const slug = params.collection.toLowerCase().replace(/[^a-z0-9]/g, "");
-        const [listings, floor] = await Promise.all([
-          fetchListings(slug, params.limit ?? 20),
-          fetchFloorPrice(slug),
-        ]);
-
-        return listings
-          .filter((l) => !params.maxPrice || l.priceTon <= params.maxPrice)
-          .map(
-            (l): MarketplaceListing => ({
-              marketplace: "fragment",
-              assetKind: "gift",
-              externalId: l.slug,
-              url: l.url,
-              identifier: floor?.collection || params.collection || l.slug,
-              collection: floor?.collection || params.collection,
-              giftNum: l.giftNum,
-              priceTon: l.priceTon,
-              originalCurrency: "TON",
-              originalPrice: l.priceTon,
-              floorPriceTon: floor?.floorTon ?? undefined,
-              onSaleCount: floor?.listingCount,
-              listingType: "fixed",
-              onChain: true,
-            })
+        try {
+          const { fetchListings, fetchFloorPrice } = await import(
+            "../../gift-market/fragment-scraper.js"
           );
+          const slug = params.collection.toLowerCase().replace(/[^a-z0-9]/g, "");
+          // Fetch more than needed — scraper regex can miss items, overfetch then trim
+          const fetchLimit = Math.max((params.limit ?? 20) * 2, 30);
+          const [listings, floor] = await Promise.all([
+            fetchListings(slug, fetchLimit),
+            fetchFloorPrice(slug),
+          ]);
+
+          if (listings.length === 0) {
+            log.debug({ slug }, "Fragment scraper returned 0 listings — page may have changed");
+            return [];
+          }
+
+          // Client-side sort to ensure cheapest first (scraper may not preserve order)
+          listings.sort((a, b) => a.priceTon - b.priceTon);
+
+          return listings
+            .filter((l) => !params.maxPrice || l.priceTon <= params.maxPrice)
+            .slice(0, params.limit ?? 20)
+            .map(
+              (l): MarketplaceListing => ({
+                marketplace: "fragment",
+                assetKind: "gift",
+                externalId: `fragment-${slug}-${l.giftNum}`,
+                url: l.url,
+                identifier: floor?.collection || params.collection || l.slug,
+                collection: floor?.collection || params.collection,
+                giftNum: l.giftNum,
+                priceTon: l.priceTon,
+                originalCurrency: "TON",
+                originalPrice: l.priceTon,
+                floorPriceTon: floor?.floorTon ?? undefined,
+                onSaleCount: floor?.listingCount,
+                listingType: "fixed",
+                onChain: true,
+              })
+            );
+        } catch (err) {
+          log.warn({ err, collection: params.collection }, "Fragment gift scraping failed");
+          return [];
+        }
       }
       return [];
     } catch (err) {

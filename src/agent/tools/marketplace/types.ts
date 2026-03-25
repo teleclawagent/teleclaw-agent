@@ -158,6 +158,10 @@ export interface SearchParams {
 
   // ─── Sorting ────
   sortBy?: "price" | "rarity" | "newest";
+
+  // ─── Source filter ────
+  /** Filter to a specific marketplace (e.g. 'marketapp', 'fragment'). Omit to search all. */
+  marketplace?: string;
 }
 
 // ─── Aggregated Result ──────────────────────────────────────────────

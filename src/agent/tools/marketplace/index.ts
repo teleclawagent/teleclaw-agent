@@ -27,6 +27,7 @@ interface MarketSearchParams {
   max_price?: number;
   sort_by?: "price" | "rarity" | "newest";
   limit?: number;
+  marketplace?: string;
 }
 
 const marketSearchTool: Tool = {
@@ -51,7 +52,10 @@ const marketSearchTool: Tool = {
     "• Search usernames: asset_type='username', query='crypto'\n" +
     "• Search numbers: asset_type='number', query='888777'\n" +
     "• Search gifts: asset_type='gift', collection='Plush Pepe', min_tier='Epic'\n" +
-    "• Find cheapest: asset_type='gift', collection='Plush Pepe', sort_by='price'",
+    "• Find cheapest: asset_type='gift', collection='Plush Pepe', sort_by='price'\n" +
+    "• Market.app only: asset_type='gift', collection='Plush Pepe', marketplace='marketapp'\n" +
+    "• Fragment only: asset_type='gift', collection='Plush Pepe', marketplace='fragment'\n\n" +
+    "Use 'marketplace' param to isolate a single source. Omit for cross-marketplace search.",
   category: "data-bearing",
   parameters: Type.Object({
     asset_type: Type.Union(
@@ -75,6 +79,12 @@ const marketSearchTool: Tool = {
     limit: Type.Optional(
       Type.Number({ description: "Max results (default 20)", minimum: 1, maximum: 50 })
     ),
+    marketplace: Type.Optional(
+      Type.String({
+        description:
+          "Filter to a specific marketplace: 'fragment', 'marketapp', 'getgems', 'tonnel', 'portals', 'mrkt'. Omit to search all.",
+      })
+    ),
   }),
 };
 
@@ -93,6 +103,7 @@ const marketSearchExecutor: ToolExecutor<MarketSearchParams> = async (
       maxPrice: params.max_price,
       sortBy: params.sort_by || "price",
       limit: params.limit ?? 20,
+      marketplace: params.marketplace,
     });
 
     return {
