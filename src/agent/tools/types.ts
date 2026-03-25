@@ -21,6 +21,11 @@ export interface ToolContext {
   isGroup: boolean;
   /** Full config for accessing API key, model, etc. (optional) */
   config?: Config;
+  /**
+   * Per-user Market.app API token (request-scoped).
+   * Must NOT be stored in any global/module-level state.
+   */
+  marketappToken?: string | null;
   /** Shared OTC matchmaker API client (optional) */
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   matchmakerApi?: import("../tools/fragment/matchmaker-api.js").MatchmakerAPIClient;

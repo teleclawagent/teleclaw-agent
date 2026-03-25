@@ -62,6 +62,7 @@
     "lint:fix": "eslint src packages/sdk/src --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
+    "pretest": "npm run build:sdk",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

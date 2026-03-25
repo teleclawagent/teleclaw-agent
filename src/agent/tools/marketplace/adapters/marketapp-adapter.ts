@@ -13,28 +13,6 @@ const log = createLogger("Marketplace:MarketApp");
 
 const BASE_URL = "https://api.marketapp.ws";
 
-// ── Token management (set from outside via setMarketappToken) ────────
-
-let _apiToken: string | null = null;
-
-/** Set the Marketapp API token (called from tool context) */
-export function setMarketappToken(token: string | null): void {
-  _apiToken = token;
-}
-
-/** Check if a token is configured */
-export function hasMarketappToken(): boolean {
-  return !!_apiToken;
-}
-
-function authHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (_apiToken) {
-    headers["Authorization"] = _apiToken;
-  }
-  return headers;
-}
-
 // ── Helpers ──────────────────────────────────────────────────────────
 
 interface CollectionItem {
@@ -136,86 +114,87 @@ function attrValue(
 
 // ── Adapter ─────────────────────────────────────────────────────────
 
-export const marketAppAdapter: MarketplaceAdapter = {
-  id: "marketapp",
-  name: "Market.app",
-  supports: ["username", "number", "gift"],
+export function createMarketAppAdapter(apiToken: string): MarketplaceAdapter {
+  function authHeaders(): Record<string, string> {
+    return {
+      Accept: "application/json",
+      Authorization: apiToken,
+    };
+  }
 
-  async search(params: SearchParams): Promise<MarketplaceListing[]> {
-    if (!_apiToken) {
-      log.debug("No Marketapp token configured, skipping");
-      return [];
-    }
+  return {
+    id: "marketapp",
+    name: "Market.app",
+    supports: ["username", "number", "gift"],
 
-    try {
-      log.info(
-        `Marketapp search: kind=${params.assetKind}, hasToken=${!!_apiToken}, tokenLen=${_apiToken?.length ?? 0}`
-      );
-      if (params.assetKind === "gift") {
-        // Try gifts/onsale first, then fall back to NFT collections endpoint
-        const giftResults = await searchGifts(params);
-        if (giftResults.length > 0) return giftResults;
-        // Gift collections (like Plush Pepe) are under /nfts/collections/
-        log.debug("No gifts from onsale endpoint, trying NFT collections fallback");
-        return await searchNfts({ ...params, assetKind: "gift" });
+    async search(params: SearchParams): Promise<MarketplaceListing[]> {
+      try {
+        log.info(
+          `Marketapp search: kind=${params.assetKind}, hasToken=true, tokenLen=${apiToken.length}`
+        );
+        if (params.assetKind === "gift") {
+          // Try gifts/onsale first, then fall back to NFT collections endpoint
+          const giftResults = await searchGifts(params, authHeaders);
+          if (giftResults.length > 0) return giftResults;
+          // Gift collections (like Plush Pepe) are under /nfts/collections/
+          log.debug("No gifts from onsale endpoint, trying NFT collections fallback");
+          return await searchNfts({ ...params, assetKind: "gift" }, authHeaders);
+        }
+        // For usernames/numbers, use NFT collections endpoint
+        return await searchNfts(params, authHeaders);
+      } catch (err) {
+        log.error({ err }, "Marketapp search failed");
+        return [];
       }
-      // For usernames/numbers, use NFT collections endpoint
-      return await searchNfts(params);
-    } catch (err) {
-      log.error({ err }, "Marketapp search failed");
-      return [];
-    }
-  },
+    },
 
-  async getListing(assetKind: AssetKind, identifier: string): Promise<MarketplaceListing | null> {
-    if (!_apiToken) return null;
+    async getListing(assetKind: AssetKind, identifier: string): Promise<MarketplaceListing | null> {
+      try {
+        const res = await fetch(`${BASE_URL}/v1/nfts/${encodeURIComponent(identifier)}/`, {
+          headers: authHeaders(),
+          signal: AbortSignal.timeout(10000),
+        });
 
-    try {
-      const res = await fetch(`${BASE_URL}/v1/nfts/${encodeURIComponent(identifier)}/`, {
-        headers: authHeaders(),
-        signal: AbortSignal.timeout(10000),
-      });
+        if (!res.ok) return null;
 
-      if (!res.ok) return null;
+        const item = (await res.json()) as { nft?: NftItem };
+        const nft = item.nft;
+        if (!nft) return null;
 
-      const item = (await res.json()) as { nft?: NftItem };
-      const nft = item.nft;
-      if (!nft) return null;
+        return {
+          marketplace: "marketapp",
+          assetKind,
+          externalId: nft.address || identifier,
+          url: `https://marketapp.ws/nft/${nft.address || identifier}`,
+          identifier: nft.name || identifier,
+          collection: nft.collection?.name,
+          priceTon: nft.sale?.currency === "TON" ? (nft.sale?.price ?? null) : null,
+          priceStars: nft.sale?.currency === "Stars" ? (nft.sale?.price ?? null) : null,
+          originalCurrency: nft.sale?.currency || "TON",
+          originalPrice: nft.sale?.price ?? null,
+          listingType: "fixed",
+          seller: nft.owner_address,
+          onChain: true,
+        };
+      } catch (err) {
+        log.error({ err }, "Marketapp getListing failed");
+        return null;
+      }
+    },
 
-      return {
-        marketplace: "marketapp",
-        assetKind,
-        externalId: nft.address || identifier,
-        url: `https://marketapp.ws/nft/${nft.address || identifier}`,
-        identifier: nft.name || identifier,
-        collection: nft.collection?.name,
-        priceTon: nft.sale?.currency === "TON" ? (nft.sale?.price ?? null) : null,
-        priceStars: nft.sale?.currency === "Stars" ? (nft.sale?.price ?? null) : null,
-        originalCurrency: nft.sale?.currency || "TON",
-        originalPrice: nft.sale?.price ?? null,
-        listingType: "fixed",
-        seller: nft.owner_address,
-        onChain: true,
-      };
-    } catch (err) {
-      log.error({ err }, "Marketapp getListing failed");
-      return null;
-    }
-  },
-
-  async isAvailable(): Promise<boolean> {
-    if (!_apiToken) return false;
-    try {
-      const res = await fetch(`${BASE_URL}/v1/collections/`, {
-        headers: authHeaders(),
-        signal: AbortSignal.timeout(5000),
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  },
-};
+    async isAvailable(): Promise<boolean> {
+      try {
+        const res = await fetch(`${BASE_URL}/v1/collections/`, {
+          headers: authHeaders(),
+          signal: AbortSignal.timeout(5000),
+        });
+        return res.ok;
+      } catch {
+        return false;
+      }
+    },
+  };
+}
 
 // ── Gift collection cache (from /v1/collections/gifts/) ─────────────
 
@@ -236,7 +215,9 @@ let _giftCollectionsCache: GiftCollectionInfo[] | null = null;
 let _giftCollectionsCacheAt = 0;
 const GIFT_COLLECTIONS_TTL_MS = 5 * 60 * 1000; // 5 min
 
-async function getGiftCollections(): Promise<GiftCollectionInfo[]> {
+async function getGiftCollections(
+  authHeaders: () => Record<string, string>
+): Promise<GiftCollectionInfo[]> {
   const now = Date.now();
   if (_giftCollectionsCache && now - _giftCollectionsCacheAt < GIFT_COLLECTIONS_TTL_MS) {
     return _giftCollectionsCache;
@@ -301,9 +282,12 @@ function findGiftCollection(
 
 // ── Gift search ─────────────────────────────────────────────────────
 
-async function searchGifts(params: SearchParams): Promise<MarketplaceListing[]> {
+async function searchGifts(
+  params: SearchParams,
+  authHeaders: () => Record<string, string>
+): Promise<MarketplaceListing[]> {
   // Resolve collection address from gift collections endpoint
-  const collections = await getGiftCollections();
+  const collections = await getGiftCollections(authHeaders);
   const query = params.collection?.toLowerCase() || params.query?.toLowerCase();
 
   let collectionAddr: string | undefined;
@@ -405,7 +389,10 @@ async function searchGifts(params: SearchParams): Promise<MarketplaceListing[]> 
 
 // ── NFT/Username/Number search ──────────────────────────────────────
 
-async function searchNfts(params: SearchParams): Promise<MarketplaceListing[]> {
+async function searchNfts(
+  params: SearchParams,
+  authHeaders: () => Record<string, string>
+): Promise<MarketplaceListing[]> {
   // Get gift collections or all collections based on asset type
   const collectionsUrl = new URL("/v1/collections/", BASE_URL);
   const colRes = await fetch(collectionsUrl.toString(), {

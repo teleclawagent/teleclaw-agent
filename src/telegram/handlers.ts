@@ -9,7 +9,6 @@ import { readOffset, writeOffset } from "./offset-store.js";
 import { PendingHistory } from "../memory/pending-history.js";
 import type { ToolContext } from "../agent/tools/types.js";
 import { TELEGRAM_SEND_TOOLS } from "../constants/tools.js";
-import { configureMarketappToken } from "../agent/tools/marketplace/aggregator.js";
 import { decrypt } from "../session/user-settings.js";
 // GramJS transcribe removed — stub for bot-only mode
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -422,16 +421,16 @@ export class MessageHandler {
           }
 
           // 5.5 Set Marketapp token for marketplace tools (if user has one)
+          let marketappToken: string | null = null;
           try {
             const maRow = this.db
               .prepare("SELECT marketapp_token FROM user_settings WHERE user_id = ?")
               .get(message.senderId) as { marketapp_token: string | null } | undefined;
-            let maToken: string | null = null;
             if (maRow?.marketapp_token) {
               try {
-                maToken = decrypt(maRow.marketapp_token);
+                marketappToken = decrypt(maRow.marketapp_token);
                 log.debug(
-                  `Marketapp token decrypted OK for user ${message.senderId} (len=${maToken?.length})`
+                  `Marketapp token decrypted OK for user ${message.senderId} (len=${marketappToken?.length})`
                 );
               } catch (decErr) {
                 log.warn(
@@ -440,8 +439,6 @@ export class MessageHandler {
                 );
               }
             }
-            configureMarketappToken(maToken);
-            log.debug(`Marketapp token configured: ${maToken ? "yes" : "no"}`);
           } catch {
             // Column may not exist yet — ignore
           }
@@ -453,6 +450,7 @@ export class MessageHandler {
             senderId: message.senderId,
             senderUsername: message.senderUsername ?? undefined,
             config: this.fullConfig,
+            marketappToken,
             matchmakerApi: this.matchmakerApi ?? undefined,
           };
 

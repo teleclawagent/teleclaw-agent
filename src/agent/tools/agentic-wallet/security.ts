@@ -92,27 +92,42 @@ export function verifyPin(db: Database.Database, userId: number, pin: string): b
     return true;
   }
 
-  // Wrong PIN
-  const newAttempts = row.failed_attempts + 1;
-  if (newAttempts >= MAX_PIN_ATTEMPTS) {
-    const lockedUntil = now + LOCKOUT_DURATION_SEC;
-    db.prepare(
-      "UPDATE wallet_pins SET failed_attempts = ?, locked_until = ? WHERE user_id = ?"
-    ).run(newAttempts, lockedUntil, userId);
-    auditLog(db, userId, "pin_lockout", `Locked after ${newAttempts} failed attempts`);
-    log.warn({ userId, attempts: newAttempts }, "Account locked — too many failed PIN attempts");
+  // Wrong PIN — one atomic UPDATE (increment + optional lockout) so concurrent
+  // callers cannot lose increments between read and write.
+  const lockUntil = now + LOCKOUT_DURATION_SEC;
+  const after = db
+    .prepare(
+      `UPDATE wallet_pins
+       SET failed_attempts = failed_attempts + 1,
+           locked_until = CASE
+             WHEN failed_attempts + 1 >= ? THEN ?
+             ELSE locked_until
+           END
+       WHERE user_id = ?
+       RETURNING failed_attempts, locked_until`
+    )
+    .get(MAX_PIN_ATTEMPTS, lockUntil, userId) as
+    | { failed_attempts: number; locked_until: number }
+    | undefined;
+
+  if (!after) {
+    throw new Error("PIN state update failed (user row missing).");
+  }
+
+  if (after.failed_attempts >= MAX_PIN_ATTEMPTS) {
+    auditLog(db, userId, "pin_lockout", `Locked after ${after.failed_attempts} failed attempts`);
+    log.warn(
+      { userId, attempts: after.failed_attempts },
+      "Account locked — too many failed PIN attempts"
+    );
     throw new Error(
       `Too many failed attempts. Account locked for ${LOCKOUT_DURATION_SEC / 60} minutes.`
     );
   }
 
-  db.prepare("UPDATE wallet_pins SET failed_attempts = ? WHERE user_id = ?").run(
-    newAttempts,
-    userId
-  );
-  auditLog(db, userId, "pin_failed", `Failed attempt ${newAttempts}/${MAX_PIN_ATTEMPTS}`);
+  auditLog(db, userId, "pin_failed", `Failed attempt ${after.failed_attempts}/${MAX_PIN_ATTEMPTS}`);
 
-  const remaining = MAX_PIN_ATTEMPTS - newAttempts;
+  const remaining = MAX_PIN_ATTEMPTS - after.failed_attempts;
   throw new Error(
     `Wrong PIN. ${remaining} attempt${remaining > 1 ? "s" : ""} remaining before lockout.`
   );

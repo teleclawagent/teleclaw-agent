@@ -85,23 +85,26 @@ const marketSearchTool: Tool = {
   }),
 };
 
-const marketSearchExecutor: ToolExecutor<MarketSearchParams> = async (
-  params
-): Promise<ToolResult> => {
+const marketSearchExecutor: ToolExecutor<MarketSearchParams> = async (params, context) => {
   try {
-    const result = await aggregatedSearch({
-      assetKind: params.asset_type,
-      query: params.query,
-      collection: params.collection,
-      model: params.model,
-      backdrop: params.backdrop,
-      symbol: params.symbol,
-      minTier: params.min_tier,
-      maxPrice: params.max_price,
-      sortBy: params.sort_by || "price",
-      limit: params.limit ?? 20,
-      marketplace: params.marketplace,
-    });
+    const result = await aggregatedSearch(
+      {
+        assetKind: params.asset_type,
+        query: params.query,
+        collection: params.collection,
+        model: params.model,
+        backdrop: params.backdrop,
+        symbol: params.symbol,
+        minTier: params.min_tier,
+        maxPrice: params.max_price,
+        sortBy: params.sort_by || "price",
+        limit: params.limit ?? 20,
+        marketplace: params.marketplace,
+      },
+      {
+        marketappToken: context.marketappToken ?? null,
+      }
+    );
 
     return {
       success: true,
@@ -187,11 +190,11 @@ const marketCompareTool: Tool = {
   }),
 };
 
-const marketCompareExecutor: ToolExecutor<MarketCompareParams> = async (
-  params
-): Promise<ToolResult> => {
+const marketCompareExecutor: ToolExecutor<MarketCompareParams> = async (params, context) => {
   try {
-    const result = await aggregatedGetListing(params.asset_type, params.identifier);
+    const result = await aggregatedGetListing(params.asset_type, params.identifier, {
+      marketappToken: context.marketappToken ?? null,
+    });
 
     if (result.listings.length === 0) {
       return {
@@ -252,9 +255,9 @@ const marketHealthTool: Tool = {
   parameters: Type.Object({}),
 };
 
-const marketHealthExecutor: ToolExecutor = async (): Promise<ToolResult> => {
+const marketHealthExecutor: ToolExecutor = async (_params, context): Promise<ToolResult> => {
   try {
-    const health = await checkMarketplaceHealth();
+    const health = await checkMarketplaceHealth({ marketappToken: context.marketappToken ?? null });
 
     return {
       success: true,

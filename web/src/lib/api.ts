@@ -779,8 +779,13 @@ export const setup = {
       body: JSON.stringify(config),
     }),
 
-  launch: () =>
-    fetchSetupAPI<{ token: string }>('/setup/launch', { method: 'POST' }),
+  launch: async () => {
+    const { nonce } = await fetchSetupAPI<{ nonce: string }>('/setup/launch-nonce');
+    return fetchSetupAPI<{ token: string }>('/setup/launch', {
+      method: 'POST',
+      headers: { 'x-teleclaw-launch-nonce': nonce },
+    });
+  },
 
   pollHealth: async (timeoutMs = 30000): Promise<void> => {
     const start = Date.now();

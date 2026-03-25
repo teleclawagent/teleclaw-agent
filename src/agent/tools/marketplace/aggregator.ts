@@ -19,11 +19,7 @@ import type {
 import { getMarketplacesForAsset } from "./types.js";
 import { fragmentAdapter } from "./adapters/fragment-adapter.js";
 import { getgemsAdapter } from "./adapters/getgems-adapter.js";
-import {
-  marketAppAdapter,
-  setMarketappToken,
-  hasMarketappToken,
-} from "./adapters/marketapp-adapter.js";
+import { createMarketAppAdapter } from "./adapters/marketapp-adapter.js";
 import { tonnelAdapter } from "./adapters/tonnel-adapter.js";
 import { portalsAdapter } from "./adapters/portals-adapter.js";
 import { mrktAdapter } from "./adapters/mrkt-adapter.js";
@@ -33,37 +29,40 @@ const log = createLogger("Aggregator");
 
 // ─── Adapter Registry ────────────────────────────────────────────────
 
-const ALL_ADAPTERS: MarketplaceAdapter[] = [
+const STATIC_ADAPTERS: MarketplaceAdapter[] = [
   fragmentAdapter,
   getgemsAdapter,
-  marketAppAdapter,
   tonnelAdapter,
   portalsAdapter,
   mrktAdapter,
 ];
 
 const adapterMap = new Map<MarketplaceId, MarketplaceAdapter>();
-for (const adapter of ALL_ADAPTERS) {
+for (const adapter of STATIC_ADAPTERS) {
   adapterMap.set(adapter.id, adapter);
 }
 
-/** Get adapters that support a given asset type */
-function getAdaptersForAsset(assetKind: AssetKind): MarketplaceAdapter[] {
+/** Get adapters that support a given asset type (plus optional Market.app) */
+function getAdaptersForAsset(
+  assetKind: AssetKind,
+  marketappToken?: string | null
+): MarketplaceAdapter[] {
   const ids = getMarketplacesForAsset(assetKind);
-  return ids.map((id) => adapterMap.get(id)).filter((a): a is MarketplaceAdapter => Boolean(a));
+  const adapters: MarketplaceAdapter[] = [];
+  for (const id of ids) {
+    if (id === "marketapp") {
+      if (marketappToken) adapters.push(createMarketAppAdapter(marketappToken));
+      continue;
+    }
+    const adapter = adapterMap.get(id);
+    if (adapter) adapters.push(adapter);
+  }
+  return adapters;
 }
 
 // ─── Aggregated Search ───────────────────────────────────────────────
 
 const SEARCH_TIMEOUT_MS = 8000; // 8s per marketplace max
-
-/**
- * Configure Marketapp API token for the adapter.
- * Call this when a user's token is available from user_settings.
- */
-export function configureMarketappToken(token: string | null): void {
-  setMarketappToken(token);
-}
 
 /**
  * Deduplicate listings from multiple marketplaces.
@@ -125,8 +124,12 @@ function deduplicateListings(listings: MarketplaceListing[]): MarketplaceListing
  * Search across all marketplaces for a given asset type.
  * Runs queries in parallel with individual timeouts.
  */
-export async function aggregatedSearch(params: SearchParams): Promise<AggregatedResult> {
-  let adapters = getAdaptersForAsset(params.assetKind);
+export async function aggregatedSearch(
+  params: SearchParams,
+  options?: { marketappToken?: string | null }
+): Promise<AggregatedResult> {
+  const marketappToken = options?.marketappToken ?? null;
+  let adapters = getAdaptersForAsset(params.assetKind, marketappToken);
 
   // Usernames & numbers: Fragment + Getgems only.
   // Market.app returns irrelevant results (cheapest listings ignoring query).
@@ -145,7 +148,7 @@ export async function aggregatedSearch(params: SearchParams): Promise<Aggregated
         "Requested marketplace not found or doesn't support this asset type"
       );
     }
-  } else if (hasMarketappToken() && params.assetKind === "gift") {
+  } else if (marketappToken && params.assetKind === "gift") {
     // Market.app is a meta-aggregator for gifts: it already shows listings from
     // Fragment, Getgems, and Portals with source attribution. Use it as single
     // source for gifts to avoid duplicates.
@@ -229,12 +232,13 @@ export async function aggregatedSearch(params: SearchParams): Promise<Aggregated
  */
 export async function aggregatedGetListing(
   assetKind: AssetKind,
-  identifier: string
+  identifier: string,
+  options?: { marketappToken?: string | null }
 ): Promise<{
   listings: MarketplaceListing[];
   cheapest: MarketplaceListing | null;
 }> {
-  const adapters = getAdaptersForAsset(assetKind);
+  const adapters = getAdaptersForAsset(assetKind, options?.marketappToken ?? null);
 
   const results = await Promise.allSettled(
     adapters.map(async (adapter) => {
@@ -265,11 +269,16 @@ export async function aggregatedGetListing(
 /**
  * Check which marketplaces are currently available.
  */
-export async function checkMarketplaceHealth(): Promise<
-  Array<{ id: MarketplaceId; name: string; available: boolean; supports: AssetKind[] }>
-> {
+export async function checkMarketplaceHealth(options?: {
+  marketappToken?: string | null;
+}): Promise<Array<{ id: MarketplaceId; name: string; available: boolean; supports: AssetKind[] }>> {
+  const adapters: MarketplaceAdapter[] = [...STATIC_ADAPTERS];
+  if (options?.marketappToken) {
+    adapters.push(createMarketAppAdapter(options.marketappToken));
+  }
+
   const results = await Promise.allSettled(
-    ALL_ADAPTERS.map(async (adapter) => ({
+    adapters.map(async (adapter) => ({
       id: adapter.id,
       name: adapter.name,
       available: await adapter.isAvailable(),
