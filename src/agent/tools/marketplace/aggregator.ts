@@ -70,18 +70,22 @@ function deduplicateListings(listings: MarketplaceListing[]): MarketplaceListing
   const seen = new Map<string, MarketplaceListing>();
 
   for (const listing of listings) {
-    // Build dedup key: prefer externalId (NFT address), fallback to collection+giftNum
-    let key = listing.externalId;
-    if (
-      !key ||
-      key.startsWith("gift-") ||
-      key.startsWith("nft-") ||
-      key === listing.url // generic fallback IDs aren't unique
+    // Build dedup key: for gifts with a collection+giftNum, always use that as primary key
+    // (same gift #1213 from Fragment and Market.app should dedup)
+    // For non-gift assets, use externalId
+    let key: string;
+    if (listing.assetKind === "gift" && listing.collection && listing.giftNum) {
+      key = `${listing.collection.toLowerCase().replace(/[^a-z0-9]/g, "")}#${listing.giftNum}`;
+    } else if (
+      listing.externalId &&
+      !listing.externalId.startsWith("gift-") &&
+      !listing.externalId.startsWith("nft-") &&
+      !listing.externalId.startsWith("fragment-")
     ) {
-      if (listing.collection && listing.giftNum) {
-        key = `${listing.collection.toLowerCase()}#${listing.giftNum}`;
-      }
-      // If still no good key, keep as-is (won't dedup, which is safer than dropping)
+      key = listing.externalId;
+    } else {
+      // Fallback: marketplace + externalId (won't dedup across marketplaces, but safe)
+      key = `${listing.marketplace}:${listing.externalId}`;
     }
 
     const existing = seen.get(key);
