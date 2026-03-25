@@ -179,8 +179,36 @@ program
     }
   });
 
-program.action(() => {
-  program.help();
+program.action(async () => {
+  // No subcommand: if not configured → setup, else → start
+  const defaultConfigPath = getDefaultConfigPath();
+  if (!configExists(defaultConfigPath)) {
+    console.log("👋 Welcome to Teleclaw! Let's get you set up.\n");
+    try {
+      await onboardCommand({});
+    } catch (error) {
+      console.error("Error:", getErrorMessage(error));
+      process.exit(1);
+    }
+    // After setup, start automatically if config now exists
+    if (configExists(defaultConfigPath)) {
+      console.log("\n🚀 Starting Teleclaw...\n");
+      try {
+        await startApp(defaultConfigPath);
+      } catch (error) {
+        console.error("Error:", getErrorMessage(error));
+        process.exit(1);
+      }
+    }
+  } else {
+    // Config exists → start directly
+    try {
+      await startApp(defaultConfigPath);
+    } catch (error) {
+      console.error("Error:", getErrorMessage(error));
+      process.exit(1);
+    }
+  }
 });
 
 // Skill commands

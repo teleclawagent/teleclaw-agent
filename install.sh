@@ -1,122 +1,43 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+set -e
 
-# Teleclaw Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/gioooton/teleclaw-agent/main/install.sh | bash
+echo ""
+echo "⚡ Teleclaw Agent — Personal AI for Telegram"
+echo "============================================="
+echo ""
 
-REPO="gioooton/teleclaw-agent"
-DOCKER_IMAGE="ghcr.io/${REPO}:latest"
-NPM_PACKAGE="teleclaw"
-
-BOLD='\033[1m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
-
-ok()   { echo -e "${GREEN}✓${NC} $1"; }
-warn() { echo -e "${YELLOW}!${NC} $1"; }
-err()  { echo -e "${RED}✗${NC} $1"; }
-
-install_npm() {
+# Check Node.js
+if ! command -v node &>/dev/null; then
+  echo "❌ Node.js is required but not installed."
   echo ""
-  echo -e "${BOLD}Installing via npm...${NC}"
-  if command -v npm &>/dev/null; then
-    npm install -g "${NPM_PACKAGE}"
-    ok "Teleclaw installed via npm"
-    echo ""
-    echo "Next steps:"
-    echo "  teleclaw setup    # Configure your agent"
-    echo "  teleclaw start    # Start the agent"
-    echo "  teleclaw doctor   # Run health checks"
-  else
-    err "npm not found. Install Node.js 18+ first."
-    exit 1
-  fi
-}
-
-install_docker() {
+  echo "   Install it from: https://nodejs.org (v18+)"
+  echo "   Or: curl -fsSL https://fnm.vercel.app/install | bash && fnm install 22"
   echo ""
-  echo -e "${BOLD}Installing via Docker...${NC}"
-  if command -v docker &>/dev/null; then
-    docker pull "${DOCKER_IMAGE}"
-    ok "Teleclaw Docker image pulled"
-    echo ""
-    echo "Setup:"
-    echo "  docker run -it -v ~/.teleclaw:/data ${DOCKER_IMAGE} setup"
-    echo ""
-    echo "Start:"
-    echo "  docker run -d -v ~/.teleclaw:/data --name teleclaw ${DOCKER_IMAGE}"
-    echo ""
-    echo "Health check:"
-    echo "  docker run -it -v ~/.teleclaw:/data ${DOCKER_IMAGE} doctor"
-  else
-    err "Docker not found."
-    exit 1
-  fi
-}
+  exit 1
+fi
 
-install_binary() {
-  local install_dir="${HOME}/.teleclaw-app"
-  local bin_dir="${HOME}/.local/bin"
-  local version="latest"
+NODE_VERSION=$(node -v | sed 's/v//' | cut -d. -f1)
+if [ "$NODE_VERSION" -lt 18 ]; then
+  echo "❌ Node.js v18+ required (you have v$NODE_VERSION)"
+  exit 1
+fi
 
-  echo ""
-  echo -e "${BOLD}Installing standalone binary...${NC}"
-
-  local os=$(uname -s | tr '[:upper:]' '[:lower:]')
-  local arch=$(uname -m)
-  [[ "$arch" == "x86_64" ]] && arch="amd64"
-  [[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && arch="arm64"
-
-  local tarball="teleclaw-${os}-${arch}.tar.gz"
-  local url="https://github.com/${REPO}/releases/${version}/download/${tarball}"
-
-  mkdir -p "${install_dir}" "${bin_dir}"
-
-  echo "Downloading ${url}..."
-  curl -fsSL "${url}" | tar xz -C "${install_dir}"
-
-  ln -sf "${install_dir}/bin/teleclaw.js" "${bin_dir}/teleclaw"
-
-  if echo "$PATH" | grep -q "${bin_dir}"; then
-    ok "Teleclaw installed to ${bin_dir}/teleclaw"
-  else
-    ok "Teleclaw installed to ${bin_dir}/teleclaw"
-    warn "Add ${bin_dir} to your PATH:"
-    echo "  export PATH=\"\$PATH:${bin_dir}\""
-  fi
-
-  echo ""
-  echo "Next steps:"
-  echo "  teleclaw setup    # Configure your agent"
-  echo "  teleclaw start    # Start the agent"
-}
-
-# ── Main ──────────────────────────────────────────────────────────────
-clear 2>/dev/null || true
-echo ""
-echo -e "${BOLD}  ╔═══════════════════════════════════╗${NC}"
-echo -e "${BOLD}  ║       Teleclaw Installer          ║${NC}"
-echo -e "${BOLD}  ║   AI Agent for Telegram & TON     ║${NC}"
-echo -e "${BOLD}  ╚═══════════════════════════════════╝${NC}"
+echo "✅ Node.js $(node -v) detected"
 echo ""
 
-echo "Choose installation method:"
-echo ""
-echo "  1) npm (recommended)"
-echo "  2) Docker"
-echo "  3) Standalone binary"
+# Install Teleclaw
+echo "📦 Installing Teleclaw..."
+npm install -g teleclaw@beta 2>&1 | grep -E "added|up to date|ERR" || true
 echo ""
 
-read -rp "Select [1-3]: " choice
+# Verify
+if ! command -v teleclaw &>/dev/null; then
+  echo "❌ Installation failed. Try manually: npm install -g teleclaw@beta"
+  exit 1
+fi
 
-case "${choice}" in
-  1) install_npm ;;
-  2) install_docker ;;
-  3) install_binary ;;
-  *) err "Invalid choice"; exit 1 ;;
-esac
-
+echo "✅ Teleclaw installed successfully!"
 echo ""
-ok "Done! 🚀"
+
+# Launch setup + start
+teleclaw
