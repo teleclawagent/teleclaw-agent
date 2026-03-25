@@ -609,72 +609,55 @@ async function runInteractiveOnboarding(
       const { isCodexOAuthConfigured, isCodexTokenValid } =
         await import("../../providers/openai-codex-oauth.js");
 
+      // Always show the guide — user must confirm even if already installed
+      noteBox(
+        "Connect your ChatGPT Plus/Pro subscription\n\n" +
+          "Open a SECOND terminal/PowerShell and follow these steps:\n\n" +
+          "   Step 1: npm install -g @openai/codex\n" +
+          "           (wait for install to complete)\n\n" +
+          "   Step 2: codex --login\n" +
+          "           (browser opens → sign in with your ChatGPT account)\n" +
+          "           (wait for 'Successfully logged in' message)\n\n" +
+          "Come back HERE and press Enter when done.\n\n" +
+          "Already completed these steps? Just press Enter.",
+        "ChatGPT Subscription",
+        TON
+      );
+
+      await input({
+        message: "Press Enter when Codex login is complete",
+        theme,
+      });
+
+      // Verify credentials
       let detected = false;
       try {
         if (isCodexOAuthConfigured()) {
           const valid = isCodexTokenValid();
           detected = true;
-          noteBox(
-            `Codex CLI credentials detected ✓\n` +
-              `Status: ${valid ? GREEN("valid ✓") : "expired (will refresh on use)"}\n` +
-              `Your ChatGPT subscription will be used — no API charges.`,
-            "ChatGPT Subscription",
-            TON
-          );
-          apiKey = ""; // Auto-detected at runtime
-          // Switch to openai-codex provider internally
+          apiKey = "";
           selectedProvider = "openai-codex" as SupportedProvider;
+          prompter.log(
+            GREEN("✓ ChatGPT subscription connected!") +
+              ` ${DIM(valid ? "(token valid)" : "(token expired — will refresh on use)")}`
+          );
         }
       } catch {
         // Not configured
       }
 
       if (!detected) {
+        prompter.warn("Codex CLI credentials not found. Falling back to API key.");
         noteBox(
-          "Connect your ChatGPT Plus/Pro subscription\n\n" +
-            "Open a SECOND terminal/PowerShell and follow these steps:\n\n" +
-            "   Step 1: npm install -g @openai/codex\n" +
-            "           (wait for install to complete)\n\n" +
-            "   Step 2: codex --login\n" +
-            "           (browser opens → sign in with your ChatGPT account)\n" +
-            "           (wait for 'Successfully logged in' message)\n\n" +
-            "Come back HERE and press Enter when done.",
-          "ChatGPT Subscription",
+          `OpenAI API key required.\nGet it at: https://platform.openai.com/api-keys`,
+          "API Key",
           TON
         );
-
-        await input({
-          message: "Press Enter after completing login in the other terminal",
+        apiKey = await password({
+          message: `OpenAI API Key (sk-proj-...)`,
           theme,
+          validate: (value = "") => validateApiKeyFormat("openai", value) ?? true,
         });
-
-        // Re-check
-        try {
-          const { isCodexOAuthConfigured: recheck } =
-            await import("../../providers/openai-codex-oauth.js");
-          if (recheck()) {
-            detected = true;
-            apiKey = "";
-            selectedProvider = "openai-codex" as SupportedProvider;
-            prompter.log(GREEN("✓ ChatGPT subscription connected!"));
-          }
-        } catch {
-          // still not found
-        }
-
-        if (!detected) {
-          prompter.warn("Codex CLI credentials not found. Falling back to API key.");
-          noteBox(
-            `OpenAI API key required.\nGet it at: https://platform.openai.com/api-keys`,
-            "API Key",
-            TON
-          );
-          apiKey = await password({
-            message: `OpenAI API Key (sk-proj-...)`,
-            theme,
-            validate: (value = "") => validateApiKeyFormat("openai", value) ?? true,
-          });
-        }
       }
 
       if (detected) {
