@@ -126,6 +126,7 @@ const marketSearchExecutor: ToolExecutor<MarketSearchParams> = async (
           marketplace: l.marketplace,
           identifier: l.identifier,
           collection: l.collection,
+          giftNum: l.giftNum,
           model: l.model,
           backdrop: l.backdrop,
           symbol: l.symbol,
@@ -135,6 +136,8 @@ const marketSearchExecutor: ToolExecutor<MarketSearchParams> = async (
             : l.originalPrice
               ? `${l.originalPrice} ${l.originalCurrency}`
               : "N/A",
+          floorPrice: l.floorPriceTon ? `${l.floorPriceTon} TON` : undefined,
+          onSale: l.onSaleCount,
           type: l.listingType,
           onChain: l.onChain,
           url: l.url,

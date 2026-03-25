@@ -106,8 +106,38 @@ export const fragmentAdapter: MarketplaceAdapter = {
         return filtered.slice(0, params.limit ?? 20).map(numberToListing);
       }
 
-      // Gifts — Fragment gift listings
-      // TODO: Implement when Fragment gifts scraping is integrated
+      // Gifts — Fragment gift listings via fragment-scraper
+      if (params.collection) {
+        const { fetchListings, fetchFloorPrice } = await import(
+          "../../gift-market/fragment-scraper.js"
+        );
+        const slug = params.collection.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const [listings, floor] = await Promise.all([
+          fetchListings(slug, params.limit ?? 20),
+          fetchFloorPrice(slug),
+        ]);
+
+        return listings
+          .filter((l) => !params.maxPrice || l.priceTon <= params.maxPrice)
+          .map(
+            (l): MarketplaceListing => ({
+              marketplace: "fragment",
+              assetKind: "gift",
+              externalId: l.slug,
+              url: l.url,
+              identifier: floor?.collection || params.collection || l.slug,
+              collection: floor?.collection || params.collection,
+              giftNum: l.giftNum,
+              priceTon: l.priceTon,
+              originalCurrency: "TON",
+              originalPrice: l.priceTon,
+              floorPriceTon: floor?.floorTon ?? undefined,
+              onSaleCount: floor?.listingCount,
+              listingType: "fixed",
+              onChain: true,
+            })
+          );
+      }
       return [];
     } catch (err) {
       log.error({ err }, "Fragment search failed");
