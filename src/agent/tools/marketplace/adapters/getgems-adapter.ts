@@ -97,12 +97,23 @@ export const getgemsAdapter: MarketplaceAdapter = {
 
       if (!data?.alphaNftSearch?.edges) return [];
 
-      return data.alphaNftSearch.edges
-        .map((e) => nftToListing(e.node, params.assetKind))
-        .filter((l) => {
-          if (params.maxPrice && l.priceTon && l.priceTon > params.maxPrice) return false;
-          return true;
-        });
+      let listings = data.alphaNftSearch.edges.map((e) =>
+        nftToListing(e.node, params.assetKind)
+      );
+
+      // For gift searches, filter to only results matching the requested collection
+      // Getgems text search returns any NFT matching the query, not just the collection
+      if (params.assetKind === "gift" && params.collection) {
+        const colLower = params.collection.toLowerCase();
+        listings = listings.filter(
+          (l) => l.collection && l.collection.toLowerCase().includes(colLower)
+        );
+      }
+
+      return listings.filter((l) => {
+        if (params.maxPrice && l.priceTon && l.priceTon > params.maxPrice) return false;
+        return true;
+      });
     } catch (err) {
       log.error({ err }, "Getgems search failed");
       return [];

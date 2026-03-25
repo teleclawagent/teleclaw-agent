@@ -62,6 +62,58 @@ export function configureMarketappToken(token: string | null): void {
 }
 
 /**
+ * Deduplicate listings from multiple marketplaces.
+ * Same gift (by NFT address or giftNum+collection) may appear on Fragment, Market.app, Getgems.
+ * Keep the cheapest listing for each unique gift. Prefer Market.app data (has floor/onSale).
+ */
+function deduplicateListings(listings: MarketplaceListing[]): MarketplaceListing[] {
+  const seen = new Map<string, MarketplaceListing>();
+
+  for (const listing of listings) {
+    // Build dedup key: prefer externalId (NFT address), fallback to collection+giftNum
+    let key = listing.externalId;
+    if (
+      !key ||
+      key.startsWith("gift-") ||
+      key.startsWith("nft-") ||
+      key === listing.url // generic fallback IDs aren't unique
+    ) {
+      if (listing.collection && listing.giftNum) {
+        key = `${listing.collection.toLowerCase()}#${listing.giftNum}`;
+      }
+      // If still no good key, keep as-is (won't dedup, which is safer than dropping)
+    }
+
+    const existing = seen.get(key);
+    if (!existing) {
+      seen.set(key, listing);
+      continue;
+    }
+
+    // Keep the one with better data: cheaper price wins, or prefer one with floor data
+    const existingPrice = existing.priceTon ?? Infinity;
+    const newPrice = listing.priceTon ?? Infinity;
+
+    if (newPrice < existingPrice) {
+      // New one is cheaper — keep it but merge floor data from existing if missing
+      if (!listing.floorPriceTon && existing.floorPriceTon) {
+        listing.floorPriceTon = existing.floorPriceTon;
+        listing.onSaleCount = existing.onSaleCount;
+        listing.ownerCount = existing.ownerCount;
+      }
+      seen.set(key, listing);
+    } else if (!existing.floorPriceTon && listing.floorPriceTon) {
+      // Existing is cheaper but new one has floor data — merge it in
+      existing.floorPriceTon = listing.floorPriceTon;
+      existing.onSaleCount = listing.onSaleCount;
+      existing.ownerCount = listing.ownerCount;
+    }
+  }
+
+  return [...seen.values()];
+}
+
+/**
  * Search across all marketplaces for a given asset type.
  * Runs queries in parallel with individual timeouts.
  */
@@ -99,8 +151,12 @@ export async function aggregatedSearch(params: SearchParams): Promise<Aggregated
     }
   }
 
+  // Deduplicate: same gift can appear on multiple marketplaces or adapters.
+  // Keep the cheapest listing per unique gift (by externalId or giftNum+collection).
+  const deduped = deduplicateListings(allListings);
+
   // Sort by price (lowest first, null prices at end)
-  allListings.sort((a, b) => {
+  deduped.sort((a, b) => {
     if (a.priceTon === null && b.priceTon === null) return 0;
     if (a.priceTon === null) return 1;
     if (b.priceTon === null) return -1;
@@ -108,7 +164,7 @@ export async function aggregatedSearch(params: SearchParams): Promise<Aggregated
   });
 
   // Apply overall limit
-  const limited = allListings.slice(0, params.limit ?? 30);
+  const limited = deduped.slice(0, params.limit ?? 30);
 
   // Find best deal
   const bestDeal = limited.find((l) => l.priceTon !== null) ?? null;
@@ -123,7 +179,7 @@ export async function aggregatedSearch(params: SearchParams): Promise<Aggregated
     marketplacesChecked: checked,
     marketplacesFailed: failed,
     bestDeal,
-    totalFound: allListings.length,
+    totalFound: deduped.length,
     priceRange: {
       lowest,
       highest,
