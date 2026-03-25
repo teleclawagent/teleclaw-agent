@@ -1,6 +1,6 @@
 {
   "name": "teleclaw",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "workspaces": [
     "packages/*"
   ],
@@ -82,7 +82,6 @@
     "@mariozechner/pi-ai": "^0.57.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@sinclair/typebox": "^0.34.48",
-
     "@ton/core": "^0.63.1",
     "@ton/crypto": "^3.3.0",
     "@ton/ton": "^16.2.2",
