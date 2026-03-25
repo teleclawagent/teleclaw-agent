@@ -128,12 +128,11 @@ function deduplicateListings(listings: MarketplaceListing[]): MarketplaceListing
 export async function aggregatedSearch(params: SearchParams): Promise<AggregatedResult> {
   let adapters = getAdaptersForAsset(params.assetKind);
 
-  // Usernames & numbers: Fragment is the only reliable source.
-  // Market.app returns irrelevant results (cheapest listings ignoring query),
-  // Getgems search is also unreliable for these asset types.
+  // Usernames & numbers: Fragment + Getgems only.
+  // Market.app returns irrelevant results (cheapest listings ignoring query).
   if (!params.marketplace && (params.assetKind === "username" || params.assetKind === "number")) {
-    log.debug(`${params.assetKind} search — Fragment only (other sources unreliable)`);
-    adapters = adapters.filter((a) => a.id === "fragment");
+    log.debug(`${params.assetKind} search — Fragment + Getgems only (Market.app excluded)`);
+    adapters = adapters.filter((a) => a.id === "fragment" || a.id === "getgems");
   }
 
   // If a specific marketplace is requested, filter to only that adapter
