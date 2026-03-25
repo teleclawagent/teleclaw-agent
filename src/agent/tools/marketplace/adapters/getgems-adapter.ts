@@ -97,9 +97,7 @@ export const getgemsAdapter: MarketplaceAdapter = {
 
       if (!data?.alphaNftSearch?.edges) return [];
 
-      let listings = data.alphaNftSearch.edges.map((e) =>
-        nftToListing(e.node, params.assetKind)
-      );
+      let listings = data.alphaNftSearch.edges.map((e) => nftToListing(e.node, params.assetKind));
 
       // For gift searches, filter to only results matching the requested collection
       // Getgems text search returns any NFT matching the query, not just the collection
