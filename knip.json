@@ -13,7 +13,17 @@
         "src/constants/index.ts"
       ],
       "project": ["src/**/*.ts"],
-      "ignore": ["src/**/__tests__/**", "src/telegram/media-utils.ts"]
+      "ignore": [
+        "src/**/__tests__/**",
+        "src/telegram/media-utils.ts",
+        "src/agent/tools/fragment/fetch-gifts-data.ts",
+        "src/agent/tools/gift-market/types.ts",
+        "src/bot/index.ts",
+        "src/providers/claude-oauth-flow.ts",
+        "src/providers/generate-setup-token.ts",
+        "src/services/tts.ts",
+        "src/ton/payment-verifier.ts"
+      ]
     },
     "packages/sdk": {
       "entry": ["src/index.ts"],

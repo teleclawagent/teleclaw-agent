@@ -294,7 +294,7 @@ export class AdminHandler {
     if (command.args[0] === "status") {
       let response = `🧠 **Model:** \`${cfg.agent.model}\`\n📡 **Provider:** ${provider}\n`;
       try {
-        const catalog = require("../../config/model-catalog.js") as {
+        const catalog = require("../config/model-catalog") as {
           MODEL_OPTIONS: Record<
             string,
             Array<{ value: string; name: string; description: string }>
@@ -322,7 +322,7 @@ export class AdminHandler {
     // Persist to config file
     try {
       const { readRawConfig, setNestedValue, writeRawConfig } =
-        require("../../config/configurable-keys.js") as {
+        require("../config/configurable-keys") as {
           readRawConfig: () => Record<string, unknown>;
           setNestedValue: (obj: Record<string, unknown>, path: string, value: unknown) => void;
           writeRawConfig: (config: Record<string, unknown>) => void;
