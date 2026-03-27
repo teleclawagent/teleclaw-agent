@@ -31,6 +31,8 @@ Setup walks you through bot token, AI provider, and wallet — you're live in un
 
 Teleclaw is a personal AI agent that runs as your Telegram bot. You chat with it in plain text, and it uses 150+ built-in tools to handle everything on TON.
 
+Teleclaw Agent is based on the open-source TONresistor/teleton-agent project and includes Teleclaw-specific modifications, improvements, and additional features.
+
 **Named by Durov** — Pavel Durov [demoed a bot called TeleClaw](https://x.com/durov/status/2028455440862830970) when announcing real-time streaming for Telegram bots.
 
 ## Features
