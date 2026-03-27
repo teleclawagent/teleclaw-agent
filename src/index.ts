@@ -849,16 +849,6 @@ export class TeleclawApp {
           return;
         }
 
-        // /ping — available to everyone
-        if (userCmd.command === "ping") {
-          await this.bridge.sendMessage({
-            chatId: message.chatId,
-            text: "🏓 Pong!",
-            replyToId: message.id,
-          });
-          return;
-        }
-
         // /verify — wallet verification (available to all users)
         if (userCmd.command === "verify") {
           const action = userCmd.args[0] === "check" ? "check" : "start";

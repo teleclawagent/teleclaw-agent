@@ -205,8 +205,6 @@ export class AdminHandler {
         return await this.handleVersionCommand();
       case "help":
         return this.handleHelpCommand();
-      case "ping":
-        return "🏓 Pong!";
       default:
         return `❓ Unknown command: /${command.command}\n\nUse /help for available commands.`;
     }
@@ -868,7 +866,6 @@ export class AdminHandler {
     return `🤖 **Teleclaw Admin Commands**
 
 📋 **Info**
-/ping — Check if agent is alive
 /status — Agent status & info
 /help — Show this help message
 /settings — View all current settings
