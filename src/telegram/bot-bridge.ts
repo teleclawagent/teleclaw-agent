@@ -40,7 +40,6 @@ export class BotBridge implements TelegramTransport {
     try {
       await this.client.getBot().api.setMyCommands([
         { command: "help", description: "List all commands" },
-        { command: "ping", description: "Check if agent is alive" },
         { command: "verify", description: "Verify your TON wallet" },
         { command: "otc", description: "OTC Matchmaker — P2P trading" },
         { command: "marketapp", description: "Connect Marketapp API" },
