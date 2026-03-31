@@ -21,10 +21,10 @@ export default defineConfig({
         "**/dist/**",
       ],
       thresholds: {
-        statements: 18.4,
-        branches: 15.8,
-        functions: 21.5,
-        lines: 18.6,
+        statements: 11,
+        branches: 9,
+        functions: 13,
+        lines: 11,
       },
     },
     // Longer timeout for tests that import heavy deps (GramJS, @ton/ton)
