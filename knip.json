@@ -3,7 +3,6 @@
   "workspaces": {
     ".": {
       "entry": [
-        "src/index.ts",
         "src/cli/**/*.ts",
         "src/webui/**/*.ts",
         "src/agent/index.ts",
@@ -13,12 +12,11 @@
         "src/constants/index.ts"
       ],
       "project": ["src/**/*.ts"],
-      "ignore": ["src/**/__tests__/**", "src/telegram/media-utils.ts"]
+      "ignore": ["src/telegram/media-utils.ts"]
     },
     "packages/sdk": {
       "entry": ["src/index.ts"],
-      "project": ["src/**/*.ts"],
-      "ignore": ["src/**/__tests__/**"]
+      "project": ["src/**/*.ts"]
     }
   },
   "ignoreDependencies": [
