@@ -73,10 +73,41 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  # ---- Publish SDK to npm — disabled until developers need it ----
-  # publish-sdk:
-  #   needs: build
-  #   ...
+  # ---- Publish SDK to npm (if version changed) ----
+  publish-sdk:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Check if SDK version needs publishing
+        id: check
+        run: |
+          LOCAL=$(node -p "require('./packages/sdk/package.json').version")
+          REMOTE=$(npm view @teleclaw-agent/sdk version 2>/dev/null || echo "0.0.0")
+          echo "local=$LOCAL" >> "$GITHUB_OUTPUT"
+          echo "remote=$REMOTE" >> "$GITHUB_OUTPUT"
+          if [ "$LOCAL" != "$REMOTE" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install root deps (for @types/node hoisting)
+        if: steps.check.outputs.publish == 'true'
+        run: npm ci
+
+      - name: Build and publish SDK
+        if: steps.check.outputs.publish == 'true'
+        run: npm run build -w packages/sdk && cd packages/sdk && npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   # ---- Publish Docker image ----
   publish-docker:
